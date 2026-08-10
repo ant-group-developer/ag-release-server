@@ -193,7 +193,9 @@ export class FtpService {
 		session: FtpSession | undefined,
 		op: (client: ftp.Client) => Promise<T>,
 	): Promise<T> {
-		const client = session ? await session.getClient() : await this.connect();
+		const client = session
+			? await session.getClient()
+			: await this.connect();
 		try {
 			return await op(client);
 		} catch (error) {
@@ -316,21 +318,31 @@ export class FtpService {
 	/**
 	 * Discovery deliberately bypasses parser-specific selectors, but honours the
 	 * global exclude configuration. A configured folder/file must not be added to
-	 * the discovery catalog, sample queue, or auto-generated rules. Categories
-	 * are isolated by connection: an FTP session issue while traversing a large
-	 * category must not make subsequent categories disappear from an otherwise
-	 * "completed" scan.
+	 * the discovery catalog, sample queue, or auto-generated rules. One leased
+	 * session traverses every requested category; a dropped socket is reopened by
+	 * `withSessionRetry` before the failed operation is retried.
 	 */
 	async listAllRemoteReportFiles(
 		categories: string[],
 		minimumPeriods: Record<string, string | undefined> = {},
+		session?: FtpSession,
 	): Promise<FtpRemoteCategoryFiles[]> {
+		if (!session)
+			return this.withSession((ownedSession) =>
+				this.listAllRemoteReportFiles(
+					categories,
+					minimumPeriods,
+					ownedSession,
+				),
+			);
+
 		const results: FtpRemoteCategoryFiles[] = [];
 		for (const category of categories) {
 			results.push(
 				await this.listRemoteReportFilesForCategory(
 					category,
 					minimumPeriods[category],
+					session,
 				),
 			);
 		}
@@ -340,13 +352,17 @@ export class FtpService {
 	private async listRemoteReportFilesForCategory(
 		category: string,
 		minimumPeriod?: string,
+		session?: FtpSession,
 	): Promise<FtpRemoteCategoryFiles> {
 		const config = this.getConfig();
 		const folders: FtpRemoteFolderFiles[] = [];
 		const failedPaths: string[] = [];
-		const periodEntries = await this.withFreshDiscoveryClientRetry(
-			`discovery category ${category}`,
-			(client) => client.list(`${config.basePath}/${category}`),
+		const periodEntries = await this.withSessionRetry(session, (client) =>
+			this.listDirectoryWithRetry(
+				client,
+				`${config.basePath}/${category}`,
+				`discovery category ${category}`,
+			),
 		);
 		const allPeriods = periodEntries
 			.filter((item) => item.isDirectory && /^\d{6}$/.test(item.name))
@@ -360,10 +376,14 @@ export class FtpService {
 		for (const periodEntry of periods) {
 			const periodPath = `${config.basePath}/${category}/${periodEntry.name}`;
 			try {
-				const scan = await this.withFreshDiscoveryClientRetry(
-					`discovery period ${category}/${periodEntry.name}`,
+				const scan = await this.withSessionRetry(
+					session,
 					async (client) => {
-						const folderEntries = await client.list(periodPath);
+						const folderEntries = await this.listDirectoryWithRetry(
+							client,
+							periodPath,
+							`discovery period ${category}/${periodEntry.name}`,
+						);
 						const periodFolders: FtpRemoteFolderFiles[] = [];
 						let periodFiles = 0;
 						for (const folderEntry of folderEntries.filter(
@@ -522,49 +542,21 @@ export class FtpService {
 		throw lastError || new Error(`Unable to list FTP ${label}`);
 	}
 
-	private async withFreshDiscoveryClientRetry<T>(
-		label: string,
-		action: (client: ftp.Client) => Promise<T>,
-		maxAttempts = 3,
-	): Promise<T> {
-		let lastError: Error | null = null;
-		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-			let client: ftp.Client | null = null;
-			try {
-				client = await this.connect();
-				return await action(client);
-			} catch (error) {
-				lastError = error as Error;
-				if (this.isAuthenticationError(lastError)) throw lastError;
-				if (attempt === maxAttempts) break;
-				const delayMs = attempt * 750;
-				this.logger.warn(
-					`FTP ${label} failed (attempt ${attempt}/${maxAttempts}): ${lastError.message}; reconnecting in ${delayMs}ms`,
-				);
-				await new Promise((resolve) => setTimeout(resolve, delayMs));
-			} finally {
-				client?.close();
-			}
-		}
-		throw lastError || new Error(`Unable to list FTP ${label}`);
-	}
-
 	async downloadDiscoverySampleFile(
 		category: string,
 		period: string,
 		dspFolder: string,
 		relativePath: string,
 		localPath: string,
+		session?: FtpSession,
 	): Promise<void> {
 		const config = this.getConfig();
 		fs.mkdirSync(path.dirname(localPath), { recursive: true });
-		await this.withFreshDiscoveryClientRetry(
-			`discovery sample ${category}/${period}/${dspFolder}/${relativePath}`,
-			(client) =>
-				client.downloadTo(
-					localPath,
-					`${config.basePath}/${category}/${period}/${dspFolder}/${relativePath}`,
-				),
+		await this.withSessionRetry(session, (client) =>
+			client.downloadTo(
+				localPath,
+				`${config.basePath}/${category}/${period}/${dspFolder}/${relativePath}`,
+			),
 		);
 	}
 

@@ -12,8 +12,8 @@ import {
 	Matches,
 	MaxLength,
 } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { IsValidName } from 'src/common/decorators/common.decorator-validate';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { ChannelStatus } from '../enum/channel.enum';
 
 export class CreateChannelDto {

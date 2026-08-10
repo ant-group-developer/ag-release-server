@@ -206,12 +206,16 @@ export class AssetImportQueryService {
 	): Promise<AssetImportItemView[]> {
 		const tenantIds = [
 			...new Set(
-				items.map((i) => i.currentTenantId).filter((v): v is string => !!v),
+				items
+					.map((i) => i.currentTenantId)
+					.filter((v): v is string => !!v),
 			),
 		];
 		const labelIds = [
 			...new Set(
-				items.map((i) => i.currentLabelId).filter((v): v is string => !!v),
+				items
+					.map((i) => i.currentLabelId)
+					.filter((v): v is string => !!v),
 			),
 		];
 

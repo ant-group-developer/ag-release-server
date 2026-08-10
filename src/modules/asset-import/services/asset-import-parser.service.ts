@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import * as XLSX from 'xlsx';
 import { normalizeStandardUpcOrEmpty } from 'src/utils/upc.util';
+import * as XLSX from 'xlsx';
 import { buildHeaderMap } from '../constants/asset-import.constant';
 import { ParsedAssetRow } from '../interfaces/asset-import.interface';
 
@@ -25,7 +25,9 @@ export class AssetImportParserService {
 			sheet = workbook.Sheets[sheetName];
 		} catch (err: any) {
 			if (err instanceof BadRequestException) throw err;
-			throw new BadRequestException(`Không đọc được file: ${err.message}`);
+			throw new BadRequestException(
+				`Không đọc được file: ${err.message}`,
+			);
 		}
 
 		const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
@@ -47,7 +49,9 @@ export class AssetImportParserService {
 		}
 
 		this.logger.log(
-			`Parsed ${rows.length} rows; mapped columns: ${[...headerMap.entries()]
+			`Parsed ${rows.length} rows; mapped columns: ${[
+				...headerMap.entries(),
+			]
 				.map(([h, f]) => `${h}→${f}`)
 				.join(', ')}`,
 		);

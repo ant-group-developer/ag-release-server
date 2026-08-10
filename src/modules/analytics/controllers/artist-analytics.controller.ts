@@ -5,9 +5,9 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
-	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -49,10 +49,6 @@ export class ArtistAnalyticsController {
 			),
 		});
 	}
-
-
-
-
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for an artist' })
@@ -195,7 +191,9 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của artist (sortBy: views | usage | revenue)' })
+	@ApiOperation({
+		summary: 'Top DSPs của artist (sortBy: views | usage | revenue)',
+	})
 	async topDsps(
 		@Param('artistId') artistId: string,
 		@Body() dto: EntityRankingQueryDto,

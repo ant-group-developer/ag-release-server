@@ -15,12 +15,12 @@ import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 import { QueryGetListJobsDto } from '../dto/job-query.dto';
 import { ImportJob, ImportJobSourceType } from '../interfaces';
+import { EtlImportHistoryRepository } from '../services/etl-import-history/etl-import-history.repository';
 import {
 	ImportJobsService,
 	computeProgressDetail,
 } from '../services/import-jobs/import-jobs.service';
 import { JobEventsGateway } from '../services/import-jobs/job-events.gateway';
-import { EtlImportHistoryRepository } from '../services/etl-import-history/etl-import-history.repository';
 
 @ApiTags('ETL')
 @Controller('etl')
@@ -42,7 +42,10 @@ export class JobController {
 		@Param('id') id: string,
 	): Promise<ResponseSuccess<any>> {
 		const rows = await this.etlImportHistoryRepository.findByJobId(id);
-		const grouped: Record<string, Record<string, Record<string, any[]>>> = {};
+		const grouped: Record<
+			string,
+			Record<string, Record<string, any[]>>
+		> = {};
 
 		for (const row of rows) {
 			const period = row.period || '_';

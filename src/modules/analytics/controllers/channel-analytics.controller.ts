@@ -10,11 +10,11 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
-	ChartQueryDto,
-	RevenueChartQueryDto,
 	AnalyticsSummaryQueryDto,
+	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -57,10 +57,6 @@ export class ChannelAnalyticsController {
 		);
 		return new ResponseSuccess({ data });
 	}
-
-
-
-
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a channel' })
@@ -178,7 +174,9 @@ export class ChannelAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của channel (sortBy: views | usage | revenue)' })
+	@ApiOperation({
+		summary: 'Top DSPs của channel (sortBy: views | usage | revenue)',
+	})
 	async topDsps(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -195,7 +193,8 @@ export class ChannelAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của channel (sortBy: views | usage | revenue)',
+		summary:
+			'Top territories của channel (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('channelId', ParseUUIDPipe) channelId: string,

@@ -3,7 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 
 const LOCK_KEY = 'etl:ftp:exclusive-operation';
-const LOCK_TTL_MS = 24 * 60 * 60 * 1000;
+const LOCK_TTL_MS = 2 * 60 * 1000;
+const LOCK_HEARTBEAT_MS = 30 * 1000;
 
 /** Prevents the scheduled FTP sync and rule-discovery scan from logging in concurrently. */
 @Injectable()
@@ -31,11 +32,13 @@ export class FtpOperationLockService {
 	/**
 	 * Waits for the lock instead of skipping immediately. Use for user-triggered
 	 * work, where a silent skip reads as nothing having happened; background jobs
-	 * should keep using tryAcquire and drop the run.
+	 * should keep using tryAcquire and drop the run. The default wait exceeds one
+	 * full lease so a manual retry immediately after a process crash can acquire
+	 * the abandoned lock instead of being incorrectly marked failed after 30s.
 	 */
 	async tryAcquireWithWait(
 		operation: string,
-		{ maxWaitMs = 30_000, pollIntervalMs = 2_000 } = {},
+		{ maxWaitMs = LOCK_TTL_MS + 10_000, pollIntervalMs = 2_000 } = {},
 	): Promise<string | null> {
 		const deadline = Date.now() + maxWaitMs;
 		for (;;) {
@@ -54,9 +57,7 @@ export class FtpOperationLockService {
 				);
 				return null;
 			}
-			await new Promise((resolve) =>
-				setTimeout(resolve, pollIntervalMs),
-			);
+			await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 		}
 	}
 
@@ -73,5 +74,47 @@ export class FtpOperationLockService {
 					`Failed to release FTP operation lock: ${error.message}`,
 				),
 			);
+	}
+
+	/**
+	 * Extends the lease only when this process still owns it. A crashed worker
+	 * stops heartbeating, so its lock disappears quickly instead of blocking FTP
+	 * work for a full day after restart.
+	 */
+	async renew(token: string): Promise<boolean> {
+		const result = await this.redis.eval(
+			"if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) end return 0",
+			1,
+			LOCK_KEY,
+			token,
+			String(LOCK_TTL_MS),
+		);
+		return Number(result) === 1;
+	}
+
+	/** Starts a lightweight owner-checked lease heartbeat and returns its stopper. */
+	startHeartbeat(token: string, operation: string): () => void {
+		let renewing = false;
+		const timer = setInterval(() => {
+			if (renewing) return;
+			renewing = true;
+			void this.renew(token)
+				.then((renewed) => {
+					if (!renewed)
+						this.logger.warn(
+							`FTP lock lease was lost while ${operation} was running`,
+						);
+				})
+				.catch((error) =>
+					this.logger.warn(
+						`Failed to renew FTP lock for ${operation}: ${error.message}`,
+					),
+				)
+				.finally(() => {
+					renewing = false;
+				});
+		}, LOCK_HEARTBEAT_MS);
+		timer.unref();
+		return () => clearInterval(timer);
 	}
 }

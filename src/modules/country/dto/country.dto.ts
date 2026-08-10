@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
 	IsBoolean,
 	IsEnum,
@@ -6,7 +7,6 @@ import {
 	IsString,
 	ValidateIf,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
 import { ApiProperty, PartialType } from '@nestjs/swagger';

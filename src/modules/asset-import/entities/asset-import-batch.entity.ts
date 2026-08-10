@@ -1,7 +1,14 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import {
+	Column,
+	Entity,
+	Index,
+	JoinColumn,
+	ManyToOne,
+	OneToMany,
+} from 'typeorm';
 import { AssetImportBatchStatus } from '../enum/asset-import.enum';
 import { AssetImportOptions } from '../interfaces/asset-import.interface';
 import { AssetImportItem } from './asset-import-item.entity';
@@ -39,7 +46,8 @@ export class AssetImportBatch extends BaseUUIDEntity {
 		type: 'varchar',
 		length: 10,
 		nullable: true,
-		comment: 'Label đích áp dụng cho toàn bộ file, nếu người dùng chọn cố định',
+		comment:
+			'Label đích áp dụng cho toàn bộ file, nếu người dùng chọn cố định',
 	})
 	targetLabelId: string | null;
 
@@ -57,13 +65,21 @@ export class AssetImportBatch extends BaseUUIDEntity {
 	})
 	status: AssetImportBatchStatus;
 
-	@Column({ type: 'int', default: 0, comment: 'Tổng số dòng dữ liệu trong file' })
+	@Column({
+		type: 'int',
+		default: 0,
+		comment: 'Tổng số dòng dữ liệu trong file',
+	})
 	totalRows: number;
 
 	@Column({ type: 'int', default: 0, comment: 'Số dòng khớp bản ghi có sẵn' })
 	matchedRows: number;
 
-	@Column({ type: 'int', default: 0, comment: 'Số dòng chưa có trong hệ thống' })
+	@Column({
+		type: 'int',
+		default: 0,
+		comment: 'Số dòng chưa có trong hệ thống',
+	})
 	newRows: number;
 
 	@Column({

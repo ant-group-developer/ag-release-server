@@ -14,9 +14,9 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
-	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -80,10 +80,6 @@ export class TenantAnalyticsController {
 			),
 		});
 	}
-
-
-
-
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a tenant' })
@@ -234,7 +230,9 @@ export class TenantAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của tenant (sortBy: views | usage | revenue)' })
+	@ApiOperation({
+		summary: 'Top DSPs của tenant (sortBy: views | usage | revenue)',
+	})
 	async topDsps(
 		@Param('tenantId') tenantId: string,
 		@Body() dto: EntityRankingQueryDto,

@@ -117,15 +117,10 @@ export class SpotifySonarController {
 	): Observable<MessageEvent> {
 		const updates$ = this.sonarEvents
 			.subscribe(scanId)
-			.pipe(
-				map(
-					(evt) =>
-						({ type: evt.type, data: evt.data }) as MessageEvent,
-				),
-			);
+			.pipe(map((evt) => ({ type: evt.type, data: evt.data })));
 
 		const heartbeat$ = interval(20000).pipe(
-			map(() => ({ type: 'heartbeat', data: {} }) as MessageEvent),
+			map(() => ({ type: 'heartbeat', data: {} })),
 		);
 
 		const initial$ = from(this.scanService.findSessionById(scanId)).pipe(

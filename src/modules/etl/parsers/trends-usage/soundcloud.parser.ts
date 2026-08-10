@@ -40,14 +40,30 @@ export class SoundCloudParser extends BaseParser {
 		});
 
 		return [
-			mapping('reporting_start_date', 'Streamlevelreport', 'reporting_period'),
+			mapping(
+				'reporting_start_date',
+				'Streamlevelreport',
+				'reporting_period',
+			),
 			mapping('isrc', 'Streamlevelreport', 'isrc', 'isrc'),
 			mapping('country', 'Streamlevelreport', 'territory_code'),
 			mapping('track_id', 'Streamlevelreport', 'track_id_internal'),
-			mapping('client_application', 'Streamlevelreport', 'metadata.client'),
+			mapping(
+				'client_application',
+				'Streamlevelreport',
+				'metadata.client',
+			),
 			mapping('operating_system', 'Streamlevelreport', 'metadata.os'),
-			mapping('play_length', 'Streamlevelreport', 'metadata.play_length_ms'),
-			mapping('track_favorited', 'Streamlevelreport', 'metadata.favorited'),
+			mapping(
+				'play_length',
+				'Streamlevelreport',
+				'metadata.play_length_ms',
+			),
+			mapping(
+				'track_favorited',
+				'Streamlevelreport',
+				'metadata.favorited',
+			),
 			mapping(
 				'track_reposted_shared',
 				'Streamlevelreport',

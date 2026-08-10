@@ -5,9 +5,9 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
-	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -153,7 +153,9 @@ export class TrackAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của track (sortBy: views | usage | revenue)' })
+	@ApiOperation({
+		summary: 'Top DSPs của track (sortBy: views | usage | revenue)',
+	})
 	async topDsps(
 		@Param('isrc') isrc: string,
 		@Body() dto: EntityRankingQueryDto,

@@ -106,6 +106,10 @@ export class SchedulerService implements OnModuleInit {
 		const lockToken =
 			await this.ftpOperationLockService.tryAcquire('auto-sync');
 		if (!lockToken) return;
+		const stopLockHeartbeat = this.ftpOperationLockService.startHeartbeat(
+			lockToken,
+			'auto-sync',
+		);
 
 		let job: Awaited<ReturnType<ImportJobsService['create']>> | null = null;
 		try {
@@ -137,6 +141,7 @@ export class SchedulerService implements OnModuleInit {
 			this.logger.error(`Auto-sync failed: ${err.message}`, err.stack);
 			if (job) await this.importJobsService.markFailed(job.id, err);
 		} finally {
+			stopLockHeartbeat();
 			await this.ftpOperationLockService.release(lockToken);
 		}
 	}

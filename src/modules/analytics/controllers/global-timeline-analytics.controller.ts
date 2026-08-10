@@ -9,8 +9,8 @@ import {
 	TimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import {
-	DspBarChartItem,
 	AnalyticsSummaryResponse,
+	DspBarChartItem,
 	OverviewTrendsResponse,
 	RevenueArtistItem,
 	RevenueChannelItem,
@@ -58,14 +58,9 @@ export class TimelineAnalyticsController {
 	// DSP TIMELINE ENDPOINTS
 	// ═══════════════════════════════════════════════════════
 
-
-
-
 	// ═══════════════════════════════════════════════════════
 	// TERRITORY TIMELINE ENDPOINTS
 	// ═══════════════════════════════════════════════════════
-
-
 
 	// ═══════════════════════════════════════════════════════
 	// REVENUE ANALYTICS
@@ -92,7 +87,6 @@ export class TimelineAnalyticsController {
 		);
 		return new ResponseSuccess({ data });
 	}
-
 
 	@Post('revenue/top-dsp')
 	@ApiOperation({

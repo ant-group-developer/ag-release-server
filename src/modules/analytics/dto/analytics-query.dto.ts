@@ -194,7 +194,10 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
  * Extends BaseAnalyticsQueryDto — dùng chung page/pageSize từ BaseQueryDto.
  */
 export class RankingQueryDto extends BaseAnalyticsQueryDto {
-	@ApiPropertyOptional({ description: 'Filter by a specific release UUID', format: 'uuid' })
+	@ApiPropertyOptional({
+		description: 'Filter by a specific release UUID',
+		format: 'uuid',
+	})
 	@IsOptional()
 	@IsUUID()
 	releaseId?: string;
@@ -216,12 +219,18 @@ export class RankingQueryDto extends BaseAnalyticsQueryDto {
 	@IsString()
 	artistId?: string;
 
-	@ApiPropertyOptional({ description: 'Filter by a specific channel UUID', format: 'uuid' })
+	@ApiPropertyOptional({
+		description: 'Filter by a specific channel UUID',
+		format: 'uuid',
+	})
 	@IsOptional()
 	@IsUUID()
 	channelId?: string;
 
-	@ApiPropertyOptional({ description: 'Filter by an exact ISRC', example: 'USUM72601234' })
+	@ApiPropertyOptional({
+		description: 'Filter by an exact ISRC',
+		example: 'USUM72601234',
+	})
 	@IsOptional()
 	@IsString()
 	isrc?: string;
@@ -249,8 +258,7 @@ export class RankingQueryDto extends BaseAnalyticsQueryDto {
 export class DspAnalyticsBaseDto {
 	@ApiPropertyOptional({
 		description:
-			'Postgres DSP UUID — lấy từ field pgDspId trong response ranking/revenue API. Ưu tiên hơn dspReportId.',
-		format: 'uuid',
+			'Postgres DSP ID — lấy từ field pgDspId trong response ranking/revenue API. Ưu tiên hơn dspReportId.',
 	})
 	@IsOptional()
 	@IsString()
@@ -302,7 +310,8 @@ export class DspChartQueryDto extends DspOverviewQueryDto {}
 /** DTO dành riêng cho revenue chart của một DSP. */
 export class DspRevenueChartQueryDto extends DspChartQueryDto {
 	@ApiPropertyOptional({
-		description: 'Order bar-chart items by revenue (default) or usage quantity',
+		description:
+			'Order bar-chart items by revenue (default) or usage quantity',
 		enum: ['revenue', 'usage'],
 		default: 'revenue',
 	})
@@ -468,17 +477,26 @@ export class ChartQueryDto {
 	@IsUUID()
 	tenantId?: string;
 
-	@ApiPropertyOptional({ description: 'Filter by a specific artist UUID', format: 'uuid' })
+	@ApiPropertyOptional({
+		description: 'Filter by a specific artist UUID',
+		format: 'uuid',
+	})
 	@IsOptional()
 	@IsUUID()
 	artistId?: string;
 
-	@ApiPropertyOptional({ description: 'Filter by a specific channel UUID', format: 'uuid' })
+	@ApiPropertyOptional({
+		description: 'Filter by a specific channel UUID',
+		format: 'uuid',
+	})
 	@IsOptional()
 	@IsUUID()
 	channelId?: string;
 
-	@ApiPropertyOptional({ description: 'Filter by an exact ISRC', example: 'USUM72601234' })
+	@ApiPropertyOptional({
+		description: 'Filter by an exact ISRC',
+		example: 'USUM72601234',
+	})
 	@IsOptional()
 	@IsString()
 	isrc?: string;
@@ -504,7 +522,8 @@ export class ChartQueryDto {
 /** DTO dành riêng cho revenue chart; trend-view chart không nhận sortBy này. */
 export class RevenueChartQueryDto extends ChartQueryDto {
 	@ApiPropertyOptional({
-		description: 'Order bar-chart items by revenue (default) or usage quantity',
+		description:
+			'Order bar-chart items by revenue (default) or usage quantity',
 		enum: ['revenue', 'usage'],
 		default: 'revenue',
 	})

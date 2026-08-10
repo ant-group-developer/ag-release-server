@@ -16,7 +16,11 @@ import { UpdateSyncConfigDto } from '../../dto/sync-config.dto';
 import { ImportJobSourceType } from '../../interfaces';
 import { AnalyticsProjectionRefreshService } from '../cube-rebuild/analytics-projection-refresh.service';
 import { EtlImportHistoryRepository } from '../etl-import-history/etl-import-history.repository';
-import { FtpAuthenticationError, FtpService } from '../ftp/ftp.service';
+import {
+	FtpAuthenticationError,
+	FtpService,
+	FtpSession,
+} from '../ftp/ftp.service';
 import { ImportService } from '../import/import.service';
 
 export interface SyncConfig {
@@ -421,7 +425,17 @@ export class SyncService {
 			'trends' | 'usage' | 'sales' | 'illegitimate_activity'
 		>,
 		jobId?: string,
+		session?: FtpSession,
 	): Promise<SyncPeriodResult> {
+		// A period can be called on its own or as part of a range/auto-sync. In
+		// the latter case the caller owns the leased connection, so every DSP is
+		// still checked but does not cause another FTP login.
+		if (!session) {
+			return this.ftpService.withSession((ownedSession) =>
+				this.syncPeriod(period, force, categories, jobId, ownedSession),
+			);
+		}
+
 		const config = await this.getSyncConfig();
 		const resolvedForce = force ?? config.force;
 		const resolvedCategories =
@@ -478,6 +492,7 @@ export class SyncService {
 			const rawFolders = await this.ftpService.listDspFolders(
 				category,
 				period,
+				session,
 			);
 
 			// Lọc folder bị exclude theo config
@@ -509,350 +524,331 @@ export class SyncService {
 				const existing = importedDetails.get(key);
 				let parserConfig: ResolvedFtpParserConfig;
 				let ignoredFilesCleaned = 0;
-				// One login serves this folder's listing, rule check and download.
-				// The FTP server answers 530 when logins arrive too fast, so the
-				// connection is leased per folder instead of per call.
-				const ftpSession = this.ftpService.createSession();
+				let availableFiles: string[] = [];
 				try {
-					try {
-						const availableFiles =
-							await this.ftpService.listRemoteFiles(
-								category,
-								period,
-								dspFolder,
-								undefined,
-								true,
-								ftpSession,
+					availableFiles = await this.ftpService.listRemoteFiles(
+						category,
+						period,
+						dspFolder,
+						undefined,
+						true,
+						session,
+					);
+					const ruleDecision =
+						await this.ftpReportFileRuleService.resolveFiles(
+							'ftp',
+							category as FtpSourceCategory,
+							dspFolder,
+							availableFiles,
+						);
+					if (ruleDecision.pending.length) {
+						this.logger.warn(
+							`FTP rules pending confirmation for ${category}/${dspFolder}: ${ruleDecision.pending.length} file(s)`,
+						);
+					}
+					// A rule may have changed from import to ignore after its file was
+					// already imported. During a force sync, reconcile those historical
+					// FTP rows before the normal early-return for "no import rule".
+					if (resolvedForce) {
+						const trackedFiles = await this.getFtpFolderFactFiles(
+							period,
+							category,
+							dspFolder,
+						);
+						if (trackedFiles.unattributableRows > 0) {
+							this.logger.warn(
+								`Cannot safely reconcile ${trackedFiles.unattributableRows} legacy FTP fact row(s) without source_file_name in ${category}/${dspFolder}/${period}`,
 							);
-						const ruleDecision =
+						}
+						const historicalRuleDecision =
 							await this.ftpReportFileRuleService.resolveFiles(
 								'ftp',
 								category as FtpSourceCategory,
 								dspFolder,
-								availableFiles,
+								trackedFiles.fileNames,
 							);
-						if (ruleDecision.pending.length) {
-							this.logger.warn(
-								`FTP rules pending confirmation for ${category}/${dspFolder}: ${ruleDecision.pending.length} file(s)`,
-							);
-						}
-						// A rule may have changed from import to ignore after its file was
-						// already imported. During a force sync, reconcile those historical
-						// FTP rows before the normal early-return for "no import rule".
-						if (resolvedForce) {
-							const trackedFiles =
-								await this.getFtpFolderFactFiles(
+						const ignoredHistoricalFiles =
+							historicalRuleDecision.ignored;
+						if (ignoredHistoricalFiles.length > 0) {
+							const deletedRows =
+								await this.deleteIgnoredFtpFolderFiles(
 									period,
 									category,
 									dspFolder,
-								);
-							if (trackedFiles.unattributableRows > 0) {
-								this.logger.warn(
-									`Cannot safely reconcile ${trackedFiles.unattributableRows} legacy FTP fact row(s) without source_file_name in ${category}/${dspFolder}/${period}`,
-								);
-							}
-							const historicalRuleDecision =
-								await this.ftpReportFileRuleService.resolveFiles(
-									'ftp',
-									category as FtpSourceCategory,
-									dspFolder,
-									trackedFiles.fileNames,
-								);
-							const ignoredHistoricalFiles =
-								historicalRuleDecision.ignored;
-							if (ignoredHistoricalFiles.length > 0) {
-								const deletedRows =
-									await this.deleteIgnoredFtpFolderFiles(
-										period,
-										category,
-										dspFolder,
-										ignoredHistoricalFiles,
-									);
-								await this.writeIgnoredFileHistory(
-									period,
-									category,
-									dspFolder,
-									batchId,
-									jobId,
 									ignoredHistoricalFiles,
 								);
-								ignoredFilesCleaned =
-									ignoredHistoricalFiles.length;
-								if (deletedRows > 0)
-									registerAffectedPeriod(category);
-							}
-						}
-						if (
-							!ruleDecision.selected.length ||
-							!ruleDecision.parserCode
-						) {
-							categoryResult.folders.push({
-								dsp_folder: dspFolder,
-								status: 'skipped',
-								rows: 0,
-								files: 0,
-								durationMs: 0,
-								ignoredFilesCleaned:
-									ignoredFilesCleaned || undefined,
-								reason: ruleDecision.pending.length
-									? 'files pending admin confirmation'
-									: ignoredFilesCleaned
-										? `${ignoredFilesCleaned} ignored file(s) removed by force sync`
-										: 'no import rule matched files',
-							});
-							continue;
-						}
-						parserConfig =
-							await this.ftpParserConfigService.resolveForParserCode(
+							await this.writeIgnoredFileHistory(
+								period,
+								category,
 								dspFolder,
-								category as FtpSourceCategory,
-								ruleDecision.parserCode,
+								batchId,
+								jobId,
+								ignoredHistoricalFiles,
 							);
-						const selectedNames = new Set(ruleDecision.selected);
-						parserConfig.selectFile = (path) =>
-							selectedNames.has(path);
-					} catch (err) {
-						if (err instanceof FtpAuthenticationError) throw err;
-						this.logger.error(
-							`Invalid parser config for ${category}/${dspFolder}: ${err.message}`,
-						);
-						categoryResult.folders.push({
-							dsp_folder: dspFolder,
-							status: 'error',
-							rows: 0,
-							files: 0,
-							durationMs: 0,
-							error: err.message,
-						});
-						continue;
+							ignoredFilesCleaned = ignoredHistoricalFiles.length;
+							if (deletedRows > 0)
+								registerAffectedPeriod(category);
+						}
 					}
-					const remoteFiles = await this.ftpService.listRemoteFiles(
-						category,
-						period,
-						dspFolder,
-						parserConfig.selectFile,
-						true,
-						ftpSession,
-					);
-					if (remoteFiles.length === 0) {
-						this.logger.warn(
-							`No files matched parser config for ${category}/${dspFolder}`,
-						);
+					if (
+						!ruleDecision.selected.length ||
+						!ruleDecision.parserCode
+					) {
 						categoryResult.folders.push({
 							dsp_folder: dspFolder,
 							status: 'skipped',
 							rows: 0,
 							files: 0,
 							durationMs: 0,
-							reason: 'no files matched parser config',
+							ignoredFilesCleaned:
+								ignoredFilesCleaned || undefined,
+							reason: ruleDecision.pending.length
+								? 'files pending admin confirmation'
+								: ignoredFilesCleaned
+									? `${ignoredFilesCleaned} ignored file(s) removed by force sync`
+									: 'no import rule matched files',
 						});
 						continue;
 					}
+					parserConfig =
+						await this.ftpParserConfigService.resolveForParserCode(
+							dspFolder,
+							category as FtpSourceCategory,
+							ruleDecision.parserCode,
+						);
+					const selectedNames = new Set(ruleDecision.selected);
+					parserConfig.selectFile = (path) => selectedNames.has(path);
+				} catch (err) {
+					if (err instanceof FtpAuthenticationError) throw err;
+					this.logger.error(
+						`Invalid parser config for ${category}/${dspFolder}: ${err.message}`,
+					);
+					categoryResult.folders.push({
+						dsp_folder: dspFolder,
+						status: 'error',
+						rows: 0,
+						files: 0,
+						durationMs: 0,
+						error: err.message,
+					});
+					continue;
+				}
+				// The first recursive listing above is authoritative for this DSP.
+				// Filtering it locally avoids walking the same remote tree a second
+				// time before the download, while preserving the manifest check.
+				const remoteFiles = availableFiles.filter((file) =>
+					parserConfig.selectFile(file),
+				);
+				if (remoteFiles.length === 0) {
+					this.logger.warn(
+						`No files matched parser config for ${category}/${dspFolder}`,
+					);
+					categoryResult.folders.push({
+						dsp_folder: dspFolder,
+						status: 'skipped',
+						rows: 0,
+						files: 0,
+						durationMs: 0,
+						reason: 'no files matched parser config',
+					});
+					continue;
+				}
 
-					// ── Change detection: compare file lists ──
-					if (existing && existing.status === 'done') {
-						if (resolvedForce) {
-							// Delete old data for this specific folder before re-import
-							await this.deleteFolderData(
-								period,
-								category,
-								dspFolder,
-								['ftp', ''],
-							);
-							registerAffectedPeriod(category);
-						} else {
-							const previousFiles = (
-								existing.file_manifest ||
-								existing.files_list ||
-								[]
-							).sort();
+				// ── Change detection: compare file lists ──
+				if (existing && existing.status === 'done') {
+					if (resolvedForce) {
+						// Delete old data for this specific folder before re-import
+						await this.deleteFolderData(
+							period,
+							category,
+							dspFolder,
+							['ftp', ''],
+						);
+						registerAffectedPeriod(category);
+					} else {
+						const previousFiles = (
+							existing.file_manifest ||
+							existing.files_list ||
+							[]
+						).sort();
 
-							// Compare: if identical → skip
-							const filesMatch =
-								remoteFiles.length === previousFiles.length &&
-								remoteFiles.every(
-									(f, i) => f === previousFiles[i],
-								);
+						// Compare: if identical → skip
+						const filesMatch =
+							remoteFiles.length === previousFiles.length &&
+							remoteFiles.every((f, i) => f === previousFiles[i]);
 
-							if (filesMatch) {
-								this.logger.log(
-									`  ✅ ${category}/${dspFolder} — ${remoteFiles.length} files unchanged, skip`,
-								);
-								categoryResult.folders.push({
-									dsp_folder: dspFolder,
-									status: 'skipped',
-									rows: 0,
-									files: 0,
-									durationMs: 0,
-									reason: 'files unchanged',
-								});
-								continue;
-							}
-
-							// Files differ → need re-sync
-							const newFiles = remoteFiles.filter(
-								(f) => !previousFiles.includes(f),
-							);
+						if (filesMatch) {
 							this.logger.log(
-								`  🔄 ${category}/${dspFolder} — ${newFiles.length} new files detected ` +
-									`(FTP: ${remoteFiles.length}, imported: ${previousFiles.length}, config v${parserConfig.configVersion}). Re-syncing...`,
-							);
-
-							// Delete old data for this specific folder before re-import
-							await this.deleteFolderData(
-								period,
-								category,
-								dspFolder,
-								['ftp', ''],
-							);
-							registerAffectedPeriod(category);
-						}
-					}
-
-					// ── Download + import ──
-					const folderStart = Date.now();
-					const isUpdate = existing && existing.status === 'done';
-					try {
-						// Download from FTPS
-						const { localPath, fileCount } =
-							await this.ftpService.downloadDspFolder(
-								period,
-								category,
-								dspFolder,
-								this.tempBaseDir,
-								parserConfig.selectFile,
-								ftpSession,
-							);
-
-						// Parse using existing import service
-						const dspResult =
-							await this.importService.importDspFolder(
-								localPath,
-								dspFolder,
-								batchId,
-								category,
-								'ftp',
-								parserConfig,
-							);
-
-						// If no parser found, log and skip
-						if (!dspResult) {
-							this.logger.warn(
-								`  ⚠️ [UNKNOWN DSP] No parser for ${category}/${dspFolder} — skipping`,
+								`  ✅ ${category}/${dspFolder} — ${remoteFiles.length} files unchanged, skip`,
 							);
 							categoryResult.folders.push({
 								dsp_folder: dspFolder,
 								status: 'skipped',
 								rows: 0,
 								files: 0,
-								durationMs: Date.now() - folderStart,
-								reason: `no parser for ${category}`,
+								durationMs: 0,
+								reason: 'files unchanged',
 							});
-							this.ftpService.cleanupTemp(localPath);
 							continue;
 						}
 
-						const rows = dspResult.rows || 0;
-						const files = dspResult.files || 0;
-						const fileNames = remoteFiles;
-						const durationMs = Date.now() - folderStart;
-
-						// Write per-file records to etl_import_history
-						if (jobId && dspResult.fileStats?.length) {
-							for (const stat of dspResult.fileStats) {
-								await this.etlImportHistoryRepository
-									.upsert({
-										job_id: jobId,
-										batch_id: batchId,
-										period,
-										source_type:
-											ImportJobSourceType.FTP_SYNC_PERIOD,
-										category,
-										dsp_folder: dspFolder,
-										file_name: stat.fileName,
-										file_directory: `${category}/${period}/${dspFolder}`,
-										file_path: `${category}/${period}/${dspFolder}/${stat.fileName}`,
-										status: 'done',
-										file_size_bytes: stat.fileSizeBytes,
-										total_lines: stat.totalLines,
-										processed_rows: stat.processedRows,
-										skipped_rows: stat.skippedRows,
-										error_rows: stat.errorRows,
-										duration_ms: durationMs,
-									})
-									.catch((err) =>
-										this.logger.warn(
-											`Failed to write etl_import_history for ${stat.fileName}: ${err.message}`,
-										),
-									);
-							}
-						}
-
-						// Cleanup temp
-						this.ftpService.cleanupTemp(localPath);
-
-						const releases =
-							dspResult && dspResult.releases
-								? {
-										total: dspResult.releases.totalReleases,
-										imported: dspResult.releases.created,
-										skipped: dspResult.releases.skipped,
-										errors: dspResult.releases.errors,
-										inDb: dspResult.releases.inDb,
-										pending: dspResult.releases.pending,
-									}
-								: null;
-
-						categoryResult.folders.push({
-							dsp_folder: dspFolder,
-							status: isUpdate ? 'updated' : 'done',
-							rows,
-							files,
-							durationMs,
-							reason: isUpdate ? 'new files detected' : undefined,
-							releases,
-						});
-
-						if (dspResult && dspResult.releases) {
-							result.releases!.total +=
-								dspResult.releases.totalReleases;
-							result.releases!.imported +=
-								dspResult.releases.created;
-							result.releases!.skipped +=
-								dspResult.releases.skipped;
-							result.releases!.errors += dspResult.releases.errors;
-							result.releases!.inDb += dspResult.releases.inDb;
-							result.releases!.pending +=
-								dspResult.releases.pending;
-						}
-
-						result.totalRows += rows;
-						result.totalFiles += files;
-						if (rows > 0) registerAffectedPeriod(category);
-
-						this.logger.log(
-							`  ${isUpdate ? '🔄' : '✅'} ${category}/${dspFolder}: ${rows} rows, ${files} files (${durationMs}ms)` +
-								(isUpdate ? ' [UPDATED]' : ''),
+						// Files differ → need re-sync
+						const newFiles = remoteFiles.filter(
+							(f) => !previousFiles.includes(f),
 						);
-					} catch (err) {
-						if (err instanceof FtpAuthenticationError) throw err;
-						const durationMs = Date.now() - folderStart;
+						this.logger.log(
+							`  🔄 ${category}/${dspFolder} — ${newFiles.length} new files detected ` +
+								`(FTP: ${remoteFiles.length}, imported: ${previousFiles.length}, config v${parserConfig.configVersion}). Re-syncing...`,
+						);
 
+						// Delete old data for this specific folder before re-import
+						await this.deleteFolderData(
+							period,
+							category,
+							dspFolder,
+							['ftp', ''],
+						);
+						registerAffectedPeriod(category);
+					}
+				}
+
+				// ── Download + import ──
+				const folderStart = Date.now();
+				const isUpdate = existing && existing.status === 'done';
+				try {
+					// Download from FTPS
+					const { localPath, fileCount } =
+						await this.ftpService.downloadDspFolder(
+							period,
+							category,
+							dspFolder,
+							this.tempBaseDir,
+							parserConfig.selectFile,
+							session,
+						);
+
+					// Parse using existing import service
+					const dspResult = await this.importService.importDspFolder(
+						localPath,
+						dspFolder,
+						batchId,
+						category,
+						'ftp',
+						parserConfig,
+					);
+
+					// If no parser found, log and skip
+					if (!dspResult) {
+						this.logger.warn(
+							`  ⚠️ [UNKNOWN DSP] No parser for ${category}/${dspFolder} — skipping`,
+						);
 						categoryResult.folders.push({
 							dsp_folder: dspFolder,
-							status: 'error',
+							status: 'skipped',
 							rows: 0,
 							files: 0,
-							durationMs,
-							error: err.message,
+							durationMs: Date.now() - folderStart,
+							reason: `no parser for ${category}`,
 						});
-
-						this.logger.error(
-							`  ❌ ${category}/${dspFolder}: ${err.message}`,
-						);
+						this.ftpService.cleanupTemp(localPath);
+						continue;
 					}
-				} finally {
-					ftpSession.close();
+
+					const rows = dspResult.rows || 0;
+					const files = dspResult.files || 0;
+					const fileNames = remoteFiles;
+					const durationMs = Date.now() - folderStart;
+
+					// Write per-file records to etl_import_history
+					if (jobId && dspResult.fileStats?.length) {
+						for (const stat of dspResult.fileStats) {
+							await this.etlImportHistoryRepository
+								.upsert({
+									job_id: jobId,
+									batch_id: batchId,
+									period,
+									source_type:
+										ImportJobSourceType.FTP_SYNC_PERIOD,
+									category,
+									dsp_folder: dspFolder,
+									file_name: stat.fileName,
+									file_directory: `${category}/${period}/${dspFolder}`,
+									file_path: `${category}/${period}/${dspFolder}/${stat.fileName}`,
+									status: 'done',
+									file_size_bytes: stat.fileSizeBytes,
+									total_lines: stat.totalLines,
+									processed_rows: stat.processedRows,
+									skipped_rows: stat.skippedRows,
+									error_rows: stat.errorRows,
+									duration_ms: durationMs,
+								})
+								.catch((err) =>
+									this.logger.warn(
+										`Failed to write etl_import_history for ${stat.fileName}: ${err.message}`,
+									),
+								);
+						}
+					}
+
+					// Cleanup temp
+					this.ftpService.cleanupTemp(localPath);
+
+					const releases =
+						dspResult && dspResult.releases
+							? {
+									total: dspResult.releases.totalReleases,
+									imported: dspResult.releases.created,
+									skipped: dspResult.releases.skipped,
+									errors: dspResult.releases.errors,
+									inDb: dspResult.releases.inDb,
+									pending: dspResult.releases.pending,
+								}
+							: null;
+
+					categoryResult.folders.push({
+						dsp_folder: dspFolder,
+						status: isUpdate ? 'updated' : 'done',
+						rows,
+						files,
+						durationMs,
+						reason: isUpdate ? 'new files detected' : undefined,
+						releases,
+					});
+
+					if (dspResult && dspResult.releases) {
+						result.releases!.total +=
+							dspResult.releases.totalReleases;
+						result.releases!.imported += dspResult.releases.created;
+						result.releases!.skipped += dspResult.releases.skipped;
+						result.releases!.errors += dspResult.releases.errors;
+						result.releases!.inDb += dspResult.releases.inDb;
+						result.releases!.pending += dspResult.releases.pending;
+					}
+
+					result.totalRows += rows;
+					result.totalFiles += files;
+					if (rows > 0) registerAffectedPeriod(category);
+
+					this.logger.log(
+						`  ${isUpdate ? '🔄' : '✅'} ${category}/${dspFolder}: ${rows} rows, ${files} files (${durationMs}ms)` +
+							(isUpdate ? ' [UPDATED]' : ''),
+					);
+				} catch (err) {
+					if (err instanceof FtpAuthenticationError) throw err;
+					const durationMs = Date.now() - folderStart;
+
+					categoryResult.folders.push({
+						dsp_folder: dspFolder,
+						status: 'error',
+						rows: 0,
+						files: 0,
+						durationMs,
+						error: err.message,
+					});
+
+					this.logger.error(
+						`  ❌ ${category}/${dspFolder}: ${err.message}`,
+					);
 				}
 			}
 
@@ -899,9 +895,16 @@ export class SyncService {
 		categories?: Array<
 			'trends' | 'usage' | 'sales' | 'illegitimate_activity'
 		>,
+		session?: FtpSession,
 	): Promise<SyncPeriodResult[]> {
+		if (!session) {
+			return this.ftpService.withSession((ownedSession) =>
+				this.syncAll(force, categories, ownedSession),
+			);
+		}
+
 		const config = await this.getSyncConfig();
-		const periods = await this.ftpService.listPeriods();
+		const periods = await this.ftpService.listPeriods(session);
 
 		let filteredPeriods = periods;
 		const startPeriod = config.startPeriod;
@@ -924,6 +927,8 @@ export class SyncService {
 				period,
 				resolvedForce,
 				resolvedCategories,
+				undefined,
+				session,
 			);
 			results.push(result);
 		}
