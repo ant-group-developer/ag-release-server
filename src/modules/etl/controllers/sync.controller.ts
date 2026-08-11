@@ -3,6 +3,7 @@ import {
 	Body,
 	Controller,
 	Get,
+	Logger,
 	Patch,
 	Post,
 	Put,
@@ -13,7 +14,6 @@ import { User } from '../../../common/decorators/req.decorators';
 import { ResponseSuccess } from '../../../common/dtos/common.response.dto';
 import { UpdateSyncConfigDto } from '../dto/sync-config.dto';
 import { ImportJobSourceType } from '../interfaces';
-import { FtpOperationLockService } from '../services/ftp/ftp-operation-lock.service';
 import { FtpService, FtpSession } from '../services/ftp/ftp.service';
 import { ImportJobsService } from '../services/import-jobs/import-jobs.service';
 import { SchedulerService } from '../services/scheduler/scheduler.service';
@@ -22,12 +22,13 @@ import { SyncService } from '../services/sync/sync.service';
 @ApiTags('ETL')
 @Controller('etl')
 export class SyncController {
+	private readonly logger = new Logger(SyncController.name);
+
 	constructor(
 		private readonly syncService: SyncService,
 		private readonly ftpService: FtpService,
 		private readonly importJobsService: ImportJobsService,
 		private readonly schedulerService: SchedulerService,
-		private readonly ftpOperationLockService: FtpOperationLockService,
 	) {}
 
 	// ── FTP: Connection ───────────────────────────────────
@@ -290,38 +291,8 @@ export class SyncController {
 	// Job runners — chạy nền, không throw ra ngoài
 	// ─────────────────────────────────────────────────────
 
-	/**
-	 * Holds the FTP lock for one job so a manual sync cannot log in alongside the
-	 * auto-sync cron or a discovery scan — concurrent logins are what trip the
-	 * server's 530 throttle. Waits briefly rather than skipping, because a user
-	 * is watching this job's status.
-	 */
-	private async runFtpJobExclusively(
-		jobId: string,
-		operation: string,
-		run: () => Promise<void>,
-	): Promise<void> {
-		const lockToken =
-			await this.ftpOperationLockService.tryAcquireWithWait(operation);
-		if (!lockToken) {
-			await this.importJobsService.markFailed(
-				jobId,
-				new Error(
-					'Another FTP operation (auto-sync, discovery scan, or another manual sync) is currently running. Please retry once it finishes.',
-				),
-			);
-			return;
-		}
-		const stopLockHeartbeat = this.ftpOperationLockService.startHeartbeat(
-			lockToken,
-			operation,
-		);
-		try {
-			await run();
-		} finally {
-			stopLockHeartbeat();
-			await this.ftpOperationLockService.release(lockToken);
-		}
+	private async runFtpJob(run: () => Promise<void>): Promise<void> {
+		await run();
 	}
 
 	private async runSyncPeriodJob(
@@ -332,7 +303,7 @@ export class SyncController {
 			'trends' | 'usage' | 'sales' | 'illegitimate_activity'
 		>,
 	): Promise<void> {
-		await this.runFtpJobExclusively(jobId, 'manual-sync-period', async () => {
+		await this.runFtpJob(async () => {
 			try {
 				await this.importJobsService.markProcessing(jobId);
 				await this.importJobsService.updateProgress(
@@ -352,7 +323,11 @@ export class SyncController {
 				);
 				await this.importJobsService.updateProgress(
 					jobId,
-					{ progressTotal: 1, progressCurrent: 1, progressLabel: 'Done' },
+					{
+						progressTotal: 1,
+						progressCurrent: 1,
+						progressLabel: 'Done',
+					},
 					true,
 				);
 				await this.importJobsService.markCompleted(jobId, {
@@ -373,17 +348,19 @@ export class SyncController {
 			'trends' | 'usage' | 'sales' | 'illegitimate_activity'
 		>,
 	): Promise<void> {
-		// The lock covers every period in the range, not one per period, so the
-		// range job is a single FTP operation from the server's point of view.
-		await this.runFtpJobExclusively(jobId, 'manual-sync-range', () =>
-			this.ftpService.withSession((session) =>
-				this.executeSyncRangeJob(
-					jobId,
-					periods,
-					force,
-					categories,
-					session,
-				),
+		// One session covers every period in the range, so the range job leases a
+		// single FTP connection slot instead of one per period.
+		await this.runFtpJob(() =>
+			this.ftpService.withSession(
+				(session) =>
+					this.executeSyncRangeJob(
+						jobId,
+						periods,
+						force,
+						categories,
+						session,
+					),
+				'manual-sync-range',
 			),
 		);
 	}
@@ -471,28 +448,28 @@ export class SyncController {
 				totalPeriods: periods.length,
 				totalRows,
 				totalFolderErrors,
+				hasWarnings: totalFolderErrors > 0,
 				results,
 				releases,
 			};
 
 			await this.importJobsService.updateProgress(
 				jobId,
-				{ progressCurrent: periods.length, progressLabel: totalFolderErrors > 0 ? `Done with ${totalFolderErrors} error(s)` : 'Done' },
+				{
+					progressCurrent: periods.length,
+					progressLabel:
+						totalFolderErrors > 0
+							? `Done with ${totalFolderErrors} warning(s)`
+							: 'Done',
+				},
 				true,
 			);
 			if (totalFolderErrors > 0) {
-				await this.importJobsService.updateProgress(
-					jobId,
-					{ totalRows, processedRows: totalRows },
-					true,
+				this.logger.warn(
+					`Sync completed with ${totalFolderErrors} folder warning(s). Rows imported: ${totalRows}. See result for details.`,
 				);
-				await this.importJobsService.markFailed(
-					jobId,
-					new Error(`Sync completed with ${totalFolderErrors} folder error(s). Rows imported: ${totalRows}. See result for details.`),
-				);
-			} else {
-				await this.importJobsService.markCompleted(jobId, summary);
 			}
+			await this.importJobsService.markCompleted(jobId, summary);
 		} catch (err) {
 			await this.importJobsService.markFailed(jobId, err);
 		}

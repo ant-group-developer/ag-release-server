@@ -69,15 +69,96 @@ async function queryClickHouse(sql, format = '', body = null, useDb = true) {
   return response;
 }
 
+const RESUME = process.argv.includes('--resume');
+const MAX_RETRIES = 3;
+
+async function queryClickHouseWithRetry(sql, format = '', body = null, useDb = true, retries = MAX_RETRIES) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await queryClickHouse(sql, format, body, useDb);
+    } catch (err) {
+      if (attempt < retries) {
+        const wait = attempt * 5000;
+        console.warn(`  Retry ${attempt}/${retries - 1} after ${wait / 1000}s... (${err.message})`);
+        await new Promise(r => setTimeout(r, wait));
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
+async function findLastCompletedTable(filePath) {
+  if (!fs.existsSync(filePath)) return { completed: new Set(), truncateTo: 0 };
+
+  return new Promise((resolve, reject) => {
+    const completedTables = new Set();
+    let lastInsertTable = null;
+    let prevLine = '';
+    let byteOffset = 0;
+    let truncateTo = 0;
+
+    const rl = readline.createInterface({
+      input: fs.createReadStream(filePath),
+      crlfDelay: Infinity,
+    });
+
+    rl.on('line', (line) => {
+      byteOffset += Buffer.byteLength(line, 'utf8') + 1; // +1 for \n
+
+      if (prevLine === '-- STATEMENT_SEPARATOR') {
+        const createMatch = line.match(/^CREATE TABLE(?: IF NOT EXISTS)? `([^`]+)`/);
+        if (createMatch) completedTables.add(createMatch[1]);
+
+        const insertMatch = line.match(/^INSERT INTO `([^`]+)` VALUES /);
+        if (insertMatch) {
+          completedTables.delete(insertMatch[1]);
+          lastInsertTable = insertMatch[1];
+        }
+      }
+
+      if (line === ';' && lastInsertTable) {
+        completedTables.add(lastInsertTable);
+        truncateTo = byteOffset;
+        lastInsertTable = null;
+      }
+
+      prevLine = line;
+    });
+
+    rl.on('close', () => resolve({ completed: new Set(completedTables), truncateTo }));
+    rl.on('error', reject);
+  });
+}
+
 async function runBackup() {
   console.log(`Starting ClickHouse Backup...`);
   console.log(`URL: ${CLICKHOUSE_URL}`);
   console.log(`Database: ${CLICKHOUSE_DATABASE}`);
   console.log(`User: ${CLICKHOUSE_USER}`);
-  console.log(`Target File: ${TARGET_FILE}\n`);
+  console.log(`Target File: ${TARGET_FILE}`);
+  console.log(`Resume mode: ${RESUME}\n`);
 
   fs.mkdirSync(path.dirname(TARGET_FILE), { recursive: true });
-  const writeStream = fs.createWriteStream(TARGET_FILE);
+
+  let completedTables = new Set();
+  let appendOffset = 0;
+  if (RESUME && fs.existsSync(TARGET_FILE)) {
+    console.log('Scanning existing backup file to find completed tables...');
+    const result = await findLastCompletedTable(TARGET_FILE);
+    completedTables = result.completed;
+    appendOffset = result.truncateTo;
+    console.log(`Resuming — completed: [${[...completedTables].join(', ') || 'none'}], truncating file to byte ${appendOffset}\n`);
+    // Truncate file to the end of the last complete table block
+    const fd = fs.openSync(TARGET_FILE, 'r+');
+    fs.ftruncateSync(fd, appendOffset);
+    fs.closeSync(fd);
+  }
+
+  // In resume mode, append to file; otherwise overwrite
+  const writeStream = RESUME && fs.existsSync(TARGET_FILE)
+    ? fs.createWriteStream(TARGET_FILE, { flags: 'a' })
+    : fs.createWriteStream(TARGET_FILE);
 
   const writeText = (text) => {
     return new Promise((resolve) => {
@@ -174,17 +255,19 @@ async function runBackup() {
     }
   };
 
-  // Write Database Headers
-  await writeText(`-- STATEMENT_SEPARATOR\nCREATE DATABASE IF NOT EXISTS \`${CLICKHOUSE_DATABASE}\`;\n`);
-  await writeText(`-- STATEMENT_SEPARATOR\nUSE \`${CLICKHOUSE_DATABASE}\`;\n`);
+  // Write Database Headers (only on fresh backup, not resume)
+  if (!RESUME || !fs.existsSync(TARGET_FILE)) {
+    await writeText(`-- STATEMENT_SEPARATOR\nCREATE DATABASE IF NOT EXISTS \`${CLICKHOUSE_DATABASE}\`;\n`);
+    await writeText(`-- STATEMENT_SEPARATOR\nUSE \`${CLICKHOUSE_DATABASE}\`;\n`);
+  }
 
   // Get all tables & views
   const tablesQuery = `
-    SELECT name, engine 
-    FROM system.tables 
+    SELECT name, engine
+    FROM system.tables
     WHERE database = '${CLICKHOUSE_DATABASE}' AND is_temporary = 0
   `;
-  const tablesRes = await queryClickHouse(tablesQuery, 'JSON');
+  const tablesRes = await queryClickHouseWithRetry(tablesQuery, 'JSON');
   const tablesData = await tablesRes.json();
   const tables = tablesData.data;
 
@@ -204,10 +287,14 @@ async function runBackup() {
 
   // 1. Backup Tables
   for (const { name: tableName, engine } of physicalTables) {
+    if (completedTables.has(tableName)) {
+      console.log(`Skipping table (already done): ${tableName}`);
+      continue;
+    }
     console.log(`Processing table: ${tableName} (${engine})...`);
 
     // Get Schema (and strip specific database prefixes so it can be restored to a different DB name)
-    const schemaRes = await queryClickHouse(`SHOW CREATE TABLE \`${CLICKHOUSE_DATABASE}\`.\`${tableName}\``);
+    const schemaRes = await queryClickHouseWithRetry(`SHOW CREATE TABLE \`${CLICKHOUSE_DATABASE}\`.\`${tableName}\``);
     const schemaSql = await schemaRes.text();
     const unescapedSchema = unescapeClickHouseString(schemaSql);
     const cleanSchema = unescapedSchema.replace(new RegExp(`\\\`?${CLICKHOUSE_DATABASE}\\\`?\\.`, 'g'), '');
@@ -216,14 +303,14 @@ async function runBackup() {
     await writeText(`-- STATEMENT_SEPARATOR\n${cleanSchema.trim()};\n`);
 
     // Get Data
-    const countRes = await queryClickHouse(`SELECT count() FROM \`${CLICKHOUSE_DATABASE}\`.\`${tableName}\``);
+    const countRes = await queryClickHouseWithRetry(`SELECT count() FROM \`${CLICKHOUSE_DATABASE}\`.\`${tableName}\``);
     const countText = await countRes.text();
     const count = parseInt(countText.trim(), 10);
 
     if (count > 0) {
       console.log(`  -> Streaming ${count} rows...`);
       await writeText(`-- STATEMENT_SEPARATOR\nINSERT INTO \`${tableName}\` VALUES `);
-      const dataRes = await queryClickHouse(`SELECT * FROM \`${CLICKHOUSE_DATABASE}\`.\`${tableName}\``, 'Values');
+      const dataRes = await queryClickHouseWithRetry(`SELECT * FROM \`${CLICKHOUSE_DATABASE}\`.\`${tableName}\``, 'Values');
       const reader = dataRes.body.getReader();
       await writeStreamFromReader(reader, tableName);
       await writeText(`;\n`);
@@ -234,9 +321,13 @@ async function runBackup() {
 
   // 2. Backup Views
   for (const { name: viewName, engine } of views) {
+    if (completedTables.has(viewName)) {
+      console.log(`Skipping view (already done): ${viewName}`);
+      continue;
+    }
     console.log(`Processing view: ${viewName} (${engine})...`);
 
-    const schemaRes = await queryClickHouse(`SHOW CREATE TABLE \`${CLICKHOUSE_DATABASE}\`.\`${viewName}\``);
+    const schemaRes = await queryClickHouseWithRetry(`SHOW CREATE TABLE \`${CLICKHOUSE_DATABASE}\`.\`${viewName}\``);
     const schemaSql = await schemaRes.text();
     const unescapedSchema = unescapeClickHouseString(schemaSql);
     const cleanSchema = unescapedSchema.replace(new RegExp(`\\\`?${CLICKHOUSE_DATABASE}\\\`?\\.`, 'g'), '');

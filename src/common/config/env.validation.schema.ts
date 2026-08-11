@@ -92,6 +92,9 @@ export const envValidationSchema = Joi.object({
 	FTP_SYNC_MODE: Joi.string().valid('manual', 'auto').default('manual'),
 	FTP_SYNC_CRON: Joi.string().default('0 2 * * *'),
 	FTP_DISCOVERY_CRON: Joi.string().default('0 1 * * *'),
+	// Số FTP connection tối đa mở đồng thời trong MỘT process/container.
+	// Cả cluster có N process thì tổng có thể lên tới FTP_MAX_CONNECTIONS × N.
+	FTP_MAX_CONNECTIONS: Joi.number().integer().min(1).default(3),
 
 	// Redis (bắt buộc — cache2.module inject trực tiếp process.env, không có fallback)
 	REDIS_HOST: Joi.string().required(),
