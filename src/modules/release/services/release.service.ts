@@ -823,11 +823,31 @@ export class ReleaseService {
 
 	async takedown(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
+
+		try {
+			await this.releaseCiDataService.bulkSyncDataCi({ ids: [id] });
+		} catch (error) {
+			console.log(error); // Không chặn takedown nếu sync CI lỗi
+		}
+
+		const releaseEndDate = new Date();
+		releaseEndDate.setDate(releaseEndDate.getDate() - 1); // Hôm qua
 		await this.releaseRepo.update(id, {
-			releaseEndDate: new Date(),
+			status: ReleaseStatus.SUBMITTED,
+			releaseEndDate,
 		});
 
-		await this.submit3(id, dto);
+		const release = await this.releaseQueryService.findOneReleaseFull({
+			releaseId: id,
+		});
+
+		this.applyCiImportActionToReleaseSnapshot(release, dto.needImportAgain);
+
+		return this.releaseExecution3Service.newReleaseExecution({
+			release,
+			dspCodes: dto.code,
+			type: ExecutionType.TAKEDOWN,
+		});
 	}
 
 	/**
