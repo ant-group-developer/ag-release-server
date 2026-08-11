@@ -186,6 +186,77 @@ export class ReleaseDdexService {
 		}
 	}
 
+	createTakedownMetadataOnServer({
+		release,
+		ernVersion,
+		recipient,
+		sender,
+		dspCode,
+	}: {
+		release: Release;
+		ernVersion: ErnVersion2;
+		recipient: { partyId: string; name: string };
+		sender: { partyId: string; name: string };
+		dspCode?: string;
+	}) {
+		const batchId = genBatchId();
+		const upc = release.upc;
+		const releaseReference =
+			release.type === 'video' ? release.video?.isrc : upc;
+
+		if (!releaseReference) {
+			throw new Error(
+				release.type === 'video'
+					? 'Không tìm thấy ISRC'
+					: 'Không tìm thấy UPC',
+			);
+		}
+
+		const baseDir =
+			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
+		const releaseDir = path.join(baseDir, batchId, releaseReference);
+
+		fs.mkdirSync(releaseDir, { recursive: true }); // Chỉ tạo folder chính
+
+		const xml = this.createErnFile({
+			release,
+			outputDir: releaseDir,
+			ernVersion,
+			recipient,
+			sender,
+			coverExtension: undefined,
+			updateIndicator: 'UpdateMessage', // ngữ nghĩa DDEX
+			isTakedown: true, // gate bỏ file resource
+		});
+
+		if (dspCode?.toUpperCase() !== 'VEVO') {
+			if (!upc) {
+				throw new Error(
+					'Không tìm thấy mã UPC của release để tạo manifest',
+				);
+			}
+			this.createManifestFile({
+				batchId,
+				upc,
+				outputRoot: path.dirname(releaseDir),
+				sender,
+				recipient,
+			});
+		}
+
+		this.logger.log({
+			releaseId: release.id,
+			step: 'createTakedownMetadataOnServer',
+		});
+
+		return {
+			outputDir: path.dirname(releaseDir),
+			batchId,
+			releaseReference,
+			xml,
+		};
+	}
+
 	createErnFile({
 		release,
 		outputDir,
