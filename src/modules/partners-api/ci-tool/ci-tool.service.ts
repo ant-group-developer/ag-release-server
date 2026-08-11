@@ -53,6 +53,37 @@ export class CiToolService {
 		return data;
 	}
 
+	async sendFileTakedownToCi(file: {
+		buffer: Buffer;
+		originalname: string;
+		mimetype: string;
+	}) {
+		const formData = new FormData();
+
+		formData.append('file', file.buffer, {
+			filename: file.originalname,
+			contentType: file.mimetype,
+		});
+		formData.append('action', 'post');
+
+		const { data } = await firstValueFrom(
+			this.httpService.post(
+				`${process.env.CI_TOOL_URL}/api/takedown/trigger`,
+				formData,
+				{
+					headers: {
+						'x-api-key': process.env.CI_TOOL_API_KEY,
+						...formData.getHeaders(),
+					},
+					maxBodyLength: Infinity,
+					maxContentLength: Infinity,
+				},
+			),
+		);
+
+		return data;
+	}
+
 	async getExportJobStatus(jobId: string): Promise<string | null> {
 		const { data } = await firstValueFrom(
 			this.httpService.get(
