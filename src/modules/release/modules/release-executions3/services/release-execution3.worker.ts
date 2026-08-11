@@ -724,8 +724,13 @@ export class ReleaseExecution3Worker {
 				.filter((code): code is string => !!code);
 
 			if (!step.metadata?.output?.jobCreated) {
+				const jobType =
+					releaseExecution.type === ExecutionType.TAKEDOWN
+						? CiJobType3.EMAIL_STATE51_TAKEDOWN
+						: CiJobType3.EMAIL_STATE51;
+
 				await this.ciJobService.createJob({
-					type: CiJobType3.EMAIL_STATE51,
+					type: jobType,
 					upc,
 					dspCiCodes,
 					releaseExecutionId: step.releaseExecutionId,

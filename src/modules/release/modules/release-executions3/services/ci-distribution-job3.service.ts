@@ -168,6 +168,7 @@ export class CiDistributionJob3Service {
 					status: CiJobStatus3.PENDING,
 					type: In([
 						CiJobType3.EMAIL_STATE51,
+						CiJobType3.EMAIL_STATE51_TAKEDOWN,
 						CiJobType3.ADMIN_EXPORT,
 						CiJobType3.ADMIN_TAKEDOWN,
 					]),
@@ -244,6 +245,7 @@ export class CiDistributionJob3Service {
 			(type) =>
 				![
 					CiJobType3.EMAIL_STATE51,
+					CiJobType3.EMAIL_STATE51_TAKEDOWN,
 					CiJobType3.ADMIN_EXPORT,
 					CiJobType3.ADMIN_TAKEDOWN,
 				].includes(type),
@@ -271,12 +273,22 @@ export class CiDistributionJob3Service {
 			result.email = await this.sendEmailToState51(emailJobs);
 		}
 
+		const emailTakedownJobs =
+			jobsByType.get(CiJobType3.EMAIL_STATE51_TAKEDOWN) ?? [];
+		if (emailTakedownJobs.length) {
+			const takedownEmailResult =
+				await this.sendEmailToState51(emailTakedownJobs);
+			result.email.sent += takedownEmailResult.sent;
+			result.email.resumed += takedownEmailResult.resumed;
+		}
+
 		const adminExportJobs = jobsByType.get(CiJobType3.ADMIN_EXPORT) ?? [];
 		if (adminExportJobs.length) {
 			result.ciTool = await this.sendExportToCi(adminExportJobs);
 		}
 
-		const adminTakedownJobs = jobsByType.get(CiJobType3.ADMIN_TAKEDOWN) ?? [];
+		const adminTakedownJobs =
+			jobsByType.get(CiJobType3.ADMIN_TAKEDOWN) ?? [];
 		if (adminTakedownJobs.length) {
 			result.takedown = await this.sendTakedownToCi(adminTakedownJobs);
 		}
@@ -439,9 +451,18 @@ export class CiDistributionJob3Service {
 
 				fs.writeFileSync(filePath, buffer);
 
+				const isEmailTakedown =
+					emailJobs[0].type === CiJobType3.EMAIL_STATE51_TAKEDOWN;
 				const subject =
 					emailJobs[0].deliveryEmailSubject ||
-					`[Distribution] CI Batch - ${dateStr}`;
+					(isEmailTakedown
+						? `[Takedown Request] ${dateStr}`
+						: `[Distribution] CI Batch - ${dateStr}`);
+				const htmlBody = isEmailTakedown
+					? `<p><strong>Takedown Request</strong></p>
+					   <p>${emailJobs.length} release(s) to be taken down from distribution.</p>
+					   <p>Please process the attached Excel file and confirm removal.</p>`
+					: `<p>${emailJobs.length} release(s) for distribution</p>`;
 
 				await this.repo.update(
 					{ id: In(ids) },
@@ -451,7 +472,7 @@ export class CiDistributionJob3Service {
 				const success = await this.notificationResendService.sendEmail({
 					to: [toEmail],
 					subject,
-					html: `<p>${emailJobs.length} release(s) for distribution</p>`,
+					html: htmlBody,
 					attachments: [{ filename: fileName, path: filePath }],
 				});
 
