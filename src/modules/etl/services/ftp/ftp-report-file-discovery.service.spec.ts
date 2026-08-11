@@ -7,13 +7,13 @@ import {
 } from '../../../clickhouse';
 import { FtpParserConfigService } from '../../../dsp-report/services/ftp-parser-config.service';
 import { FtpReportFileRuleService } from '../../../dsp-report/services/ftp-report-file-rule.service';
-import { FtpOperationLockService } from './ftp-operation-lock.service';
 import { FtpReportFileDiscoveryService } from './ftp-report-file-discovery.service';
 import { FtpService } from './ftp.service';
 
 describe('FtpReportFileDiscoveryService sample worker', () => {
 	let service: FtpReportFileDiscoveryService;
 	let originalAppRole: string | undefined;
+	let session: { close: jest.Mock };
 
 	const ftpService = {
 		createSession: jest.fn(),
@@ -29,11 +29,6 @@ describe('FtpReportFileDiscoveryService sample worker', () => {
 		deleteCronJob: jest.fn(),
 	};
 	const bucketR2Service = { uploadFileFromPath: jest.fn() };
-	const ftpOperationLockService = {
-		tryAcquire: jest.fn(),
-		release: jest.fn(),
-		startHeartbeat: jest.fn(),
-	};
 
 	const SAMPLE_TASK = {
 		id: 'task-1',
@@ -65,17 +60,13 @@ describe('FtpReportFileDiscoveryService sample worker', () => {
 				},
 				{ provide: SchedulerRegistry, useValue: schedulerRegistry },
 				{ provide: BucketR2Service, useValue: bucketR2Service },
-				{
-					provide: FtpOperationLockService,
-					useValue: ftpOperationLockService,
-				},
 			],
 		}).compile();
 
 		service = moduleRef.get(FtpReportFileDiscoveryService);
 		jest.clearAllMocks();
-		ftpService.createSession.mockReturnValue({ close: jest.fn() });
-		ftpOperationLockService.startHeartbeat.mockReturnValue(jest.fn());
+		session = { close: jest.fn() };
+		ftpService.createSession.mockReturnValue(session);
 	});
 
 	afterEach(() => {
@@ -92,30 +83,31 @@ describe('FtpReportFileDiscoveryService sample worker', () => {
 
 	const runWorker = () => (service as any).processSampleTasks();
 
-	it('does not download anything while another FTP operation holds the lock', async () => {
-		givenConfigAndTasks({}, [SAMPLE_TASK]);
-		ftpOperationLockService.tryAcquire.mockResolvedValue(null);
-
-		await runWorker();
-
-		expect(ftpOperationLockService.tryAcquire).toHaveBeenCalledWith(
-			'sample-worker',
-		);
-		expect(ftpService.downloadDiscoverySampleFile).not.toHaveBeenCalled();
-		expect(ftpOperationLockService.release).not.toHaveBeenCalled();
-	});
-
-	it('does not take the lock when there is nothing to download', async () => {
+	it('does not open an FTP session when there is nothing to download', async () => {
 		givenConfigAndTasks({}, []);
 
 		await runWorker();
 
-		expect(ftpOperationLockService.tryAcquire).not.toHaveBeenCalled();
+		expect(ftpService.createSession).not.toHaveBeenCalled();
+		expect(ftpService.downloadDiscoverySampleFile).not.toHaveBeenCalled();
 	});
 
-	it('releases the lock after a download failure is recorded', async () => {
+	it('runs alongside other FTP work instead of waiting on a shared lock', async () => {
+		// The sample worker no longer takes a cross-process mutex: concurrency is
+		// bounded by the per-process FTP connection limiter, so a sync running
+		// elsewhere must not stop this batch from downloading.
 		givenConfigAndTasks({}, [SAMPLE_TASK]);
-		ftpOperationLockService.tryAcquire.mockResolvedValue('token-1');
+		clickHouseService.insert.mockResolvedValue(undefined);
+		ftpService.downloadDiscoverySampleFile.mockResolvedValue(undefined);
+		bucketR2Service.uploadFileFromPath.mockResolvedValue(undefined);
+
+		await runWorker();
+
+		expect(ftpService.downloadDiscoverySampleFile).toHaveBeenCalledTimes(1);
+	});
+
+	it('closes the session after a download failure is recorded', async () => {
+		givenConfigAndTasks({}, [SAMPLE_TASK]);
 		clickHouseService.insert.mockResolvedValue(undefined);
 		ftpService.downloadDiscoverySampleFile.mockRejectedValue(
 			new Error('530 Login incorrect.'),
@@ -123,21 +115,18 @@ describe('FtpReportFileDiscoveryService sample worker', () => {
 
 		await runWorker();
 
-		// The task is marked failed rather than rethrown, and the lock goes back
-		// so the next sync is not blocked behind a dead sample download.
+		// The task is marked failed rather than rethrown, and the connection slot
+		// goes back so the next sync is not blocked behind a dead sample download.
 		const statuses = clickHouseService.insert.mock.calls.map(
 			(call) => call[1][0].status,
 		);
 		expect(statuses).toContain('failed');
-		expect(ftpOperationLockService.release).toHaveBeenCalledWith('token-1');
+		expect(session.close).toHaveBeenCalledTimes(1);
 	});
 
 	it('downloads a batch sequentially over one FTP session', async () => {
 		const secondTask = { ...SAMPLE_TASK, id: 'task-2' };
-		const session = { close: jest.fn() };
 		givenConfigAndTasks({}, [SAMPLE_TASK, secondTask]);
-		ftpOperationLockService.tryAcquire.mockResolvedValue('token-1');
-		ftpService.createSession.mockReturnValue(session);
 		clickHouseService.insert.mockResolvedValue(undefined);
 		ftpService.downloadDiscoverySampleFile.mockResolvedValue(undefined);
 		bucketR2Service.uploadFileFromPath.mockResolvedValue(undefined);
@@ -151,16 +140,15 @@ describe('FtpReportFileDiscoveryService sample worker', () => {
 		expect(session.close).toHaveBeenCalledTimes(1);
 	});
 
-	it('releases the lock even when bookkeeping itself throws', async () => {
+	it('closes the session even when bookkeeping itself throws', async () => {
 		givenConfigAndTasks({}, [SAMPLE_TASK]);
-		ftpOperationLockService.tryAcquire.mockResolvedValue('token-1');
 		clickHouseService.insert.mockRejectedValue(
 			new Error('clickhouse down'),
 		);
 
 		await expect(runWorker()).rejects.toThrow('clickhouse down');
 
-		expect(ftpOperationLockService.release).toHaveBeenCalledWith('token-1');
+		expect(session.close).toHaveBeenCalledTimes(1);
 	});
 
 	it('holds failed tasks back for the configured backoff', async () => {
@@ -206,6 +194,6 @@ describe('FtpReportFileDiscoveryService sample worker', () => {
 		await runWorker();
 
 		expect(clickHouseService.query).not.toHaveBeenCalled();
-		expect(ftpOperationLockService.tryAcquire).not.toHaveBeenCalled();
+		expect(ftpService.createSession).not.toHaveBeenCalled();
 	});
 });

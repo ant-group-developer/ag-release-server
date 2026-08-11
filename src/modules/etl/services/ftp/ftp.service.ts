@@ -38,25 +38,130 @@ export class FtpAuthenticationError extends Error {
 	}
 }
 
+interface FtpLimiterWaiter {
+	resolve: () => void;
+	reject: (error: Error) => void;
+	timer: NodeJS.Timeout | null;
+	settled: boolean;
+}
+
+/**
+ * Caps how many FTP connections this process opens at once. Local and in-memory
+ * on purpose: a hung holder can only ever stall its own container, and it can
+ * never make an unrelated request fail the way a shared Redis mutex did.
+ *
+ * The cap is per process. A cluster of N processes can hold up to
+ * maxConnections × N connections against the server.
+ */
+export class FtpConnectionLimiter {
+	private readonly logger = new Logger(FtpConnectionLimiter.name);
+	private active = 0;
+	private readonly waiters: FtpLimiterWaiter[] = [];
+
+	constructor(
+		private readonly maxConnections: number,
+		private readonly maxWaitMs: number,
+	) {}
+
+	get activeCount(): number {
+		return this.active;
+	}
+
+	get waitingCount(): number {
+		return this.waiters.length;
+	}
+
+	/**
+	 * Resolves with the slot's release function. Releasing twice is a no-op, so a
+	 * caller can release defensively from both a catch and a finally.
+	 */
+	async acquire(context = 'ftp'): Promise<() => void> {
+		if (this.active < this.maxConnections) {
+			this.active++;
+			return this.createRelease(context);
+		}
+
+		const startedAt = Date.now();
+		this.logger.log(
+			`Waiting for an FTP slot [${context}]: ${this.active}/${this.maxConnections} in use, ${this.waiters.length} already queued`,
+		);
+		await new Promise<void>((resolve, reject) => {
+			const waiter: FtpLimiterWaiter = {
+				resolve,
+				reject,
+				timer: null,
+				settled: false,
+			};
+			waiter.timer = setTimeout(() => {
+				if (waiter.settled) return;
+				waiter.settled = true;
+				const index = this.waiters.indexOf(waiter);
+				if (index >= 0) this.waiters.splice(index, 1);
+				reject(
+					new Error(
+						`Timed out after ${this.maxWaitMs}ms waiting for a free FTP connection slot [${context}] (limit ${this.maxConnections} per process)`,
+					),
+				);
+			}, this.maxWaitMs);
+			this.waiters.push(waiter);
+		});
+		// The slot was handed over directly by release(), so `active` already
+		// counts it — incrementing here would double-count and overshoot the cap.
+		this.logger.log(
+			`Acquired FTP slot [${context}] after waiting ${Date.now() - startedAt}ms`,
+		);
+		return this.createRelease(context);
+	}
+
+	private createRelease(context: string): () => void {
+		let released = false;
+		return () => {
+			if (released) return;
+			released = true;
+			// Hand the slot straight to the next waiter instead of decrementing
+			// first: a decrement would briefly open a gap that a fresh acquire()
+			// could take, letting the queue push active past maxConnections.
+			const next = this.waiters.shift();
+			if (next) {
+				next.settled = true;
+				if (next.timer) clearTimeout(next.timer);
+				next.resolve();
+				return;
+			}
+			this.active--;
+			this.logger.debug(
+				`Released FTP slot [${context}]: ${this.active}/${this.maxConnections} in use`,
+			);
+		};
+	}
+}
+
 /**
  * Leases one FTP connection across several operations so a unit of work costs a
- * single login instead of one per call. The server throttles repeated logins and
- * answers with 530, so reuse is what keeps a sync under that threshold.
- *
- * The connection is opened lazily and reopened transparently: basic-ftp closes a
- * client on timeout or connection error, and the control socket can also idle out
- * between calls.
+ * single login instead of one per call. The session holds exactly one
+ * FtpConnectionLimiter slot from its first connect until close().
  */
 export class FtpSession {
 	private client: ftp.Client | null = null;
 	private closed = false;
+	private releaseSlot: (() => void) | null = null;
 
-	constructor(private readonly connectFn: () => Promise<ftp.Client>) {}
+	constructor(
+		private readonly connectFn: () => Promise<ftp.Client>,
+		private readonly acquireSlot: () => Promise<() => void>,
+	) {}
 
 	async getClient(): Promise<ftp.Client> {
 		if (this.closed) throw new Error('FtpSession is already closed');
 		if (!this.client || this.client.closed) {
-			this.client = await this.connectFn();
+			if (!this.releaseSlot) this.releaseSlot = await this.acquireSlot();
+			try {
+				this.client = await this.connectFn();
+			} catch (error) {
+				this.releaseSlot?.();
+				this.releaseSlot = null;
+				throw error;
+			}
 		}
 		return this.client;
 	}
@@ -77,17 +182,33 @@ export class FtpSession {
 		if (this.closed) return;
 		this.closed = true;
 		this.invalidate();
+		this.releaseSlot?.();
+		this.releaseSlot = null;
 	}
 }
 
 @Injectable()
 export class FtpService {
 	private readonly logger = new Logger(FtpService.name);
+	private readonly connectionLimiter: FtpConnectionLimiter;
+
+	/** Max time a caller waits for a free slot before acquire() rejects. */
+	private static readonly SLOT_WAIT_TIMEOUT_MS = 5 * 60 * 1000;
 
 	constructor(
 		private readonly configService: ConfigService,
 		private readonly excludePatternService: ExcludePatternService,
-	) {}
+	) {
+		const configuredMax = Number(
+			this.configService.get<string>('FTP_MAX_CONNECTIONS') || 3,
+		);
+		this.connectionLimiter = new FtpConnectionLimiter(
+			Number.isInteger(configuredMax) && configuredMax > 0
+				? configuredMax
+				: 3,
+			FtpService.SLOT_WAIT_TIMEOUT_MS,
+		);
+	}
 
 	private getConfig(): FtpConfig {
 		return {
@@ -111,12 +232,30 @@ export class FtpService {
 	}
 
 	/**
-	 * Create and connect a new FTP client.
-	 * Retries transient connection failures up to 3 times. Authentication failures
-	 * are never retried because repeated 530 responses can lock the FTP account.
-	 * Caller is responsible for closing via client.close().
+	 * Create and connect a new FTP client while owning one limiter slot until the
+	 * caller closes the client. Prefer createSession/withSession for ETL work.
 	 */
-	async connect(): Promise<ftp.Client> {
+	async connect(context = 'ftp'): Promise<ftp.Client> {
+		const releaseSlot = await this.connectionLimiter.acquire(context);
+		try {
+			const client = await this.connectClient();
+			const close = client.close.bind(client);
+			let released = false;
+			client.close = () => {
+				if (!released) {
+					released = true;
+					releaseSlot();
+				}
+				close();
+			};
+			return client;
+		} catch (error) {
+			releaseSlot();
+			throw error;
+		}
+	}
+
+	private async connectClient(): Promise<ftp.Client> {
 		const config = this.getConfig();
 		const maxAttempts = 3;
 		const retryDelayMs = 2000;
@@ -165,8 +304,11 @@ export class FtpService {
 	 * `finally`. Prefer `withSession` unless the work sits inside a loop that
 	 * relies on `continue`, which a callback cannot express.
 	 */
-	createSession(): FtpSession {
-		return new FtpSession(() => this.connect());
+	createSession(context = 'ftp'): FtpSession {
+		return new FtpSession(
+			() => this.connectClient(),
+			() => this.connectionLimiter.acquire(context),
+		);
 	}
 
 	/**
@@ -175,8 +317,9 @@ export class FtpService {
 	 */
 	async withSession<T>(
 		action: (session: FtpSession) => Promise<T>,
+		context = 'ftp',
 	): Promise<T> {
-		const session = this.createSession();
+		const session = this.createSession(context);
 		try {
 			return await action(session);
 		} finally {
@@ -192,16 +335,26 @@ export class FtpService {
 	private async withSessionRetry<T>(
 		session: FtpSession | undefined,
 		op: (client: ftp.Client) => Promise<T>,
+		context = 'ftp',
 	): Promise<T> {
-		const client = session
-			? await session.getClient()
-			: await this.connect();
+		// A throwaway session rather than a raw connect(): closing the session is
+		// what returns the connection slot, so the slot cannot leak on a failure
+		// path and the limiter's active count stays honest.
+		if (!session) {
+			return this.withSession(
+				(ownedSession) =>
+					this.withSessionRetry(ownedSession, op, context),
+				context,
+			);
+		}
+
+		const client = await session.getClient();
 		try {
 			return await op(client);
 		} catch (error) {
 			const err = error as Error;
 			if (this.isAuthenticationError(err)) throw err;
-			if (session && this.isDisconnected(err)) {
+			if (this.isDisconnected(err)) {
 				this.logger.warn(
 					`FTP session lost (${err.message}); reconnecting once`,
 				);
@@ -209,8 +362,6 @@ export class FtpService {
 				return await op(await session.getClient());
 			}
 			throw err;
-		} finally {
-			if (!session) client.close();
 		}
 	}
 
@@ -695,17 +846,22 @@ export class FtpService {
 	}> {
 		try {
 			const config = this.getConfig();
-			const client = await this.connect();
-			const list = await client.list(config.basePath);
-			const items = list.map((f) => ({
-				name: f.name,
-				type: f.type,
-				isDirectory: f.isDirectory,
-				isFile: f.isFile,
-				size: f.size,
-			}));
-			client.close();
-			return { ok: true, basePath: config.basePath, items };
+			// close() in a finally: without it a failing list() would leak the
+			// connection slot it holds and shrink the pool for good.
+			const client = await this.connect('test-connection');
+			try {
+				const list = await client.list(config.basePath);
+				const items = list.map((f) => ({
+					name: f.name,
+					type: f.type,
+					isDirectory: f.isDirectory,
+					isFile: f.isFile,
+					size: f.size,
+				}));
+				return { ok: true, basePath: config.basePath, items };
+			} finally {
+				client.close();
+			}
 		} catch (err) {
 			return { ok: false, error: err.message };
 		}

@@ -21,7 +21,6 @@ import {
 import { FtpSourceCategory } from '../../../dsp-report/dto/ftp-parser-config.dto';
 import { FtpParserConfigService } from '../../../dsp-report/services/ftp-parser-config.service';
 import { FtpReportFileRuleService } from '../../../dsp-report/services/ftp-report-file-rule.service';
-import { FtpOperationLockService } from './ftp-operation-lock.service';
 import { canonicalizeFtpReportFilePattern } from './ftp-report-file-pattern';
 import { FtpService, FtpSession } from './ftp.service';
 
@@ -38,8 +37,6 @@ export class FtpReportFileDiscoveryService
 	private configRefreshTimer: NodeJS.Timeout | null = null;
 	private sampleWorkerTimer: NodeJS.Timeout | null = null;
 	private sampleWorkerIntervalMs = 0;
-	private activeLockToken: string | null = null;
-	private stopActiveLockHeartbeat: (() => void) | null = null;
 
 	constructor(
 		private readonly ftpService: FtpService,
@@ -49,7 +46,6 @@ export class FtpReportFileDiscoveryService
 		private readonly migrationService: ClickHouseMigrationService,
 		private readonly schedulerRegistry: SchedulerRegistry,
 		private readonly bucketR2Service: BucketR2Service,
-		private readonly ftpOperationLockService: FtpOperationLockService,
 	) {}
 
 	onModuleInit(): void {
@@ -65,8 +61,6 @@ export class FtpReportFileDiscoveryService
 	onModuleDestroy(): void {
 		if (this.configRefreshTimer) clearInterval(this.configRefreshTimer);
 		if (this.sampleWorkerTimer) clearInterval(this.sampleWorkerTimer);
-		this.stopActiveLockHeartbeat?.();
-		this.stopActiveLockHeartbeat = null;
 	}
 
 	async start(
@@ -84,16 +78,6 @@ export class FtpReportFileDiscoveryService
 		if (!categories.length)
 			throw new BadRequestException(
 				'At least one FTP source category is required',
-			);
-		const lockToken =
-			await this.ftpOperationLockService.tryAcquire('rule-discovery');
-		if (!lockToken)
-			throw new Error('Another FTP operation is already running');
-		this.activeLockToken = lockToken;
-		this.stopActiveLockHeartbeat =
-			this.ftpOperationLockService.startHeartbeat(
-				lockToken,
-				'rule-discovery',
 			);
 		this.running = true;
 		const id = uuidv4();
@@ -124,10 +108,6 @@ export class FtpReportFileDiscoveryService
 			);
 		} catch (error) {
 			this.running = false;
-			this.activeLockToken = null;
-			this.stopActiveLockHeartbeat?.();
-			this.stopActiveLockHeartbeat = null;
-			await this.ftpOperationLockService.release(lockToken);
 			throw error;
 		}
 		this.logger.log(`FTP discovery ${id} started`);
@@ -349,12 +329,14 @@ export class FtpReportFileDiscoveryService
 				? new Map<string, string>()
 				: await this.getCheckpoints();
 			const minimumPeriods = Object.fromEntries(checkpoints.entries());
-			const categoryScans = await this.ftpService.withSession((session) =>
-				this.ftpService.listAllRemoteReportFiles(
-					categories,
-					minimumPeriods,
-					session,
-				),
+			const categoryScans = await this.ftpService.withSession(
+				(session) =>
+					this.ftpService.listAllRemoteReportFiles(
+						categories,
+						minimumPeriods,
+						session,
+					),
+				'discovery',
 			);
 			const missingCategories = categories.filter(
 				(category) =>
@@ -552,12 +534,6 @@ export class FtpReportFileDiscoveryService
 			);
 		} finally {
 			this.running = false;
-			const lockToken = this.activeLockToken;
-			this.activeLockToken = null;
-			this.stopActiveLockHeartbeat?.();
-			this.stopActiveLockHeartbeat = null;
-			if (lockToken)
-				await this.ftpOperationLockService.release(lockToken);
 		}
 	}
 
@@ -853,25 +829,13 @@ export class FtpReportFileDiscoveryService
 		const tasks = await this.getSampleTaskBatch();
 		if (tasks.length === 0) return;
 
-		// Sample downloads used to log in alongside a running sync or discovery
-		// scan, which is what pushed the server past its login threshold. This is
-		// best-effort work with nobody waiting on it, so a busy tick just drops.
-		const lockToken =
-			await this.ftpOperationLockService.tryAcquire('sample-worker');
-		if (!lockToken) return;
-		const stopLockHeartbeat = this.ftpOperationLockService.startHeartbeat(
-			lockToken,
-			'sample-worker',
-		);
-		const session = this.ftpService.createSession();
+		const session = this.ftpService.createSession('sample-worker');
 		try {
 			for (const task of tasks) {
 				await this.processSampleTask(task, session);
 			}
 		} finally {
 			session.close();
-			stopLockHeartbeat();
-			await this.ftpOperationLockService.release(lockToken);
 		}
 	}
 
