@@ -15,7 +15,6 @@ import { AnalyticsProjectionRefreshService } from './services/cube-rebuild/analy
 import { CubeRebuildService } from './services/cube-rebuild/cube-rebuild.service';
 import { EtlImportHistoryRepository } from './services/etl-import-history/etl-import-history.repository';
 import { ExchangeRateService } from './services/exchange-rate/exchange-rate.service';
-import { FtpOperationLockService } from './services/ftp/ftp-operation-lock.service';
 import { FtpReportFileDiscoveryService } from './services/ftp/ftp-report-file-discovery.service';
 import { FtpService } from './services/ftp/ftp.service';
 import { ImportService } from './services/import/import.service';
@@ -45,11 +44,10 @@ import { SyncService } from './services/sync/sync.service';
 	providers: [
 		ImportService,
 		FtpService,
-		FtpOperationLockService,
 		FtpReportFileDiscoveryService,
 		SyncService,
 		SchedulerService,
-		JobService, // @deprecated — giữ tạm, sẽ remove sau khi confirm không nơi khác inject
+		JobService,
 		ExchangeRateService,
 		CubeRebuildService,
 		AnalyticsProjectionRefreshService,
@@ -65,7 +63,6 @@ import { SyncService } from './services/sync/sync.service';
 		CubeRebuildService,
 		AnalyticsProjectionRefreshService,
 		EtlImportHistoryRepository,
-		FtpOperationLockService,
 	],
 })
 export class EtlModule {}

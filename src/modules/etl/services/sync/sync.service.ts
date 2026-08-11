@@ -431,8 +431,16 @@ export class SyncService {
 		// the latter case the caller owns the leased connection, so every DSP is
 		// still checked but does not cause another FTP login.
 		if (!session) {
-			return this.ftpService.withSession((ownedSession) =>
-				this.syncPeriod(period, force, categories, jobId, ownedSession),
+			return this.ftpService.withSession(
+				(ownedSession) =>
+					this.syncPeriod(
+						period,
+						force,
+						categories,
+						jobId,
+						ownedSession,
+					),
+				'sync-period',
 			);
 		}
 
@@ -898,8 +906,9 @@ export class SyncService {
 		session?: FtpSession,
 	): Promise<SyncPeriodResult[]> {
 		if (!session) {
-			return this.ftpService.withSession((ownedSession) =>
-				this.syncAll(force, categories, ownedSession),
+			return this.ftpService.withSession(
+				(ownedSession) => this.syncAll(force, categories, ownedSession),
+				'sync-all',
 			);
 		}
 
@@ -942,7 +951,7 @@ export class SyncService {
 	async getStatus(): Promise<any> {
 		// Listing every period and category over one login keeps a status check
 		// from tripping the FTP server's login throttle.
-		const ftpSession = this.ftpService.createSession();
+		const ftpSession = this.ftpService.createSession('sync-status');
 		try {
 			const periods = await this.ftpService.listPeriods(ftpSession);
 			const importedDetails = await this.getImportedDetails();

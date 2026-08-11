@@ -3,7 +3,6 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { ClickHouseMigrationService } from '../../../clickhouse';
 import { ImportJobSourceType } from '../../interfaces';
-import { FtpOperationLockService } from '../ftp/ftp-operation-lock.service';
 import { ImportJobsService } from '../import-jobs/import-jobs.service';
 import { SyncService } from '../sync/sync.service';
 
@@ -16,7 +15,6 @@ export class SchedulerService implements OnModuleInit {
 		private readonly importJobsService: ImportJobsService,
 		private readonly schedulerRegistry: SchedulerRegistry,
 		private readonly clickHouseMigrationService: ClickHouseMigrationService,
-		private readonly ftpOperationLockService: FtpOperationLockService,
 	) {}
 
 	onModuleInit() {
@@ -50,9 +48,7 @@ export class SchedulerService implements OnModuleInit {
 		}
 	}
 
-	/**
-	 * Reschedule the auto-sync cron job dynamically.
-	 */
+	/** Reschedule the auto-sync cron job dynamically. */
 	async rescheduleAutoSync(cronExpr: string): Promise<void> {
 		const jobName = 'ftp-auto-sync';
 		try {
@@ -103,14 +99,6 @@ export class SchedulerService implements OnModuleInit {
 		}
 
 		this.logger.log('Auto-sync triggered by cron...');
-		const lockToken =
-			await this.ftpOperationLockService.tryAcquire('auto-sync');
-		if (!lockToken) return;
-		const stopLockHeartbeat = this.ftpOperationLockService.startHeartbeat(
-			lockToken,
-			'auto-sync',
-		);
-
 		let job: Awaited<ReturnType<ImportJobsService['create']>> | null = null;
 		try {
 			job = await this.importJobsService.create({
@@ -127,22 +115,39 @@ export class SchedulerService implements OnModuleInit {
 				0,
 			);
 			const totalPeriods = results.length;
+			const totalFolderWarnings = results.reduce(
+				(sum, result) =>
+					sum +
+					(result.categories || []).reduce(
+						(categorySum, category) =>
+							categorySum +
+							category.folders.filter(
+								(folder) => folder.status === 'error',
+							).length,
+						0,
+					),
+				0,
+			);
 
 			this.logger.log(
 				`Auto-sync complete: ${totalPeriods} periods, ${totalRows} total rows`,
 			);
+			if (totalFolderWarnings > 0) {
+				this.logger.warn(
+					`Auto-sync completed with ${totalFolderWarnings} folder warning(s)`,
+				);
+			}
 
 			await this.importJobsService.markCompleted(job.id, {
 				totalPeriods,
 				totalRows,
+				totalFolderErrors: totalFolderWarnings,
+				hasWarnings: totalFolderWarnings > 0,
 				results,
 			});
 		} catch (err) {
 			this.logger.error(`Auto-sync failed: ${err.message}`, err.stack);
 			if (job) await this.importJobsService.markFailed(job.id, err);
-		} finally {
-			stopLockHeartbeat();
-			await this.ftpOperationLockService.release(lockToken);
 		}
 	}
 }
