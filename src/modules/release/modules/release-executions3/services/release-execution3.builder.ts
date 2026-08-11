@@ -8,7 +8,10 @@ import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Repository } from 'typeorm';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
-import { ReleaseExecutionStepType } from '../enums/release-execution3.enum';
+import {
+	ExecutionType,
+	ReleaseExecutionStepType,
+} from '../enums/release-execution3.enum';
 
 @Injectable()
 export class ReleaseExecution3Builder {
@@ -30,6 +33,23 @@ export class ReleaseExecution3Builder {
 		switch (STEP?.type) {
 			case undefined: {
 				let order = 1;
+
+				if (releaseExecution.type === ExecutionType.TAKEDOWN) {
+					stepResult.push({
+						type: ReleaseExecutionStepType.PROCESS_DSPS,
+						order: order++,
+						childExecutionMode: 'parallel',
+						isDeliveryStep: true,
+						metadata: {
+							input: {
+								delivery:
+									releaseExecution.metadata.input.delivery
+										?.all,
+							},
+						},
+					});
+					break; // ← QUAN TRỌNG: không rơi xuống logic GEN_UPC/VALIDATE
+				}
 
 				if (!releaseSnapshot.upc && releaseSnapshot.type !== 'video') {
 					stepResult.push({

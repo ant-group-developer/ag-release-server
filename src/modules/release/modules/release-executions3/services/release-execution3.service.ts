@@ -193,7 +193,10 @@ export class ReleaseExecution3Service {
 				ci: ciDealDsps,
 				state51: state51Dsps,
 				primaryDsp: null,
-				isSkipImport: releaseSnapshot.ciData?.needImportAgain === false,
+				isSkipImport:
+					execution.type === ExecutionType.TAKEDOWN
+						? false
+						: releaseSnapshot.ciData?.needImportAgain === false,
 			},
 		};
 
