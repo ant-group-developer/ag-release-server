@@ -193,6 +193,8 @@ export class ReleaseDdexService {
 		sender,
 		recipient,
 		coverExtension,
+		updateIndicator,
+		isTakedown,
 	}: {
 		release: Release;
 		outputDir: string;
@@ -206,6 +208,10 @@ export class ReleaseDdexService {
 			partyId: string;
 			name: string;
 		};
+		/** DDEX message semantics (ERN 3.8.2). Mặc định OriginalMessage. */
+		updateIndicator?: 'OriginalMessage' | 'UpdateMessage';
+		/** Takedown: chỉ gửi metadata, bỏ file resource. */
+		isTakedown?: boolean;
 	}) {
 		const input: ErnInput2 = this.parseErnInputFromRelease({
 			release,
@@ -214,6 +220,12 @@ export class ReleaseDdexService {
 			recipient,
 			coverExtension,
 		});
+		if (updateIndicator) {
+			input.updateIndicator = updateIndicator;
+		}
+		if (isTakedown) {
+			input.isTakedown = true;
+		}
 		const xmlContent = this.ernService2.generate(input);
 
 		const releaseReference =

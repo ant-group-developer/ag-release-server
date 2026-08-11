@@ -227,49 +227,53 @@ export class Ern382Builder2 {
 					'NotExplicit',
 			);
 
-		// Technical details
-		const tech = details.ele('TechnicalSoundRecordingDetails');
-		tech.ele('TechnicalResourceDetailsReference').txt(techRef);
+		// Technical details (bỏ khi takedown — không gửi file resource)
+		if (!this.input.isTakedown) {
+			const tech = details.ele('TechnicalSoundRecordingDetails');
+			tech.ele('TechnicalResourceDetailsReference').txt(techRef);
 
-		if (track.audioFile) {
-			if (track.audioFile.codecType) {
-				const codec = track.audioFile.codecType.toUpperCase();
-				if (codec === 'WAV') {
-					tech.ele('AudioCodecType', { UserDefinedValue: codec }).txt(
-						'UserDefined',
-					);
-				} else {
-					tech.ele('AudioCodecType').txt(codec);
+			if (track.audioFile) {
+				if (track.audioFile.codecType) {
+					const codec = track.audioFile.codecType.toUpperCase();
+					if (codec === 'WAV') {
+						tech.ele('AudioCodecType', {
+							UserDefinedValue: codec,
+						}).txt('UserDefined');
+					} else {
+						tech.ele('AudioCodecType').txt(codec);
+					}
 				}
-			}
-			if (track.audioFile.bitRate) {
-				tech.ele('BitRate', { UnitOfMeasure: 'kbps' }).txt(
-					String(track.audioFile.bitRate),
-				);
-			}
-			if (track.audioFile.channels) {
-				tech.ele('NumberOfChannels').txt(track.audioFile.channels);
-			}
-			if (track.audioFile.samplingRate) {
-				tech.ele('SamplingRate').txt(
-					String(track.audioFile.samplingRate),
-				);
-			}
-			if (track.audioFile.bitDepth) {
-				tech.ele('BitsPerSample').txt(String(track.audioFile.bitDepth));
-			}
+				if (track.audioFile.bitRate) {
+					tech.ele('BitRate', { UnitOfMeasure: 'kbps' }).txt(
+						String(track.audioFile.bitRate),
+					);
+				}
+				if (track.audioFile.channels) {
+					tech.ele('NumberOfChannels').txt(track.audioFile.channels);
+				}
+				if (track.audioFile.samplingRate) {
+					tech.ele('SamplingRate').txt(
+						String(track.audioFile.samplingRate),
+					);
+				}
+				if (track.audioFile.bitDepth) {
+					tech.ele('BitsPerSample').txt(
+						String(track.audioFile.bitDepth),
+					);
+				}
 
-			const file = tech.ele('File');
-			file.ele('FileName').txt(track.audioFile.fileName);
-			if (track.audioFile.filePath) {
-				file.ele('FilePath').txt(track.audioFile.filePath);
-			}
-			if (track.audioFile.hashSum) {
-				const hash = file.ele('HashSum');
-				hash.ele('HashSum').txt(track.audioFile.hashSum);
-				hash.ele('HashSumAlgorithmType').txt(
-					track.audioFile.hashAlgorithm || 'MD5',
-				);
+				const file = tech.ele('File');
+				file.ele('FileName').txt(track.audioFile.fileName);
+				if (track.audioFile.filePath) {
+					file.ele('FilePath').txt(track.audioFile.filePath);
+				}
+				if (track.audioFile.hashSum) {
+					const hash = file.ele('HashSum');
+					hash.ele('HashSum').txt(track.audioFile.hashSum);
+					hash.ele('HashSumAlgorithmType').txt(
+						track.audioFile.hashAlgorithm || 'MD5',
+					);
+				}
 			}
 		}
 	}
@@ -327,37 +331,39 @@ export class Ern382Builder2 {
 			details.ele('TerritoryCode').txt(t);
 		}
 
-		const tech = details.ele('TechnicalImageDetails');
-		tech.ele('TechnicalResourceDetailsReference').txt(techRef);
+		// Technical details (bỏ khi takedown — không gửi file cover)
+		if (!this.input.isTakedown) {
+			const tech = details.ele('TechnicalImageDetails');
+			tech.ele('TechnicalResourceDetailsReference').txt(techRef);
 
-		if (coverArt.codecType) {
-			let c = coverArt.codecType.toUpperCase();
-			if (c === 'IMAGE/JPEG' || c === 'JPG') c = 'JPEG';
-			else if (c === 'IMAGE/PNG') c = 'PNG';
-			else if (c === 'IMAGE/GIF') c = 'GIF';
-			tech.ele('ImageCodecType').txt(c);
-		}
-		if (coverArt.height) {
-			tech.ele('ImageHeight').txt(String(coverArt.height));
-		}
-		if (coverArt.width) {
-			tech.ele('ImageWidth').txt(String(coverArt.width));
-		}
+			if (coverArt.codecType) {
+				let c = coverArt.codecType.toUpperCase();
+				if (c === 'IMAGE/JPEG' || c === 'JPG') c = 'JPEG';
+				else if (c === 'IMAGE/PNG') c = 'PNG';
+				else if (c === 'IMAGE/GIF') c = 'GIF';
+				tech.ele('ImageCodecType').txt(c);
+			}
+			if (coverArt.height) {
+				tech.ele('ImageHeight').txt(String(coverArt.height));
+			}
+			if (coverArt.width) {
+				tech.ele('ImageWidth').txt(String(coverArt.width));
+			}
 
-		const file = tech.ele('File');
-		file.ele('FileName').txt(coverArt.fileName);
-		if (coverArt.filePath) {
-			file.ele('FilePath').txt(coverArt.filePath);
-		}
-		if (coverArt.hashSum) {
-			const hash = file.ele('HashSum');
-			hash.ele('HashSum').txt(coverArt.hashSum);
-			hash.ele('HashSumAlgorithmType').txt(
-				coverArt.hashAlgorithm || 'MD5',
-			);
+			const file = tech.ele('File');
+			file.ele('FileName').txt(coverArt.fileName);
+			if (coverArt.filePath) {
+				file.ele('FilePath').txt(coverArt.filePath);
+			}
+			if (coverArt.hashSum) {
+				const hash = file.ele('HashSum');
+				hash.ele('HashSum').txt(coverArt.hashSum);
+				hash.ele('HashSumAlgorithmType').txt(
+					coverArt.hashAlgorithm || 'MD5',
+				);
+			}
 		}
 	}
-
 	// ==================== ReleaseList ====================
 
 	private buildReleaseList(root: ReturnType<typeof create>): void {
