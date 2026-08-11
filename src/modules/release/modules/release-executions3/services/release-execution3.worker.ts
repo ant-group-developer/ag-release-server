@@ -644,15 +644,24 @@ export class ReleaseExecution3Worker {
 				.filter((code): code is string => !!code);
 
 			if (!step.metadata?.output?.jobCreated) {
+				// Xác định job type dựa vào execution type
+				const jobType = releaseExecution.type === ExecutionType.TAKEDOWN
+					? CiJobType3.ADMIN_TAKEDOWN
+					: CiJobType3.ADMIN_EXPORT;
+
+				const stepLabel = jobType === CiJobType3.ADMIN_TAKEDOWN
+					? 'Export CI - Admin Takedown'
+					: 'Export CI - Admin Export';
+
 				await this.ciJobService.createJob({
-					type: CiJobType3.ADMIN_EXPORT,
+					type: jobType,
 					upc,
 					dspCiCodes,
 					releaseExecutionId: step.releaseExecutionId,
 					stepId: step.id,
 					releaseId:
 						releaseExecution.metadata.input.releaseSnapshot.id,
-					stepLabel: 'Export CI - Admin Export',
+					stepLabel,
 				});
 
 				step.metadata = {
