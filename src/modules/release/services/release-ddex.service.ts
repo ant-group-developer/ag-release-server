@@ -186,7 +186,7 @@ export class ReleaseDdexService {
 		}
 	}
 
-	createTakedownMetadataOnServer({
+	async createTakedownMetadataOnServer({
 		release,
 		ernVersion,
 		recipient,
@@ -216,7 +216,7 @@ export class ReleaseDdexService {
 			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
 		const releaseDir = path.join(baseDir, batchId, releaseReference);
 
-		fs.mkdirSync(releaseDir, { recursive: true }); // Chỉ tạo folder chính
+		await fs.promises.mkdir(releaseDir, { recursive: true }); // Chỉ tạo folder chính
 
 		const xml = this.createErnFile({
 			release,

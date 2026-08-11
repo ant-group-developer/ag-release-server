@@ -24,6 +24,7 @@ import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
 	CiJobType3,
+	ExecutionType,
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
@@ -854,14 +855,23 @@ export class ReleaseExecution3Worker {
 				generatedIsrcs,
 			});
 
-			const { outputDir, batchId, releaseReference, xml } =
-				await this.releaseDdexService.createMetadataOnServer({
-					release: releaseForMetadata,
-					ernVersion: config.ernVersion,
-					sender: config.sender,
-					recipient: config.recipient,
-					dspCode,
-				});
+			const isTakedown = releaseExecution.type === ExecutionType.TAKEDOWN;
+
+			const { outputDir, batchId, releaseReference, xml } = isTakedown
+				? await this.releaseDdexService.createTakedownMetadataOnServer({
+						release: releaseForMetadata,
+						ernVersion: config.ernVersion,
+						sender: config.sender,
+						recipient: config.recipient,
+						dspCode,
+					})
+				: await this.releaseDdexService.createMetadataOnServer({
+						release: releaseForMetadata,
+						ernVersion: config.ernVersion,
+						sender: config.sender,
+						recipient: config.recipient,
+						dspCode,
+					});
 
 			step.metadata = {
 				...step.metadata,
