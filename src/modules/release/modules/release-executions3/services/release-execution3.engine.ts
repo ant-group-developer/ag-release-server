@@ -8,6 +8,7 @@ import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
+	ExecutionType,
 	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
@@ -74,6 +75,7 @@ export class ReleaseExecutionStepEngine {
 			await this.updateStepStatus(
 				STEP,
 				ReleaseExecutionStepStatus.PROCESSING,
+				releaseExecution.type,
 			);
 
 			const status = await this.releaseExecution3Worker.dispatchStepTask({
@@ -87,7 +89,7 @@ export class ReleaseExecutionStepEngine {
 			// 	return this.cancelStep(STEP);
 			// }
 
-			await this.updateStepStatus(STEP, status);
+			await this.updateStepStatus(STEP, status, releaseExecution.type);
 			return status;
 		}
 
@@ -104,6 +106,7 @@ export class ReleaseExecutionStepEngine {
 		await this.updateStepStatus(
 			STEP,
 			ReleaseExecutionStepStatus.PROCESSING,
+			releaseExecution.type,
 		);
 
 		if (STEP.childExecutionMode === 'sequential') {
@@ -114,11 +117,17 @@ export class ReleaseExecutionStepEngine {
 				});
 
 				if (this.shouldStopSequential(childStatus)) {
-					return this.resolveStatusByChild_AndUpdateDb(STEP);
+					return this.resolveStatusByChild_AndUpdateDb(
+						STEP,
+						releaseExecution.type,
+					);
 				}
 			}
 
-			return this.resolveStatusByChild_AndUpdateDb(STEP);
+			return this.resolveStatusByChild_AndUpdateDb(
+				STEP,
+				releaseExecution.type,
+			);
 		}
 
 		if (STEP.childExecutionMode === 'parallel') {
@@ -128,7 +137,10 @@ export class ReleaseExecutionStepEngine {
 				),
 			);
 
-			return this.resolveStatusByChild_AndUpdateDb(STEP);
+			return this.resolveStatusByChild_AndUpdateDb(
+				STEP,
+				releaseExecution.type,
+			);
 		}
 
 		throw new Error(
@@ -149,9 +161,10 @@ export class ReleaseExecutionStepEngine {
 	// tính toán status cha dựa vào con, lưu db
 	private async resolveStatusByChild_AndUpdateDb(
 		step: ReleaseExecutionStep3,
+		executionType?: ExecutionType,
 	): Promise<ReleaseExecutionStepStatus> {
 		const status = this.resolveStatusByChild(step);
-		await this.updateStepStatus(step, status);
+		await this.updateStepStatus(step, status, executionType);
 		return status;
 	}
 
@@ -240,6 +253,7 @@ export class ReleaseExecutionStepEngine {
 	private async updateStepStatus(
 		step: ReleaseExecutionStep3,
 		status: ReleaseExecutionStepStatus,
+		executionType?: ExecutionType,
 	): Promise<void> {
 		step.status = status;
 
@@ -254,7 +268,11 @@ export class ReleaseExecutionStepEngine {
 		await this.stepRepo.save(step);
 
 		try {
-			await this.syncDeliveryStatusByStepStatus(step, status);
+			await this.syncDeliveryStatusByStepStatus(
+				step,
+				status,
+				executionType,
+			);
 		} catch (error) {
 			this.logService.error({
 				type: LogCategory.SYSTEM,
@@ -288,12 +306,14 @@ export class ReleaseExecutionStepEngine {
 	private async syncDeliveryStatusByStepStatus(
 		step: ReleaseExecutionStep3,
 		stepStatus: ReleaseExecutionStepStatus,
+		executionType?: ExecutionType,
 	): Promise<void> {
 		if (!step.isDeliveryStep) return;
 
 		const deliveryStatus = this.mapStepStatusToDeliveryStatus(
 			step,
 			stepStatus,
+			executionType,
 		);
 
 		if (!deliveryStatus) return;
@@ -352,6 +372,7 @@ export class ReleaseExecutionStepEngine {
 	private mapStepStatusToDeliveryStatus(
 		step: ReleaseExecutionStep3,
 		stepStatus: ReleaseExecutionStepStatus,
+		executionType?: ExecutionType,
 	): ReleaseDspStatus | null {
 		// PROCESS_DSPS, PROCESS_AGG_CI chỉ đánh dấu bắt đầu quá trình phân phối, cập nhật status bên release dsp delivery
 		// Step này DONE chưa có nghĩa là release đã được phân phối thành công.
@@ -377,7 +398,9 @@ export class ReleaseExecutionStepEngine {
 
 		// Delivery step hoàn tất thành công thì DSP được xem là đã phân phối.
 		if (stepStatus === ReleaseExecutionStepStatus.DONE) {
-			return ReleaseDspStatus.DISTRIBUTED;
+			return executionType === ExecutionType.TAKEDOWN
+				? ReleaseDspStatus.TAKEN_DOWN
+				: ReleaseDspStatus.DISTRIBUTED;
 		}
 
 		// Các trạng thái kết thúc không thành công đều cần được kiểm tra/xử lý.
