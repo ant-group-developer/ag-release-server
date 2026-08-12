@@ -21,8 +21,19 @@ export interface ErnInput2 {
 	/** ERN version to generate */
 	version: ErnVersion2;
 
-	/** ERN 3.8.2: OriginalMessage (add) or UpdateMessage (update/takedown) */
+	/**
+	 * DDEX message semantics (ERN 3.8.2 root UpdateIndicator):
+	 * OriginalMessage (bản gốc) hay UpdateMessage (bản cập nhật).
+	 * KHÔNG dùng để quyết định có render resource/file hay không — dùng `isTakedown`.
+	 */
 	updateIndicator?: 'OriginalMessage' | 'UpdateMessage';
+
+	/**
+	 * Takedown: chỉ gửi metadata định danh để DSP gỡ release,
+	 * KHÔNG kèm file resource → bỏ TechnicalDetails và set IsProvidedInDelivery=false.
+	 * Mặc định false (delivery bình thường, render đầy đủ file).
+	 */
+	isTakedown?: boolean;
 
 	/** Message metadata (sender, recipient, IDs) */
 	message: ErnMessageInput2;

@@ -60,6 +60,19 @@ export class ReleaseDspDeliveryController {
 		return AppResponseSuccess.COMMON(data);
 	}
 
+	@Post('sync-status-from-ci/release/:releaseId')
+	@ApiOperation({
+		summary:
+			'Lấy status mới nhất từ CI, map và cập nhật vào release_dsp_delivery + release.status',
+	})
+	@ApiParam({ name: 'releaseId', format: 'uuid' })
+	async syncStatusFromCi(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+	) {
+		const result = await this.service.syncStatusFromCi(releaseId);
+		return AppResponseSuccess.COMMON(result);
+	}
+
 	@Put('bulk')
 	@ApiOperation({ summary: 'Bulk update release dsp deliveries' })
 	async bulkUpdate(@Body() data: BulkUpdateReleaseDspDeliveryDto) {

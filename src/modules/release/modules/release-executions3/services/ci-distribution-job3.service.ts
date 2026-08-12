@@ -50,7 +50,7 @@ export class CiDistributionJob3Service {
 	async checkCiToolJobStatus() {
 		const jobs = await this.repo.find({
 			where: {
-				type: CiJobType3.ADMIN_EXPORT,
+				type: In([CiJobType3.ADMIN_EXPORT, CiJobType3.ADMIN_TAKEDOWN]),
 				status: CiJobStatus3.PROCESSING,
 				nextCiToolCheckAt: LessThanOrEqual(new Date()),
 			},
@@ -168,7 +168,9 @@ export class CiDistributionJob3Service {
 					status: CiJobStatus3.PENDING,
 					type: In([
 						CiJobType3.EMAIL_STATE51,
+						CiJobType3.EMAIL_STATE51_TAKEDOWN,
 						CiJobType3.ADMIN_EXPORT,
+						CiJobType3.ADMIN_TAKEDOWN,
 					]),
 				},
 				order: {
@@ -241,9 +243,12 @@ export class CiDistributionJob3Service {
 
 		const unsupportedTypes = [...jobsByType.keys()].filter(
 			(type) =>
-				![CiJobType3.EMAIL_STATE51, CiJobType3.ADMIN_EXPORT].includes(
-					type,
-				),
+				![
+					CiJobType3.EMAIL_STATE51,
+					CiJobType3.EMAIL_STATE51_TAKEDOWN,
+					CiJobType3.ADMIN_EXPORT,
+					CiJobType3.ADMIN_TAKEDOWN,
+				].includes(type),
 		);
 		if (unsupportedTypes.length) {
 			throw new BadRequestException(
@@ -257,6 +262,10 @@ export class CiDistributionJob3Service {
 				sentToCi: 0,
 				ciToolJobId: undefined as string | undefined,
 			},
+			takedown: {
+				sentToCi: 0,
+				ciToolJobId: undefined as string | undefined,
+			},
 		};
 
 		const emailJobs = jobsByType.get(CiJobType3.EMAIL_STATE51) ?? [];
@@ -264,9 +273,24 @@ export class CiDistributionJob3Service {
 			result.email = await this.sendEmailToState51(emailJobs);
 		}
 
+		const emailTakedownJobs =
+			jobsByType.get(CiJobType3.EMAIL_STATE51_TAKEDOWN) ?? [];
+		if (emailTakedownJobs.length) {
+			const takedownEmailResult =
+				await this.sendEmailToState51(emailTakedownJobs);
+			result.email.sent += takedownEmailResult.sent;
+			result.email.resumed += takedownEmailResult.resumed;
+		}
+
 		const adminExportJobs = jobsByType.get(CiJobType3.ADMIN_EXPORT) ?? [];
 		if (adminExportJobs.length) {
 			result.ciTool = await this.sendExportToCi(adminExportJobs);
+		}
+
+		const adminTakedownJobs =
+			jobsByType.get(CiJobType3.ADMIN_TAKEDOWN) ?? [];
+		if (adminTakedownJobs.length) {
+			result.takedown = await this.sendTakedownToCi(adminTakedownJobs);
 		}
 
 		return result;
@@ -333,6 +357,65 @@ export class CiDistributionJob3Service {
 		}
 	}
 
+	private async sendTakedownToCi(jobs: CiDistributionJob3[]) {
+		const ids = jobs.map((job) => job.id);
+
+		try {
+			// Tạo Excel file (tái sử dụng method export hiện có)
+			const { buffer, fileName } = await this.exportTakedownExcel(ids);
+
+			// Gửi đến CI Tool TAKEDOWN endpoint
+			const ciResult = await this.ciToolService.sendFileTakedownToCi({
+				buffer,
+				originalname: fileName,
+				mimetype:
+					'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			});
+
+			const ciToolJobId = ciResult?.jobId;
+
+			if (!ciToolJobId) {
+				throw new Error('CI Tool did not return a jobId');
+			}
+
+			// Cập nhật jobs sang PROCESSING status
+			await this.repo.update(
+				{ id: In(ids) },
+				{
+					status: CiJobStatus3.PROCESSING,
+					ciToolJobId,
+					nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000), // Check sau 5 phút
+				},
+			);
+
+			this.logger.log(
+				`[sendTakedownToCi] Đã gửi ${jobs.length} takedown jobs đến CI Tool, ciToolJobId=${ciToolJobId}`,
+			);
+
+			return { sentToCi: jobs.length, ciToolJobId };
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: 'Unknown CI Tool takedown error';
+
+			this.logger.error(
+				`[sendTakedownToCi] Thất bại khi gửi takedown batch: ${message}`,
+				error instanceof Error ? error.stack : undefined,
+			);
+
+			// Đánh dấu jobs là FAILED
+			await this.finalizeJobs(jobs, {
+				jobStatus: CiJobStatus3.FAILED,
+				stepStatus: ReleaseExecutionStepStatus.FAILED,
+				note: message,
+				nextCiToolCheckAt: null,
+			});
+
+			return { sentToCi: 0, ciToolJobId: undefined };
+		}
+	}
+
 	private async sendEmailToState51(jobs: CiDistributionJob3[]) {
 		const baseDir =
 			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
@@ -368,9 +451,18 @@ export class CiDistributionJob3Service {
 
 				fs.writeFileSync(filePath, buffer);
 
+				const isEmailTakedown =
+					emailJobs[0].type === CiJobType3.EMAIL_STATE51_TAKEDOWN;
 				const subject =
 					emailJobs[0].deliveryEmailSubject ||
-					`[Distribution] CI Batch - ${dateStr}`;
+					(isEmailTakedown
+						? `[Takedown Request] ${dateStr}`
+						: `[Distribution] CI Batch - ${dateStr}`);
+				const htmlBody = isEmailTakedown
+					? `<p><strong>Takedown Request</strong></p>
+					   <p>${emailJobs.length} release(s) to be taken down from distribution.</p>
+					   <p>Please process the attached Excel file and confirm removal.</p>`
+					: `<p>${emailJobs.length} release(s) for distribution</p>`;
 
 				await this.repo.update(
 					{ id: In(ids) },
@@ -380,7 +472,7 @@ export class CiDistributionJob3Service {
 				const success = await this.notificationResendService.sendEmail({
 					to: [toEmail],
 					subject,
-					html: `<p>${emailJobs.length} release(s) for distribution</p>`,
+					html: htmlBody,
 					attachments: [{ filename: fileName, path: filePath }],
 				});
 
@@ -631,6 +723,39 @@ export class CiDistributionJob3Service {
 
 		this.logger.log(
 			`[exportFileExcel] Generated Excel for ${jobs.length} jobs`,
+		);
+
+		return { buffer: Buffer.from(buffer), fileName };
+	}
+
+	// tạo file excel cho takedown từ các jobs
+	async exportTakedownExcel(ids: string[]) {
+		const jobs = await this.repo.find({
+			where: { id: In(ids) },
+			order: { createdAt: 'ASC' },
+		});
+
+		if (!jobs.length) {
+			throw new NotFoundException('Không tìm thấy takedown jobs');
+		}
+
+		// Cùng format Excel với export (UPC + DSP codes)
+		const excelData = jobs.map((j) => ({
+			upc: j.upc,
+			listCodeDspCi: j.dspCiCodes,
+		}));
+
+		// Tái sử dụng Excel service hiện có
+		const buffer = await this.fileExportCiService.createFileExportCi({
+			data: excelData,
+		});
+
+		// Filename pattern khác để phân biệt trong logs
+		const dateStr = new Date().toISOString().slice(0, 10);
+		const fileName = `CI_Takedown_${dateStr}_${Date.now()}.xlsx`;
+
+		this.logger.log(
+			`[exportTakedownExcel] Generated Excel for ${jobs.length} takedown jobs`,
 		);
 
 		return { buffer: Buffer.from(buffer), fileName };

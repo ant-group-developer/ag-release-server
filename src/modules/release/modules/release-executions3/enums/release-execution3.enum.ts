@@ -81,7 +81,9 @@ export enum ExecutionStepMode {
 
 export enum CiJobType3 {
 	EMAIL_STATE51 = 'EMAIL_STATE51',
+	EMAIL_STATE51_TAKEDOWN = 'EMAIL_STATE51_TAKEDOWN',
 	ADMIN_EXPORT = 'ADMIN_EXPORT',
+	ADMIN_TAKEDOWN = 'ADMIN_TAKEDOWN',
 }
 
 export enum CiJobStatus3 {

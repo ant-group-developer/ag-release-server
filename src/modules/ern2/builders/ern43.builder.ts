@@ -284,7 +284,9 @@ export class Ern43Builder2 {
 				.txt(`${defaultPath}${track.isrc}_${techRef}.wav`);
 		}
 
-		deliveryFile.ele('IsProvidedInDelivery').txt('true');
+		deliveryFile
+			.ele('IsProvidedInDelivery')
+			.txt(this.input.isTakedown ? 'false' : 'true');
 
 		// WorkId (ISWC)
 		if (track.iswc) {
@@ -407,7 +409,9 @@ export class Ern43Builder2 {
 				.ele('URI')
 				.txt(`${defaultPath}${video.isrc}_${techRef}.mp4`);
 		}
-		deliveryFile.ele('IsProvidedInDelivery').txt('true');
+		deliveryFile
+			.ele('IsProvidedInDelivery')
+			.txt(this.input.isTakedown ? 'false' : 'true');
 
 		// Title
 		const displayTitle = video.version
@@ -561,21 +565,23 @@ export class Ern43Builder2 {
 			.ele('ParentalWarningType')
 			.txt(this.input.release.parentalWarning || 'NotExplicit');
 
-		// Technical details
-		const tech = image.ele('TechnicalDetails');
-		tech.ele('TechnicalResourceDetailsReference').txt(techRef);
-		const file = tech.ele('File');
+		// Technical details (bỏ khi takedown — không gửi file cover)
+		if (!this.input.isTakedown) {
+			const tech = image.ele('TechnicalDetails');
+			tech.ele('TechnicalResourceDetailsReference').txt(techRef);
+			const file = tech.ele('File');
 
-		const uri = coverArt.filePath
-			? `${coverArt.filePath}/${coverArt.fileName}`
-			: coverArt.fileName;
-		file.ele('URI').txt(uri);
-		if (coverArt.hashSum) {
-			const hash = file.ele('HashSum');
-			hash.ele('HashSum').txt(coverArt.hashSum);
-			hash.ele('HashSumAlgorithmType').txt(
-				coverArt.hashAlgorithm || 'MD5',
-			);
+			const uri = coverArt.filePath
+				? `${coverArt.filePath}/${coverArt.fileName}`
+				: coverArt.fileName;
+			file.ele('URI').txt(uri);
+			if (coverArt.hashSum) {
+				const hash = file.ele('HashSum');
+				hash.ele('HashSum').txt(coverArt.hashSum);
+				hash.ele('HashSumAlgorithmType').txt(
+					coverArt.hashAlgorithm || 'MD5',
+				);
+			}
 		}
 	}
 

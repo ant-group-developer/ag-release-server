@@ -43,6 +43,22 @@ export class CiToolController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Post('takedown')
+	@ApiOperation({ summary: 'Upload excel takedown to CI Tool' })
+	@ApiConsumes('multipart/form-data')
+	@UseInterceptors(FileInterceptor('file'))
+	async sendFileTakedownToCi(@UploadedFile() file: any) {
+		if (!file) {
+			throw new BadRequestException(
+				'Missing file. Use form-data key = file',
+			);
+		}
+
+		const result = await this.ciToolService.sendFileTakedownToCi(file);
+
+		return new ResponseSuccess({ data: result });
+	}
+
 	@ApiOperation({
 		summary: 'Get CI Tool export job status',
 	})
