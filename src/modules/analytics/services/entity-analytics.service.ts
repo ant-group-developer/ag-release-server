@@ -130,8 +130,14 @@ export class EntityAnalyticsService {
 		const isSystem = checkIsSystemTenant(tenantId);
 		const params: Record<string, any> = { entityId };
 
-		// Track + system tenant without releaseType: filter on s.isrc, no JOIN needed
-		if (entityType === 'track' && isSystem && !releaseType) {
+		// A restricted video scope needs pg_tracks_sync even for a system-tenant
+		// track query without a release-type filter.
+		if (
+			entityType === 'track' &&
+			isSystem &&
+			!releaseType &&
+			analyticsScope?.allowedChannelIds === undefined
+		) {
 			let filterSql = 'AND s.isrc = {entityId:String}';
 			if (importSource) {
 				filterSql += ' AND s.import_source = {importSource:String}';

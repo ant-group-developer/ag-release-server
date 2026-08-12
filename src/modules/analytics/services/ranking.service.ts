@@ -78,8 +78,13 @@ export class RankingService {
 			query.isrc
 		);
 
-		// System-tenant WITHOUT sub-filters → skip pg_tracks_sync JOIN entirely
-		if (isSystem && !hasSubFilter) {
+		// A restricted video scope needs pg_tracks_sync even when the system
+		// tenant has no client-supplied sub-filter.
+		if (
+			isSystem &&
+			!hasSubFilter &&
+			getAnalyticsVideoScope(query)?.allowedChannelIds === undefined
+		) {
 			if (query.importSource) {
 				filterSql = ' AND s.import_source = {importSource:String}';
 				params.importSource = query.importSource;
