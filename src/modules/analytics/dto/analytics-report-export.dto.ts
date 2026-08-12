@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	Allow,
 	ArrayNotEmpty,
 	IsArray,
 	IsIn,
@@ -20,6 +21,7 @@ const normalizeOptionalReleaseType = (value: unknown): unknown => {
 
 export class AnalyticsReportExportDto {
 	/** Server-only scope injected from the authenticated request. */
+	@Allow()
 	analyticsVideoScope?: AnalyticsVideoScope;
 	@ApiProperty({
 		description: 'Start month of the report range',
