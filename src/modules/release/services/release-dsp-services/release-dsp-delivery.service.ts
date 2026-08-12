@@ -49,6 +49,7 @@ export class ReleaseDspDeliveryService {
 			dspId?: string;
 			dspCode: string;
 			status: ReleaseDspStatus;
+			deliveredAt?: Date | null;
 		}[];
 	}): Promise<void> {
 		const { releaseIds } = input;
@@ -60,9 +61,10 @@ export class ReleaseDspDeliveryService {
 			releaseIds,
 			items,
 		);
+
 		const now = new Date();
-		const values = releaseIds.flatMap((releaseId) =>
-			items.map((item) => ({
+		const values = releaseIds.flatMap((releaseId) => {
+			return items.map((item) => ({
 				releaseId,
 				dspId: item.dspId,
 				status: item.status,
@@ -73,12 +75,12 @@ export class ReleaseDspDeliveryService {
 						this.getDeliveryKey(releaseId, item.dspId),
 					) ?? false,
 				),
-				lastEnqueuedAt:
-					item.status === ReleaseDspStatus.PROCESSING ? now : null,
-				lastDeliveredAt:
-					item.status === ReleaseDspStatus.DISTRIBUTED ? now : null,
-			})),
-		);
+				// ...(item.status === ReleaseDspStatus.PROCESSING
+				// 	? { lastEnqueuedAt: now }
+				// 	: {}),
+				lastDeliveredAt: item?.deliveredAt ?? null,
+			}));
+		});
 
 		await this.repo
 			.createQueryBuilder()
@@ -90,12 +92,33 @@ export class ReleaseDspDeliveryService {
 					'status',
 					// 'is_selected',
 					'has_live_version',
-					'last_enqueued_at',
+					// 'last_enqueued_at',
 					'last_delivered_at',
 				],
 				['release_id', 'dsp_id'],
 			)
 			.execute();
+
+		// Nếu là processing update ngày hiện tại còn không giữ nguyên
+		const processingDspIds = [
+			...new Set(
+				values
+					.filter(
+						(item) => item.status === ReleaseDspStatus.PROCESSING,
+					)
+					.map((item) => item.dspId),
+			),
+		];
+
+		if (processingDspIds.length) {
+			await this.repo.update(
+				{
+					releaseId: In(releaseIds),
+					dspId: In(processingDspIds),
+				},
+				{ lastEnqueuedAt: now },
+			);
+		}
 
 		await Promise.all(
 			[...new Set(releaseIds)].map((releaseId) =>
@@ -214,7 +237,14 @@ export class ReleaseDspDeliveryService {
 				`
 			UPDATE "release_dsp_delivery" rdd
 			SET "has_live_version" = false
-			WHERE rdd."release_id" = ANY($1::uuid[])
+			FROM "dsp_routing_configs" routing
+			INNER JOIN "aggregators" aggregator
+				ON aggregator."id" = routing."aggregator_id"
+			WHERE rdd."dsp_id" = routing."dsp_id"
+			AND routing."mode" = 'aggregator'
+			AND routing."is_active" = true
+			AND upper(trim(aggregator."code")) = 'CI'
+			AND rdd."release_id" = ANY($1::uuid[])
 			AND rdd."has_live_version" = true
 			AND NOT EXISTS (
 				SELECT 1
@@ -496,8 +526,11 @@ export class ReleaseDspDeliveryService {
 			dspId?: string;
 			dspCode: string;
 			status: ReleaseDspStatus;
+			deliveredAt?: Date | null;
 		}[],
-	): Promise<{ dspId: string; status: ReleaseDspStatus }[]> {
+	): Promise<
+		{ dspId: string; status: ReleaseDspStatus; deliveredAt: Date | null }[]
+	> {
 		if (!items.length) return [];
 
 		const dspCodes = [
@@ -527,10 +560,16 @@ export class ReleaseDspDeliveryService {
 					(item.dspCode ? dspCodeToId.get(item.dspCode) : undefined),
 				// status: item.status ?? ReleaseDspStatus.ISSUES,
 				status: item.status,
+				deliveredAt: item.deliveredAt,
 			}))
 			.filter(
-				(item): item is { dspId: string; status: ReleaseDspStatus } =>
-					!!item.dspId,
+				(
+					item,
+				): item is {
+					dspId: string;
+					status: ReleaseDspStatus;
+					deliveredAt: Date | null;
+				} => !!item.dspId,
 			);
 		return result;
 	}
@@ -614,6 +653,7 @@ export class ReleaseDspDeliveryService {
 					status: this.releaseService.mapCiDspStatusToReleaseDspStatus(
 						ciStatus,
 					),
+					deliveredAt: ciStatus.deliveredAt,
 				},
 			];
 		});

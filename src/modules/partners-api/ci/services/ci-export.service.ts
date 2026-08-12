@@ -10,6 +10,7 @@ export interface CiDspStatus {
 	status: string;
 	task: string | null;
 	taskStatus: string | null;
+	deliveredAt: Date | null;
 }
 
 export interface GetCiDspStatusesInput {
@@ -119,6 +120,9 @@ export class CiExportService {
 				'not_found',
 			task: desire.exportRequest?.task || null,
 			taskStatus: desire.status || null,
+			deliveredAt: desire.exportBatch?.transfer_end_time
+				? new Date(desire.exportBatch.transfer_end_time)
+				: null,
 		}));
 
 		this.logger.log(
