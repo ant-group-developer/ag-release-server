@@ -8,6 +8,8 @@ export interface CiDspStatus {
 	ciCode: string;
 	name: string;
 	status: string;
+	task: string | null;
+	taskStatus: string | null;
 }
 
 export interface GetCiDspStatusesInput {
@@ -115,6 +117,8 @@ export class CiExportService {
 				desire.exportBatch?.batch_transfer_status ||
 				desire.status ||
 				'not_found',
+			task: desire.exportRequest?.task || null,
+			taskStatus: desire.status || null,
 		}));
 
 		this.logger.log(

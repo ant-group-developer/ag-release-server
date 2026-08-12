@@ -1047,10 +1047,39 @@ export class ReleaseService {
 		return results;
 	}
 
-	private mapCiDspStatusToReleaseDspStatus(
+	public mapCiDspStatusToReleaseDspStatus(
 		ciStatus: CiDspStatus,
 	): ReleaseDspStatus {
-		switch (ciStatus.status?.toLowerCase()) {
+		const { status, task, taskStatus } = ciStatus;
+
+		// Priority 1: Use task + taskStatus if available (more accurate)
+		if (task && taskStatus) {
+			const normalizedTask = task.toLowerCase();
+			const normalizedTaskStatus = taskStatus.toLowerCase();
+
+			// TakeDown
+			if (normalizedTask === 'takedown') {
+				if (normalizedTaskStatus === 'complete') {
+					return ReleaseDspStatus.TAKEN_DOWN;
+				}
+				if (normalizedTaskStatus === 'processing') {
+					return ReleaseDspStatus.PROCESSING;
+				}
+			}
+
+			// Distribute
+			if (normalizedTask === 'distribute') {
+				if (normalizedTaskStatus === 'complete') {
+					return ReleaseDspStatus.DISTRIBUTED;
+				}
+				if (normalizedTaskStatus === 'processing') {
+					return ReleaseDspStatus.PROCESSING;
+				}
+			}
+		}
+
+		// Priority 2: Fallback to status (transfer status)
+		switch (status?.toLowerCase()) {
 			case 'transferred':
 			case 'complete':
 			case 'completed':
@@ -1098,8 +1127,32 @@ export class ReleaseService {
 			release,
 			dataDsp,
 		);
+		const consideredDeliveries =
+			release.releaseDspDeliveries
+				?.filter(
+					(delivery) =>
+						delivery.isSelected &&
+						(delivery.isActive ?? delivery.dsp?.isActive ?? true) &&
+						(!dataDsp ||
+							dataDsp.some(
+								(item) => item.dspCode === delivery.dsp?.code,
+							)),
+				)
+				.map((delivery) => ({
+					dspCode: delivery.dsp?.code,
+					status: delivery.status,
+					isSelected: delivery.isSelected,
+					isActive:
+						delivery.isActive ?? delivery.dsp?.isActive ?? true,
+				})) ?? [];
 
 		await this.releaseRepo.update(releaseId, { status: newStatus });
+
+		// const updatedRelease = await this.releaseRepo.findOne({
+		// 	where: { id: releaseId },
+		// 	select: ['id', 'status'],
+		// });
+
 		return { releaseId, status: newStatus };
 	}
 

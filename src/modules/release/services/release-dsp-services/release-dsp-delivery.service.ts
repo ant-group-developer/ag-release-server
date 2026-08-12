@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { TenantDspAgreementService } from 'src/modules/dsp/services/dsp-tenant.service';
+import { CiExportService } from 'src/modules/partners-api/ci/services/ci-export.service';
 import { EntityManager, In, Repository } from 'typeorm';
 import { ReleaseDspDeliveryException } from '../../constants/release-dsp.constant';
 import { ReleaseException } from '../../constants/release.constant';
@@ -37,6 +38,8 @@ export class ReleaseDspDeliveryService {
 
 		@Inject(forwardRef(() => ReleaseService))
 		private readonly releaseService: ReleaseService,
+
+		private readonly ciExportService: CiExportService,
 	) {}
 	// ==================== Delivery orchestration ====================
 	async updateDeliveryStatus(input: {
@@ -85,7 +88,7 @@ export class ReleaseDspDeliveryService {
 			.orUpdate(
 				[
 					'status',
-					'is_selected',
+					// 'is_selected',
 					'has_live_version',
 					'last_enqueued_at',
 					'last_delivered_at',
@@ -96,7 +99,7 @@ export class ReleaseDspDeliveryService {
 
 		await Promise.all(
 			[...new Set(releaseIds)].map((releaseId) =>
-				this.releaseService.syncReleaseStatus(releaseId, input.items),
+				this.releaseService.syncReleaseStatus(releaseId),
 			),
 		);
 	}
@@ -530,5 +533,116 @@ export class ReleaseDspDeliveryService {
 					!!item.dspId,
 			);
 		return result;
+	}
+
+	/**
+	 * Sync status từ CI API:
+	 * 1. Lấy status mới nhất từ CI theo release_ci_data.release_format_id
+	 * 2. Map CI status -> ReleaseDspStatus
+	 * 3. Update release_dsp_delivery
+	 * 4. Update release.status
+	 * 5. Trả về kết quả mới
+	 */
+	async syncStatusFromCi(releaseId: string) {
+		// 1. Lấy releaseFormatId từ CI
+		let releaseFormatId: string;
+		try {
+			releaseFormatId = await this.releaseService.getReleaseFormatId(
+				releaseId,
+				{ reloadFromCi: false },
+			);
+		} catch (error) {
+			throw new Error(
+				`Release chưa có releaseFormatId từ CI: ${error.message}`,
+			);
+		}
+
+		// 2. Lấy status từ CI
+		const ciStatuses = await this.ciExportService.getStatusDsps({
+			releaseFormatId,
+		});
+
+		this.logger.log(
+			`[syncStatusFromCi] releaseId=${releaseId}, CI trả về ${ciStatuses.length} DSPs`,
+		);
+
+		if (!ciStatuses.length) {
+			return {
+				releaseId,
+				message: 'Không có DSP nào từ CI',
+				updated: 0,
+			};
+		}
+
+		// 3. CI returns musicService.dpc, which maps to Dsp.codeCi (not Dsp.code).
+		// Resolve the internal DSP first so updateDeliveryStatus receives a dspId.
+		const normalizedCiCodes = [
+			...new Set(
+				ciStatuses
+					.map((item) => item.ciCode?.trim().toLowerCase())
+					.filter((code): code is string => !!code),
+			),
+		];
+		const dsps = normalizedCiCodes.length
+			? await this.dspRepo
+					.createQueryBuilder('dsp')
+					.select(['dsp.id', 'dsp.code', 'dsp.codeCi'])
+					.where('LOWER(dsp.codeCi) IN (:...ciCodes)', {
+						ciCodes: normalizedCiCodes,
+					})
+					.getMany()
+			: [];
+		const dspByCodeCi = new Map(
+			dsps
+				.filter((dsp) => !!dsp.codeCi)
+				.map((dsp) => [dsp.codeCi!.trim().toLowerCase(), dsp]),
+		);
+		const mappedStatuses = ciStatuses.flatMap((ciStatus) => {
+			const dsp = dspByCodeCi.get(ciStatus.ciCode?.trim().toLowerCase());
+
+			if (!dsp) {
+				this.logger.warn(
+					`[syncStatusFromCi] DSP not found for CI code=${ciStatus.ciCode}`,
+				);
+				return [];
+			}
+
+			return [
+				{
+					dspId: dsp.id,
+					dspCode: dsp.code,
+					status: this.releaseService.mapCiDspStatusToReleaseDspStatus(
+						ciStatus,
+					),
+				},
+			];
+		});
+
+		// 4. Update release_dsp_delivery
+		await this.updateDeliveryStatus({
+			releaseIds: [releaseId],
+			items: mappedStatuses,
+		});
+
+		// 5. Lấy lại data mới
+		// const updatedDspIds = mappedStatuses.map((item) => item.dspId);
+		// const updatedDeliveries = updatedDspIds.length
+		// 	? await this.repo.find({
+		// 			where: { releaseId, dspId: In(updatedDspIds) },
+		// 			relations: ['dsp'],
+		// 		})
+		// 	: [];
+
+		const updatedRelease = await this.releaseRepo.findOne({
+			where: { id: releaseId },
+			select: ['id', 'status'],
+		});
+
+		return {
+			releaseId,
+			releaseStatus: updatedRelease?.status,
+			ciStatuses,
+			// updated: mappedStatuses?.length,
+		};
 	}
 }
