@@ -42,6 +42,29 @@ export class ReleaseDspDeliveryService {
 		private readonly ciExportService: CiExportService,
 	) {}
 	// ==================== Delivery orchestration ====================
+
+	async filterOutTakenDownDspCodes(
+		releaseId: string,
+		dspCodes: string[],
+	): Promise<string[]> {
+		if (!dspCodes.length) return [];
+
+		const takenDownDeliveries = await this.repo.find({
+			where: {
+				releaseId,
+				status: ReleaseDspStatus.TAKEN_DOWN,
+				dsp: { code: In(dspCodes) },
+			},
+			relations: ['dsp'],
+		});
+
+		const takenDownDspCodes = new Set(
+			takenDownDeliveries.map((delivery) => delivery.dsp.code),
+		);
+
+		return dspCodes.filter((code) => !takenDownDspCodes.has(code));
+	}
+
 	async updateDeliveryStatus(input: {
 		releaseIds: string[];
 		items: {

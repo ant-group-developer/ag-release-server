@@ -824,6 +824,14 @@ export class ReleaseService {
 	async takedown(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
 
+		const dspCodes =
+			await this.releaseDspDeliveryService.filterOutTakenDownDspCodes(
+				id,
+				dto.code,
+			);
+
+		if (!dspCodes.length) return;
+
 		try {
 			await this.releaseCiDataService.bulkSyncDataCi({ ids: [id] });
 		} catch (error) {
@@ -845,7 +853,7 @@ export class ReleaseService {
 
 		return this.releaseExecution3Service.newReleaseExecution({
 			release,
-			dspCodes: dto.code,
+			dspCodes,
 			type: ExecutionType.TAKEDOWN,
 		});
 	}
