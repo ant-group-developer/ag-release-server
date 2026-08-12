@@ -34,8 +34,12 @@ export class DashboardAnalyticsService {
 
 		const isSystem = checkIsSystemTenant(tenantId);
 
-		// System tenant with no sub-filters → skip JOIN
-		if (isSystem && !query.releaseType) {
+		// A restricted video scope needs pg_tracks_sync even for the system tenant.
+		if (
+			isSystem &&
+			!query.releaseType &&
+			getAnalyticsVideoScope(query)?.allowedChannelIds === undefined
+		) {
 			return { joinSql: '', filterSql: '', params };
 		}
 

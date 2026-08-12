@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+	Allow,
 	IsBoolean,
 	IsDateString,
 	IsEnum,
@@ -14,6 +15,7 @@ import {
 	Min,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import type { AnalyticsVideoScope } from '../services/analytics-video-scope.service';
 
 const normalizeOptionalReleaseType = (value: unknown): unknown => {
 	if (typeof value !== 'string') return value;
@@ -28,6 +30,10 @@ const normalizeOptionalReleaseType = (value: unknown): unknown => {
  * Thêm fromDate/toDate bắt buộc cho analytics.
  */
 export abstract class BaseAnalyticsQueryDto extends BaseQueryDto {
+	/** Server-only scope injected from the authenticated request. */
+	@Allow()
+	analyticsVideoScope?: AnalyticsVideoScope;
+
 	@ApiProperty({
 		description: 'Start date of the filter range (inclusive)',
 		example: '2026-01-01',
@@ -256,6 +262,10 @@ export class RankingQueryDto extends BaseAnalyticsQueryDto {
  * Base DTO cho DSP analytics. Truyền cả pgDspId + dspReportId — ưu tiên pgDspId.
  */
 export class DspAnalyticsBaseDto {
+	/** Server-only scope injected from the authenticated request. */
+	@Allow()
+	analyticsVideoScope?: AnalyticsVideoScope;
+
 	@ApiPropertyOptional({
 		description:
 			'Postgres DSP ID — lấy từ field pgDspId trong response ranking/revenue API. Ưu tiên hơn dspReportId.',
@@ -419,6 +429,10 @@ export class DspTopQueryDto extends DspAnalyticsBaseDto {
  * Chỉ cần fromDate / toDate, không cần pagination.
  */
 export class ChartQueryDto {
+	/** Server-only scope injected from the authenticated request. */
+	@Allow()
+	analyticsVideoScope?: AnalyticsVideoScope;
+
 	@ApiProperty({
 		description: 'Start date of the filter range (inclusive)',
 		example: '2026-01-01',
@@ -533,6 +547,10 @@ export class RevenueChartQueryDto extends ChartQueryDto {
 }
 
 export class EntityTimelineQueryDto {
+	/** Server-only scope injected from the authenticated request. */
+	@Allow()
+	analyticsVideoScope?: AnalyticsVideoScope;
+
 	@IsDateString()
 	@ApiPropertyOptional({
 		description: 'Start date of the filter range (inclusive)',
@@ -598,6 +616,10 @@ export class EntityTimelineQueryDto {
 }
 
 export class EntityOverviewQueryDto {
+	/** Server-only scope injected from the authenticated request. */
+	@Allow()
+	analyticsVideoScope?: AnalyticsVideoScope;
+
 	@IsDateString()
 	@ApiPropertyOptional({
 		description: 'Start date of the filter range (inclusive)',
@@ -642,6 +664,10 @@ export class EntityOverviewQueryDto {
  * sales usage và revenue được tổng hợp theo các tháng giao với khoảng ngày.
  */
 export class AnalyticsSummaryQueryDto {
+	/** Server-only scope injected from the authenticated request. */
+	@Allow()
+	analyticsVideoScope?: AnalyticsVideoScope;
+
 	@ApiProperty({
 		description: 'Start date of the filter range (inclusive)',
 		example: '2026-01-01',
