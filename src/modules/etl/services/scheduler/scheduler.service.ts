@@ -109,7 +109,13 @@ export class SchedulerService implements OnModuleInit {
 				},
 			});
 			await this.importJobsService.markProcessing(job.id);
-			const results = await this.syncService.syncAll(false);
+			const results = await this.syncService.syncAll(
+				false,
+				undefined,
+				undefined,
+				job.id,
+				ImportJobSourceType.FTP_AUTO_CRON,
+			);
 			const totalRows = results.reduce(
 				(sum, r) => sum + (r.totalRows ?? 0),
 				0,
