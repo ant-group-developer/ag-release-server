@@ -1,4 +1,6 @@
 import { globalValidationPipe } from 'src/common/config/validation.config';
+import { UserReq } from 'src/common/interface/common.interface';
+import { TenantUserType, UserType } from 'src/modules/user/enum/user.enum';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
@@ -10,6 +12,7 @@ import {
 import { AnalyticsReportExportDto } from '../dto/analytics-report-export.dto';
 import {
 	AnalyticsVideoScope,
+	AnalyticsVideoScopeService,
 	appendAnalyticsVideoScopeFilter,
 } from './analytics-video-scope.service';
 
@@ -31,6 +34,28 @@ describe('appendAnalyticsVideoScopeFilter', () => {
 		);
 		expect(params.analyticsAllowedChannelIds).toEqual(['channel-a']);
 	});
+
+	it.each([TenantUserType.OWNER, TenantUserType.ADMIN])(
+		'leaves analytics unrestricted for tenant %s',
+		async (tenantUserType) => {
+			const userChannelRepo = {
+				createQueryBuilder: jest.fn(),
+			};
+			const service = new AnalyticsVideoScopeService(
+				userChannelRepo as never,
+				{} as never,
+			);
+
+			await expect(
+				service.resolve({
+					type: UserType.USER,
+					tenantUserType,
+					tenantId: 'tenant-id',
+				} as UserReq),
+			).resolves.toEqual({});
+			expect(userChannelRepo.createQueryBuilder).not.toHaveBeenCalled();
+		},
+	);
 
 	it.each([
 		[TimelineQueryDto, { fromDate: '2026-01-01', toDate: '2026-01-31' }],

@@ -19,12 +19,10 @@ import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
 import { Release } from '../../entities/release.entity';
 import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
 import { TakedownEligibilityResult } from '../../interfaces/takedown.interface';
-import { ReleaseExecution3 } from '../../modules/release-executions3/entites/release-execution3.entity';
-import { ExecutionType } from '../../modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseService } from '../release.service';
 import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
 
-type SyncStatusSkipReason = 'NULL_TASK' | 'TASK_MISMATCH' | 'STALE_DESIRE';
+type SyncStatusSkipReason = 'STALE_DESIRE';
 
 @Injectable()
 export class ReleaseDspDeliveryService {
@@ -48,9 +46,6 @@ export class ReleaseDspDeliveryService {
 		private readonly releaseService: ReleaseService,
 
 		private readonly ciExportService: CiExportService,
-
-		@InjectRepository(ReleaseExecution3)
-		private readonly releaseExecution3Repo: Repository<ReleaseExecution3>,
 	) {}
 	// ==================== Delivery orchestration ====================
 
@@ -633,17 +628,6 @@ export class ReleaseDspDeliveryService {
 		return result;
 	}
 
-	private async getLatestExecutionType(
-		releaseId: string,
-	): Promise<ExecutionType | null> {
-		const execution = await this.releaseExecution3Repo.findOne({
-			where: { releaseId },
-			select: ['id', 'type', 'createdAt'],
-			order: { createdAt: 'DESC' },
-		});
-		return execution?.type ?? null;
-	}
-
 	private async getDeliveryGateMap(
 		releaseId: string,
 		dspIds: string[],
@@ -666,7 +650,7 @@ export class ReleaseDspDeliveryService {
 	/**
 	 * Sync status từ CI API:
 	 * 1. Lấy status mới nhất từ CI theo release_ci_data.release_format_id
-	 * 2. Chỉ apply khi task CI khớp execution hiện tại và desireDate >= lastEnqueuedAt
+	 * 2. Chỉ apply khi desireDate >= lastEnqueuedAt của từng DSP
 	 * 3. Map CI status -> ReleaseDspStatus
 	 * 4. Update release_dsp_delivery (không stamp lastEnqueuedAt)
 	 * 5. Update release.status
@@ -726,10 +710,6 @@ export class ReleaseDspDeliveryService {
 				.map((dsp) => [dsp.codeCi!.trim().toLowerCase(), dsp]),
 		);
 
-		const latestType = await this.getLatestExecutionType(releaseId);
-		const expectedTask =
-			latestType === ExecutionType.TAKEDOWN ? 'takedown' : 'distribute';
-
 		const mappedCandidates = ciStatuses.flatMap((ciStatus) => {
 			const dsp = dspByCodeCi.get(ciStatus.ciCode?.trim().toLowerCase());
 
@@ -768,8 +748,6 @@ export class ReleaseDspDeliveryService {
 
 		for (const item of mappedCandidates) {
 			const skipReason = this.resolveCiSyncSkipReason({
-				latestType,
-				expectedTask,
 				ciStatus: item.ciStatus,
 				lastEnqueuedAt: gateMap.get(item.dspId)?.lastEnqueuedAt ?? null,
 			});
@@ -783,7 +761,6 @@ export class ReleaseDspDeliveryService {
 				this.logger.log(
 					`[syncStatusFromCi] SKIP reason=${skipReason.reason} ` +
 						`releaseId=${releaseId} dsp=${item.dspCode} ` +
-						`expected=${expectedTask} actual=${item.ciStatus.task} ` +
 						`desireDate=${item.ciStatus.desireDate?.toISOString() ?? 'null'} ` +
 						`lastEnqueuedAt=${
 							gateMap.get(item.dspId)?.lastEnqueuedAt
@@ -792,8 +769,7 @@ export class ReleaseDspDeliveryService {
 											.lastEnqueuedAt!,
 									).toISOString()
 								: 'null'
-						} ` +
-						`executionType=${latestType}`,
+						}`,
 				);
 				continue;
 			}
@@ -829,8 +805,6 @@ export class ReleaseDspDeliveryService {
 		return {
 			releaseId,
 			releaseStatus: updatedRelease?.status,
-			executionType: latestType,
-			expectedTask,
 			applied: applied.length,
 			skipped: skipped.length,
 			skippedItems: skipped,
@@ -839,48 +813,12 @@ export class ReleaseDspDeliveryService {
 	}
 
 	private resolveCiSyncSkipReason(input: {
-		latestType: ExecutionType | null;
-		expectedTask: 'takedown' | 'distribute';
 		ciStatus: CiDspStatus;
 		lastEnqueuedAt: Date | null;
 	}): {
 		reason: SyncStatusSkipReason;
 		detail: Record<string, unknown>;
 	} | null {
-		const actualTask = input.ciStatus.task?.trim().toLowerCase() || null;
-
-		if (input.latestType !== null) {
-			if (!actualTask) {
-				return {
-					reason: 'NULL_TASK',
-					detail: {
-						expectedTask: input.expectedTask,
-						actualTask,
-						latestType: input.latestType,
-					},
-				};
-			}
-			if (actualTask !== input.expectedTask) {
-				return {
-					reason: 'TASK_MISMATCH',
-					detail: {
-						expectedTask: input.expectedTask,
-						actualTask,
-						latestType: input.latestType,
-					},
-				};
-			}
-		} else if (actualTask && actualTask !== input.expectedTask) {
-			return {
-				reason: 'TASK_MISMATCH',
-				detail: {
-					expectedTask: input.expectedTask,
-					actualTask,
-					latestType: input.latestType,
-				},
-			};
-		}
-
 		if (input.lastEnqueuedAt) {
 			const desireMs = input.ciStatus.desireDate?.getTime() ?? 0;
 			const enqueuedMs = new Date(input.lastEnqueuedAt).getTime();

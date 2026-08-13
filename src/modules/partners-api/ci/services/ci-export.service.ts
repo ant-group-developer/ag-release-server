@@ -117,7 +117,8 @@ export class CiExportService {
 
 			return {
 				ciCode: desire.musicService?.dpc || '',
-				name: desire.musicService?.name || desire.musicService?.dpc || '',
+				name:
+					desire.musicService?.name || desire.musicService?.dpc || '',
 				status:
 					desire.exportBatch?.batch_transfer_status ||
 					desire.status ||
