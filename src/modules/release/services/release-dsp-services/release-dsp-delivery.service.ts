@@ -3,7 +3,10 @@ import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { TenantDspAgreementService } from 'src/modules/dsp/services/dsp-tenant.service';
-import { CiExportService } from 'src/modules/partners-api/ci/services/ci-export.service';
+import {
+	CiDspStatus,
+	CiExportService,
+} from 'src/modules/partners-api/ci/services/ci-export.service';
 import { EntityManager, In, Repository } from 'typeorm';
 import { ReleaseDspDeliveryException } from '../../constants/release-dsp.constant';
 import { ReleaseException } from '../../constants/release.constant';
@@ -15,8 +18,12 @@ import {
 import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
 import { Release } from '../../entities/release.entity';
 import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
+import { ReleaseExecution3 } from '../../modules/release-executions3/entites/release-execution3.entity';
+import { ExecutionType } from '../../modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseService } from '../release.service';
 import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
+
+type SyncStatusSkipReason = 'NULL_TASK' | 'TASK_MISMATCH' | 'STALE_DESIRE';
 
 @Injectable()
 export class ReleaseDspDeliveryService {
@@ -40,6 +47,9 @@ export class ReleaseDspDeliveryService {
 		private readonly releaseService: ReleaseService,
 
 		private readonly ciExportService: CiExportService,
+
+		@InjectRepository(ReleaseExecution3)
+		private readonly releaseExecution3Repo: Repository<ReleaseExecution3>,
 	) {}
 	// ==================== Delivery orchestration ====================
 
@@ -74,6 +84,7 @@ export class ReleaseDspDeliveryService {
 			status: ReleaseDspStatus;
 			deliveredAt?: Date | null;
 		}[];
+		stampLastEnqueuedAt?: boolean;
 	}): Promise<void> {
 		const { releaseIds } = input;
 		const items = await this.resolveDeliveryStatusItems(input.items);
@@ -122,25 +133,30 @@ export class ReleaseDspDeliveryService {
 			)
 			.execute();
 
-		// Nếu là processing update ngày hiện tại còn không giữ nguyên
-		const processingDspIds = [
-			...new Set(
-				values
-					.filter(
-						(item) => item.status === ReleaseDspStatus.PROCESSING,
-					)
-					.map((item) => item.dspId),
-			),
-		];
+		// Nếu là processing update ngày hiện tại còn không giữ nguyên.
+		// CI sync truyền stampLastEnqueuedAt=false để không đẩy clock
+		// qua desire cũ và kẹt các lần sync sau.
+		if (input.stampLastEnqueuedAt !== false) {
+			const processingDspIds = [
+				...new Set(
+					values
+						.filter(
+							(item) =>
+								item.status === ReleaseDspStatus.PROCESSING,
+						)
+						.map((item) => item.dspId),
+				),
+			];
 
-		if (processingDspIds.length) {
-			await this.repo.update(
-				{
-					releaseId: In(releaseIds),
-					dspId: In(processingDspIds),
-				},
-				{ lastEnqueuedAt: now },
-			);
+			if (processingDspIds.length) {
+				await this.repo.update(
+					{
+						releaseId: In(releaseIds),
+						dspId: In(processingDspIds),
+					},
+					{ lastEnqueuedAt: now },
+				);
+			}
 		}
 
 		await Promise.all(
@@ -211,69 +227,21 @@ export class ReleaseDspDeliveryService {
 			// 1. Upsert has_live_version cho các dsp CÓ xuất hiện trong export mới
 			const upsertRows = await manager.query(
 				`
-			INSERT INTO "release_dsp_delivery" (
-				"release_id",
-				"dsp_id",
-				"has_live_version"
-			)
-			SELECT
-				ci_export."release_id",
-				dsp."id",
-				bool_or(
-					lower(coalesce(ci_export."delivery_point_status", '')) IN ('live', 'transferred')
+				INSERT INTO "release_dsp_delivery" (
+					"release_id",
+					"dsp_id",
+					"has_live_version"
 				)
-			FROM (
 				SELECT
-					rcd."release_id",
-					export_item."value" ->> 'deliveryPointStatus' AS "delivery_point_status",
-					coalesce(
-						nullif(trim(export_item."value" ->> 'deliveryPointCode'), ''),
-						nullif(trim(substring(
-							export_item."value" ->> 'deliveryPoint'
-							FROM '\\(([^()]*)\\)\\s*$'
-						)), '')
-					) AS "delivery_point_code"
-				FROM "release_ci_data" rcd
-				INNER JOIN LATERAL jsonb_array_elements(
-					coalesce(rcd."export_parsed_data", '[]'::jsonb)
-				) AS export_item("value") ON true
-				WHERE rcd."release_id" = ANY($1::uuid[])
-			) ci_export
-			INNER JOIN "dsps" dsp
-				ON upper(trim(dsp."code_ci")) =
-					upper(trim(ci_export."delivery_point_code"))
-			WHERE dsp."code_ci" IS NOT NULL
-			AND ci_export."delivery_point_code" IS NOT NULL
-			GROUP BY
-				ci_export."release_id",
-				dsp."id"
-			ON CONFLICT ("release_id", "dsp_id")
-			DO UPDATE SET
-				"has_live_version" = EXCLUDED."has_live_version"
-			RETURNING "id"
-			`,
-				[uniqueReleaseIds],
-			);
-
-			// 2. Set false cho dsp đang live cũ nhưng KHÔNG còn xuất hiện trong export mới
-			const downRows = await manager.query(
-				`
-			UPDATE "release_dsp_delivery" rdd
-			SET "has_live_version" = false
-			FROM "dsp_routing_configs" routing
-			INNER JOIN "aggregators" aggregator
-				ON aggregator."id" = routing."aggregator_id"
-			WHERE rdd."dsp_id" = routing."dsp_id"
-			AND routing."mode" = 'aggregator'
-			AND routing."is_active" = true
-			AND upper(trim(aggregator."code")) = 'CI'
-			AND rdd."release_id" = ANY($1::uuid[])
-			AND rdd."has_live_version" = true
-			AND NOT EXISTS (
-				SELECT 1
+					ci_export."release_id",
+					dsp."id",
+					bool_or(
+						lower(coalesce(ci_export."delivery_point_status", '')) IN ('live', 'transferred')
+					)
 				FROM (
 					SELECT
 						rcd."release_id",
+						export_item."value" ->> 'deliveryPointStatus' AS "delivery_point_status",
 						coalesce(
 							nullif(trim(export_item."value" ->> 'deliveryPointCode'), ''),
 							nullif(trim(substring(
@@ -287,13 +255,61 @@ export class ReleaseDspDeliveryService {
 					) AS export_item("value") ON true
 					WHERE rcd."release_id" = ANY($1::uuid[])
 				) ci_export
-				INNER JOIN "dsps" dsp2
-					ON upper(trim(dsp2."code_ci")) = upper(trim(ci_export."delivery_point_code"))
-				WHERE ci_export."release_id" = rdd."release_id"
-				AND dsp2."id" = rdd."dsp_id"
-			)
-			RETURNING rdd."id"
-			`,
+				INNER JOIN "dsps" dsp
+					ON upper(trim(dsp."code_ci")) =
+						upper(trim(ci_export."delivery_point_code"))
+				WHERE dsp."code_ci" IS NOT NULL
+				AND ci_export."delivery_point_code" IS NOT NULL
+				GROUP BY
+					ci_export."release_id",
+					dsp."id"
+				ON CONFLICT ("release_id", "dsp_id")
+				DO UPDATE SET
+					"has_live_version" = EXCLUDED."has_live_version"
+				RETURNING "id"
+				`,
+				[uniqueReleaseIds],
+			);
+
+			// 2. Set false cho dsp đang live cũ nhưng KHÔNG còn xuất hiện trong export mới
+			const downRows = await manager.query(
+				`
+				UPDATE "release_dsp_delivery" rdd
+				SET "has_live_version" = false
+				FROM "dsp_routing_configs" routing
+				INNER JOIN "aggregators" aggregator
+					ON aggregator."id" = routing."aggregator_id"
+				WHERE rdd."dsp_id" = routing."dsp_id"
+				AND routing."mode" = 'aggregator'
+				AND routing."is_active" = true
+				AND upper(trim(aggregator."code")) = 'CI'
+				AND rdd."release_id" = ANY($1::uuid[])
+				AND rdd."has_live_version" = true
+				AND NOT EXISTS (
+					SELECT 1
+					FROM (
+						SELECT
+							rcd."release_id",
+							coalesce(
+								nullif(trim(export_item."value" ->> 'deliveryPointCode'), ''),
+								nullif(trim(substring(
+									export_item."value" ->> 'deliveryPoint'
+									FROM '\\(([^()]*)\\)\\s*$'
+								)), '')
+							) AS "delivery_point_code"
+						FROM "release_ci_data" rcd
+						INNER JOIN LATERAL jsonb_array_elements(
+							coalesce(rcd."export_parsed_data", '[]'::jsonb)
+						) AS export_item("value") ON true
+						WHERE rcd."release_id" = ANY($1::uuid[])
+					) ci_export
+					INNER JOIN "dsps" dsp2
+						ON upper(trim(dsp2."code_ci")) = upper(trim(ci_export."delivery_point_code"))
+					WHERE ci_export."release_id" = rdd."release_id"
+					AND dsp2."id" = rdd."dsp_id"
+				)
+				RETURNING rdd."id"
+				`,
 				[uniqueReleaseIds],
 			);
 
@@ -597,13 +613,43 @@ export class ReleaseDspDeliveryService {
 		return result;
 	}
 
+	private async getLatestExecutionType(
+		releaseId: string,
+	): Promise<ExecutionType | null> {
+		const execution = await this.releaseExecution3Repo.findOne({
+			where: { releaseId },
+			select: ['id', 'type', 'createdAt'],
+			order: { createdAt: 'DESC' },
+		});
+		return execution?.type ?? null;
+	}
+
+	private async getDeliveryGateMap(
+		releaseId: string,
+		dspIds: string[],
+	): Promise<Map<string, { lastEnqueuedAt: Date | null }>> {
+		if (!dspIds.length) return new Map();
+
+		const deliveries = await this.repo.find({
+			where: { releaseId, dspId: In(dspIds) },
+			select: ['dspId', 'lastEnqueuedAt'],
+		});
+
+		return new Map(
+			deliveries.map((delivery) => [
+				delivery.dspId,
+				{ lastEnqueuedAt: delivery.lastEnqueuedAt },
+			]),
+		);
+	}
+
 	/**
 	 * Sync status từ CI API:
 	 * 1. Lấy status mới nhất từ CI theo release_ci_data.release_format_id
-	 * 2. Map CI status -> ReleaseDspStatus
-	 * 3. Update release_dsp_delivery
-	 * 4. Update release.status
-	 * 5. Trả về kết quả mới
+	 * 2. Chỉ apply khi task CI khớp execution hiện tại và desireDate >= lastEnqueuedAt
+	 * 3. Map CI status -> ReleaseDspStatus
+	 * 4. Update release_dsp_delivery (không stamp lastEnqueuedAt)
+	 * 5. Update release.status
 	 */
 	async syncStatusFromCi(releaseId: string) {
 		// 1. Lấy releaseFormatId từ CI
@@ -659,7 +705,12 @@ export class ReleaseDspDeliveryService {
 				.filter((dsp) => !!dsp.codeCi)
 				.map((dsp) => [dsp.codeCi!.trim().toLowerCase(), dsp]),
 		);
-		const mappedStatuses = ciStatuses.flatMap((ciStatus) => {
+
+		const latestType = await this.getLatestExecutionType(releaseId);
+		const expectedTask =
+			latestType === ExecutionType.TAKEDOWN ? 'takedown' : 'distribute';
+
+		const mappedCandidates = ciStatuses.flatMap((ciStatus) => {
 			const dsp = dspByCodeCi.get(ciStatus.ciCode?.trim().toLowerCase());
 
 			if (!dsp) {
@@ -673,28 +724,82 @@ export class ReleaseDspDeliveryService {
 				{
 					dspId: dsp.id,
 					dspCode: dsp.code,
-					status: this.releaseService.mapCiDspStatusToReleaseDspStatus(
-						ciStatus,
-					),
-					deliveredAt: ciStatus.deliveredAt,
+					ciStatus,
 				},
 			];
 		});
 
-		// 4. Update release_dsp_delivery
-		await this.updateDeliveryStatus({
-			releaseIds: [releaseId],
-			items: mappedStatuses,
-		});
+		const gateMap = await this.getDeliveryGateMap(
+			releaseId,
+			mappedCandidates.map((item) => item.dspId),
+		);
 
-		// 5. Lấy lại data mới
-		// const updatedDspIds = mappedStatuses.map((item) => item.dspId);
-		// const updatedDeliveries = updatedDspIds.length
-		// 	? await this.repo.find({
-		// 			where: { releaseId, dspId: In(updatedDspIds) },
-		// 			relations: ['dsp'],
-		// 		})
-		// 	: [];
+		const applied: {
+			dspId: string;
+			dspCode: string;
+			status: ReleaseDspStatus;
+			deliveredAt: Date | null;
+		}[] = [];
+		const skipped: {
+			dspCode: string;
+			reason: SyncStatusSkipReason;
+			detail: Record<string, unknown>;
+		}[] = [];
+
+		for (const item of mappedCandidates) {
+			const skipReason = this.resolveCiSyncSkipReason({
+				latestType,
+				expectedTask,
+				ciStatus: item.ciStatus,
+				lastEnqueuedAt: gateMap.get(item.dspId)?.lastEnqueuedAt ?? null,
+			});
+
+			if (skipReason) {
+				skipped.push({
+					dspCode: item.dspCode,
+					reason: skipReason.reason,
+					detail: skipReason.detail,
+				});
+				this.logger.log(
+					`[syncStatusFromCi] SKIP reason=${skipReason.reason} ` +
+						`releaseId=${releaseId} dsp=${item.dspCode} ` +
+						`expected=${expectedTask} actual=${item.ciStatus.task} ` +
+						`desireDate=${item.ciStatus.desireDate?.toISOString() ?? 'null'} ` +
+						`lastEnqueuedAt=${
+							gateMap.get(item.dspId)?.lastEnqueuedAt
+								? new Date(
+										gateMap.get(item.dspId)!
+											.lastEnqueuedAt!,
+									).toISOString()
+								: 'null'
+						} ` +
+						`executionType=${latestType}`,
+				);
+				continue;
+			}
+
+			applied.push({
+				dspId: item.dspId,
+				dspCode: item.dspCode,
+				status: this.releaseService.mapCiDspStatusToReleaseDspStatus(
+					item.ciStatus,
+				),
+				deliveredAt: item.ciStatus.deliveredAt,
+			});
+		}
+
+		if (applied.length) {
+			await this.updateDeliveryStatus({
+				releaseIds: [releaseId],
+				items: applied,
+				stampLastEnqueuedAt: false,
+			});
+		} else {
+			this.logger.log(
+				`[syncStatusFromCi] releaseId=${releaseId}: nothing to apply ` +
+					`(skipped=${skipped.length})`,
+			);
+		}
 
 		const updatedRelease = await this.releaseRepo.findOne({
 			where: { id: releaseId },
@@ -704,8 +809,72 @@ export class ReleaseDspDeliveryService {
 		return {
 			releaseId,
 			releaseStatus: updatedRelease?.status,
+			executionType: latestType,
+			expectedTask,
+			applied: applied.length,
+			skipped: skipped.length,
+			skippedItems: skipped,
 			ciStatuses,
-			// updated: mappedStatuses?.length,
 		};
+	}
+
+	private resolveCiSyncSkipReason(input: {
+		latestType: ExecutionType | null;
+		expectedTask: 'takedown' | 'distribute';
+		ciStatus: CiDspStatus;
+		lastEnqueuedAt: Date | null;
+	}): {
+		reason: SyncStatusSkipReason;
+		detail: Record<string, unknown>;
+	} | null {
+		const actualTask = input.ciStatus.task?.trim().toLowerCase() || null;
+
+		if (input.latestType !== null) {
+			if (!actualTask) {
+				return {
+					reason: 'NULL_TASK',
+					detail: {
+						expectedTask: input.expectedTask,
+						actualTask,
+						latestType: input.latestType,
+					},
+				};
+			}
+			if (actualTask !== input.expectedTask) {
+				return {
+					reason: 'TASK_MISMATCH',
+					detail: {
+						expectedTask: input.expectedTask,
+						actualTask,
+						latestType: input.latestType,
+					},
+				};
+			}
+		} else if (actualTask && actualTask !== input.expectedTask) {
+			return {
+				reason: 'TASK_MISMATCH',
+				detail: {
+					expectedTask: input.expectedTask,
+					actualTask,
+					latestType: input.latestType,
+				},
+			};
+		}
+
+		if (input.lastEnqueuedAt) {
+			const desireMs = input.ciStatus.desireDate?.getTime() ?? 0;
+			const enqueuedMs = new Date(input.lastEnqueuedAt).getTime();
+			if (!desireMs || desireMs < enqueuedMs) {
+				return {
+					reason: 'STALE_DESIRE',
+					detail: {
+						desireDate: input.ciStatus.desireDate,
+						lastEnqueuedAt: input.lastEnqueuedAt,
+					},
+				};
+			}
+		}
+
+		return null;
 	}
 }

@@ -11,6 +11,7 @@ export interface CiDspStatus {
 	task: string | null;
 	taskStatus: string | null;
 	deliveredAt: Date | null;
+	desireDate: Date | null;
 }
 
 export interface GetCiDspStatusesInput {
@@ -111,19 +112,24 @@ export class CiExportService {
 			}
 		}
 
-		const result = Array.from(latestByDsp.values(), (desire) => ({
-			ciCode: desire.musicService?.dpc || '',
-			name: desire.musicService?.name || desire.musicService?.dpc || '',
-			status:
-				desire.exportBatch?.batch_transfer_status ||
-				desire.status ||
-				'not_found',
-			task: desire.exportRequest?.task || null,
-			taskStatus: desire.status || null,
-			deliveredAt: desire.exportBatch?.transfer_end_time
-				? new Date(desire.exportBatch.transfer_end_time)
-				: null,
-		}));
+		const result = Array.from(latestByDsp.values(), (desire) => {
+			const desireTs = this.getDeliverDesireTimestamp(desire);
+
+			return {
+				ciCode: desire.musicService?.dpc || '',
+				name: desire.musicService?.name || desire.musicService?.dpc || '',
+				status:
+					desire.exportBatch?.batch_transfer_status ||
+					desire.status ||
+					'not_found',
+				task: desire.exportRequest?.task || null,
+				taskStatus: desire.status || null,
+				deliveredAt: desire.exportBatch?.transfer_end_time
+					? new Date(desire.exportBatch.transfer_end_time)
+					: null,
+				desireDate: desireTs > 0 ? new Date(desireTs) : null,
+			};
+		});
 
 		this.logger.log(
 			`[getStatusDsps] releaseFormatId=${releaseFormatId}: ${result.length} DSPs found`,
