@@ -3,7 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { UserReq } from 'src/common/interface/common.interface';
 import { Channel } from 'src/modules/channel/entities/channel.entity';
 import { UserChannel } from 'src/modules/channel/entities/user-channel.entity';
-import { UserType } from 'src/modules/user/enum/user.enum';
+import {
+	checkCanAccessTenantAll,
+	checkIsNotSystemTenant,
+} from 'src/modules/user/utils/user-type.util';
 import { Video } from 'src/modules/video/entities/video.entity';
 import { ILike, Repository } from 'typeorm';
 
@@ -48,7 +51,12 @@ export class AnalyticsVideoScopeService {
 	) {}
 
 	async resolve(user: UserReq): Promise<AnalyticsVideoScope> {
-		if (user.type !== UserType.USER) return {};
+		if (
+			!checkIsNotSystemTenant(user.tenantId) ||
+			checkCanAccessTenantAll(user.type, user.tenantUserType)
+		) {
+			return {};
+		}
 
 		const rows = await this.userChannelRepo
 			.createQueryBuilder('userChannel')

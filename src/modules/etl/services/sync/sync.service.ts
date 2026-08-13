@@ -388,13 +388,14 @@ export class SyncService {
 		batchId: string,
 		jobId: string | undefined,
 		fileNames: string[],
+		sourceType: ImportJobSourceType,
 	): Promise<void> {
 		for (const fileName of [...new Set(fileNames)].filter(Boolean)) {
 			await this.etlImportHistoryRepository.upsert({
 				job_id: jobId ?? batchId,
 				batch_id: batchId,
 				period,
-				source_type: ImportJobSourceType.FTP_SYNC_PERIOD,
+				source_type: sourceType,
 				category,
 				dsp_folder: dspFolder,
 				file_name: fileName,
@@ -426,6 +427,7 @@ export class SyncService {
 		>,
 		jobId?: string,
 		session?: FtpSession,
+		sourceType: ImportJobSourceType = ImportJobSourceType.FTP_SYNC_PERIOD,
 	): Promise<SyncPeriodResult> {
 		// A period can be called on its own or as part of a range/auto-sync. In
 		// the latter case the caller owns the leased connection, so every DSP is
@@ -439,6 +441,7 @@ export class SyncService {
 						categories,
 						jobId,
 						ownedSession,
+						sourceType,
 					),
 				'sync-period',
 			);
@@ -592,6 +595,7 @@ export class SyncService {
 								batchId,
 								jobId,
 								ignoredHistoricalFiles,
+								sourceType,
 							);
 							ignoredFilesCleaned = ignoredHistoricalFiles.length;
 							if (deletedRows > 0)
@@ -775,8 +779,7 @@ export class SyncService {
 									job_id: jobId,
 									batch_id: batchId,
 									period,
-									source_type:
-										ImportJobSourceType.FTP_SYNC_PERIOD,
+									source_type: sourceType,
 									category,
 									dsp_folder: dspFolder,
 									file_name: stat.fileName,
@@ -904,10 +907,19 @@ export class SyncService {
 			'trends' | 'usage' | 'sales' | 'illegitimate_activity'
 		>,
 		session?: FtpSession,
+		jobId?: string,
+		sourceType: ImportJobSourceType = ImportJobSourceType.FTP_SYNC_ALL,
 	): Promise<SyncPeriodResult[]> {
 		if (!session) {
 			return this.ftpService.withSession(
-				(ownedSession) => this.syncAll(force, categories, ownedSession),
+				(ownedSession) =>
+					this.syncAll(
+						force,
+						categories,
+						ownedSession,
+						jobId,
+						sourceType,
+					),
 				'sync-all',
 			);
 		}
@@ -936,8 +948,9 @@ export class SyncService {
 				period,
 				resolvedForce,
 				resolvedCategories,
-				undefined,
+				jobId,
 				session,
+				sourceType,
 			);
 			results.push(result);
 		}
