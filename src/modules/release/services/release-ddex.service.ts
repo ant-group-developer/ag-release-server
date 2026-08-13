@@ -186,6 +186,77 @@ export class ReleaseDdexService {
 		}
 	}
 
+	async createTakedownMetadataOnServer({
+		release,
+		ernVersion,
+		recipient,
+		sender,
+		dspCode,
+	}: {
+		release: Release;
+		ernVersion: ErnVersion2;
+		recipient: { partyId: string; name: string };
+		sender: { partyId: string; name: string };
+		dspCode?: string;
+	}) {
+		const batchId = genBatchId();
+		const upc = release.upc;
+		const releaseReference =
+			release.type === 'video' ? release.video?.isrc : upc;
+
+		if (!releaseReference) {
+			throw new Error(
+				release.type === 'video'
+					? 'Không tìm thấy ISRC'
+					: 'Không tìm thấy UPC',
+			);
+		}
+
+		const baseDir =
+			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
+		const releaseDir = path.join(baseDir, batchId, releaseReference);
+
+		await fs.promises.mkdir(releaseDir, { recursive: true }); // Chỉ tạo folder chính
+
+		const xml = this.createErnFile({
+			release,
+			outputDir: releaseDir,
+			ernVersion,
+			recipient,
+			sender,
+			coverExtension: undefined,
+			updateIndicator: 'UpdateMessage', // ngữ nghĩa DDEX
+			isTakedown: true, // gate bỏ file resource
+		});
+
+		if (dspCode?.toUpperCase() !== 'VEVO') {
+			if (!upc) {
+				throw new Error(
+					'Không tìm thấy mã UPC của release để tạo manifest',
+				);
+			}
+			this.createManifestFile({
+				batchId,
+				upc,
+				outputRoot: path.dirname(releaseDir),
+				sender,
+				recipient,
+			});
+		}
+
+		this.logger.log({
+			releaseId: release.id,
+			step: 'createTakedownMetadataOnServer',
+		});
+
+		return {
+			outputDir: path.dirname(releaseDir),
+			batchId,
+			releaseReference,
+			xml,
+		};
+	}
+
 	createErnFile({
 		release,
 		outputDir,
@@ -193,6 +264,8 @@ export class ReleaseDdexService {
 		sender,
 		recipient,
 		coverExtension,
+		updateIndicator,
+		isTakedown,
 	}: {
 		release: Release;
 		outputDir: string;
@@ -206,6 +279,10 @@ export class ReleaseDdexService {
 			partyId: string;
 			name: string;
 		};
+		/** DDEX message semantics (ERN 3.8.2). Mặc định OriginalMessage. */
+		updateIndicator?: 'OriginalMessage' | 'UpdateMessage';
+		/** Takedown: chỉ gửi metadata, bỏ file resource. */
+		isTakedown?: boolean;
 	}) {
 		const input: ErnInput2 = this.parseErnInputFromRelease({
 			release,
@@ -214,6 +291,12 @@ export class ReleaseDdexService {
 			recipient,
 			coverExtension,
 		});
+		if (updateIndicator) {
+			input.updateIndicator = updateIndicator;
+		}
+		if (isTakedown) {
+			input.isTakedown = true;
+		}
 		const xmlContent = this.ernService2.generate(input);
 
 		const releaseReference =

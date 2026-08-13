@@ -8,7 +8,10 @@ import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Repository } from 'typeorm';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
-import { ReleaseExecutionStepType } from '../enums/release-execution3.enum';
+import {
+	ExecutionType,
+	ReleaseExecutionStepType,
+} from '../enums/release-execution3.enum';
 
 @Injectable()
 export class ReleaseExecution3Builder {
@@ -30,6 +33,23 @@ export class ReleaseExecution3Builder {
 		switch (STEP?.type) {
 			case undefined: {
 				let order = 1;
+
+				if (releaseExecution.type === ExecutionType.TAKEDOWN) {
+					stepResult.push({
+						type: ReleaseExecutionStepType.PROCESS_DSPS,
+						order: order++,
+						childExecutionMode: 'parallel',
+						isDeliveryStep: true,
+						metadata: {
+							input: {
+								delivery:
+									releaseExecution.metadata.input.delivery
+										?.all,
+							},
+						},
+					});
+					break; // ← QUAN TRỌNG: không rơi xuống logic GEN_UPC/VALIDATE
+				}
 
 				if (!releaseSnapshot.upc && releaseSnapshot.type !== 'video') {
 					stepResult.push({
@@ -216,58 +236,64 @@ export class ReleaseExecution3Builder {
 			case ReleaseExecutionStepType.PROCESS_AGG_CI: {
 				const { dspAggregator } = releaseExecution.metadata.input;
 
-				const ciDsps = [
-					...(dspAggregator?.ci?.ci ?? []),
-					...(dspAggregator?.ci?.state51 ?? []),
-				];
+				const ciDealDsps = dspAggregator?.ci?.ci ?? [];
+				const state51Dsps = dspAggregator?.ci?.state51 ?? [];
+				const allAggregatorDsps = [...ciDealDsps, ...state51Dsps];
 
-				if (ciDsps.length) {
-					stepResult.push(
-						{
-							type: ReleaseExecutionStepType.IMPORT_CI,
-							order: 1,
-							metadata: {
-								input: {
-									dsps: ciDsps,
-									primaryDsp:
-										dspAggregator?.ci?.primaryDsp ?? null,
-								},
-							},
-						},
-						{
-							type: ReleaseExecutionStepType.EXPORT_CI,
-							order: 2,
-							childExecutionMode: 'parallel',
-						},
-						{
-							type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
-							order: 3,
-							metadata: {
-								input: {
-									waitMinutes: MINUTES_PER_DAY,
-								},
-							},
-						},
-						{
-							type: ReleaseExecutionStepType.SYNC_DATA_DSP_CI,
-							order: 4,
-							isDeliveryStep: true,
-							metadata: {
-								input: {
-									dspCiCodes: ciDsps
-										.map((dsp) => dsp.codeCi)
-										.filter(
-											(code): code is string => !!code,
-										),
+				if (!allAggregatorDsps.length) break;
 
-									delivery:
-										releaseExecution.metadata.input.delivery
-											?.all,
-								},
+				let order = 1;
+				const shouldImportCi =
+					releaseExecution.type !== ExecutionType.TAKEDOWN &&
+					ciDealDsps.length > 0 &&
+					!dspAggregator?.ci?.isSkipImport;
+
+				if (shouldImportCi) {
+					stepResult.push({
+						type: ReleaseExecutionStepType.IMPORT_CI,
+						order: order++,
+						metadata: {
+							input: {
+								dsps: ciDealDsps,
+								primaryDsp:
+									dspAggregator?.ci?.primaryDsp ?? null,
 							},
 						},
-					);
+					});
 				}
+
+				stepResult.push(
+					{
+						type: ReleaseExecutionStepType.EXPORT_CI,
+						order: order++,
+						childExecutionMode: 'parallel',
+					},
+					{
+						type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
+						order: order++,
+						metadata: {
+							input: {
+								waitMinutes: MINUTES_PER_DAY,
+							},
+						},
+					},
+					{
+						type: ReleaseExecutionStepType.SYNC_DATA_DSP_CI,
+						order: order++,
+						isDeliveryStep: true,
+						metadata: {
+							input: {
+								dspCiCodes: allAggregatorDsps
+									.map((dsp) => dsp.codeCi)
+									.filter((code): code is string => !!code),
+
+								delivery:
+									releaseExecution.metadata.input.delivery
+										?.all,
+							},
+						},
+					},
+				);
 
 				break;
 			}

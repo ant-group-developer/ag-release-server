@@ -24,6 +24,7 @@ import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
 	CiJobType3,
+	ExecutionType,
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
@@ -643,15 +644,24 @@ export class ReleaseExecution3Worker {
 				.filter((code): code is string => !!code);
 
 			if (!step.metadata?.output?.jobCreated) {
+				// Xác định job type dựa vào execution type
+				const jobType = releaseExecution.type === ExecutionType.TAKEDOWN
+					? CiJobType3.ADMIN_TAKEDOWN
+					: CiJobType3.ADMIN_EXPORT;
+
+				const stepLabel = jobType === CiJobType3.ADMIN_TAKEDOWN
+					? 'Export CI - Admin Takedown'
+					: 'Export CI - Admin Export';
+
 				await this.ciJobService.createJob({
-					type: CiJobType3.ADMIN_EXPORT,
+					type: jobType,
 					upc,
 					dspCiCodes,
 					releaseExecutionId: step.releaseExecutionId,
 					stepId: step.id,
 					releaseId:
 						releaseExecution.metadata.input.releaseSnapshot.id,
-					stepLabel: 'Export CI - Admin Export',
+					stepLabel,
 				});
 
 				step.metadata = {
@@ -714,8 +724,13 @@ export class ReleaseExecution3Worker {
 				.filter((code): code is string => !!code);
 
 			if (!step.metadata?.output?.jobCreated) {
+				const jobType =
+					releaseExecution.type === ExecutionType.TAKEDOWN
+						? CiJobType3.EMAIL_STATE51_TAKEDOWN
+						: CiJobType3.EMAIL_STATE51;
+
 				await this.ciJobService.createJob({
-					type: CiJobType3.EMAIL_STATE51,
+					type: jobType,
 					upc,
 					dspCiCodes,
 					releaseExecutionId: step.releaseExecutionId,
@@ -854,14 +869,23 @@ export class ReleaseExecution3Worker {
 				generatedIsrcs,
 			});
 
-			const { outputDir, batchId, releaseReference, xml } =
-				await this.releaseDdexService.createMetadataOnServer({
-					release: releaseForMetadata,
-					ernVersion: config.ernVersion,
-					sender: config.sender,
-					recipient: config.recipient,
-					dspCode,
-				});
+			const isTakedown = releaseExecution.type === ExecutionType.TAKEDOWN;
+
+			const { outputDir, batchId, releaseReference, xml } = isTakedown
+				? await this.releaseDdexService.createTakedownMetadataOnServer({
+						release: releaseForMetadata,
+						ernVersion: config.ernVersion,
+						sender: config.sender,
+						recipient: config.recipient,
+						dspCode,
+					})
+				: await this.releaseDdexService.createMetadataOnServer({
+						release: releaseForMetadata,
+						ernVersion: config.ernVersion,
+						sender: config.sender,
+						recipient: config.recipient,
+						dspCode,
+					});
 
 			step.metadata = {
 				...step.metadata,

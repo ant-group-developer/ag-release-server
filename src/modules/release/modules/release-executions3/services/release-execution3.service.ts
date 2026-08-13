@@ -187,13 +187,17 @@ export class ReleaseExecution3Service {
 		}
 
 		execution.metadata.input.dspDirect = directDsps;
+		const isSkipImport =
+			execution.type === ExecutionType.TAKEDOWN ||
+			ciDealDsps.length === 0 ||
+			releaseSnapshot.ciData?.needImportAgain === false;
 
 		execution.metadata.input.dspAggregator = {
 			ci: {
 				ci: ciDealDsps,
 				state51: state51Dsps,
 				primaryDsp: null,
-				isSkipImport: releaseSnapshot.ciData?.needImportAgain === false,
+				isSkipImport,
 			},
 		};
 
@@ -220,7 +224,7 @@ export class ReleaseExecution3Service {
 			),
 		};
 
-		for (const dsp of ciDsps) {
+		for (const dsp of ciDealDsps) {
 			if (!dsp.code) {
 				continue;
 			}
