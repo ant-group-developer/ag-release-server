@@ -18,6 +18,7 @@ import {
 import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
 import { Release } from '../../entities/release.entity';
 import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
+import { TakedownEligibilityResult } from '../../interfaces/takedown.interface';
 import { ReleaseExecution3 } from '../../modules/release-executions3/entites/release-execution3.entity';
 import { ExecutionType } from '../../modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseService } from '../release.service';
@@ -53,26 +54,45 @@ export class ReleaseDspDeliveryService {
 	) {}
 	// ==================== Delivery orchestration ====================
 
-	async filterOutTakenDownDspCodes(
+	async resolveTakedownEligibleDspCodes(
 		releaseId: string,
 		dspCodes: string[],
-	): Promise<string[]> {
-		if (!dspCodes.length) return [];
+	): Promise<TakedownEligibilityResult> {
+		const uniqueCodes = [...new Set(dspCodes)];
+		if (!uniqueCodes.length) return { eligibleCodes: [], skipped: [] };
 
-		const takenDownDeliveries = await this.repo.find({
+		const deliveries = await this.repo.find({
 			where: {
 				releaseId,
-				status: ReleaseDspStatus.TAKEN_DOWN,
-				dsp: { code: In(dspCodes) },
+				dsp: { code: In(uniqueCodes) },
 			},
 			relations: ['dsp'],
 		});
 
-		const takenDownDspCodes = new Set(
-			takenDownDeliveries.map((delivery) => delivery.dsp.code),
+		const deliveryByCode = new Map(
+			deliveries.map((delivery) => [delivery.dsp.code, delivery]),
 		);
+		const eligibleCodes: string[] = [];
+		const skipped: TakedownEligibilityResult['skipped'] = [];
 
-		return dspCodes.filter((code) => !takenDownDspCodes.has(code));
+		for (const code of uniqueCodes) {
+			const delivery = deliveryByCode.get(code);
+			if (!delivery) {
+				skipped.push({ code, reason: 'DELIVERY_NOT_FOUND' });
+				continue;
+			}
+			if (delivery.status === ReleaseDspStatus.TAKEN_DOWN) {
+				skipped.push({ code, reason: 'ALREADY_TAKEN_DOWN' });
+				continue;
+			}
+			if (!delivery.hasLiveVersion) {
+				skipped.push({ code, reason: 'NO_LIVE_VERSION' });
+				continue;
+			}
+			eligibleCodes.push(code);
+		}
+
+		return { eligibleCodes, skipped };
 	}
 
 	async updateDeliveryStatus(input: {

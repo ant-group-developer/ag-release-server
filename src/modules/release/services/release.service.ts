@@ -824,19 +824,26 @@ export class ReleaseService {
 	async takedown(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
 
-		const dspCodes =
-			await this.releaseDspDeliveryService.filterOutTakenDownDspCodes(
-				id,
-				dto.code,
-			);
-
-		if (!dspCodes.length) return;
-
 		try {
 			await this.releaseCiDataService.bulkSyncDataCi({ ids: [id] });
 		} catch (error) {
 			console.log(error); // Không chặn takedown nếu sync CI lỗi
 		}
+
+		const eligibility =
+			await this.releaseDspDeliveryService.resolveTakedownEligibleDspCodes(
+				id,
+				dto.code,
+			);
+
+		if (!eligibility.eligibleCodes.length) {
+			throw new ResponseError({
+				message: 'Không có DSP nào đang có bản phát hành để takedown',
+				data: { skipped: eligibility.skipped },
+			});
+		}
+
+		const dspCodes = eligibility.eligibleCodes;
 
 		const releaseEndDate = new Date();
 		releaseEndDate.setDate(releaseEndDate.getDate() - 1); // Hôm qua
