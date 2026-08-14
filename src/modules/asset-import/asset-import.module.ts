@@ -7,16 +7,19 @@ import { ReleaseModule } from 'src/modules/release/release.module';
 import { AssetImportController } from './controllers/asset-import.controller';
 import { AssetImportBatch } from './entities/asset-import-batch.entity';
 import { AssetImportItem } from './entities/asset-import-item.entity';
+import { AssetOwnershipPeriod } from './entities/asset-ownership-period.entity';
+import { AssetOwnershipTransferEvent } from './entities/asset-ownership-transfer-event.entity';
 import { AssetImportApplyService } from './services/asset-import-apply.service';
 import { AssetImportParserService } from './services/asset-import-parser.service';
 import { AssetImportScanService } from './services/asset-import-scan.service';
 import { AssetImportTemplateService } from './services/asset-import-template.service';
 import { AssetImportQueryService } from './services/asset-import.query.service';
 import { AssetImportService } from './services/asset-import.service';
+import { AssetOwnershipService } from './services/asset-ownership.service';
 
 @Module({
 	imports: [
-		TypeOrmModule.forFeature([AssetImportBatch, AssetImportItem]),
+		TypeOrmModule.forFeature([AssetImportBatch, AssetImportItem, AssetOwnershipPeriod, AssetOwnershipTransferEvent]),
 		BucketModule2,
 		ClickHouseModule,
 		ImportJobsModule,
@@ -30,6 +33,7 @@ import { AssetImportService } from './services/asset-import.service';
 		AssetImportParserService,
 		AssetImportTemplateService,
 		AssetImportQueryService,
+		AssetOwnershipService,
 	],
 	exports: [AssetImportService],
 })

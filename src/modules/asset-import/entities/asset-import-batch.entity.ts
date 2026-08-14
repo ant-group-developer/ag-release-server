@@ -51,6 +51,12 @@ export class AssetImportBatch extends BaseUUIDEntity {
 	})
 	targetLabelId: string | null;
 
+	@Column({ type: 'date', comment: 'Ngày owner mới bắt đầu nhận trends/usage' })
+	effectiveDate: string;
+
+	@Column({ type: 'date', comment: 'Tháng owner mới bắt đầu nhận revenue' })
+	revenueEffectiveFrom: string;
+
 	@Column({
 		type: 'jsonb',
 		comment: 'Snapshot option lúc scan (updateOwnership, fillEmptyOnly...)',

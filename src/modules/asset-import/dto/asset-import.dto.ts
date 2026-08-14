@@ -3,6 +3,7 @@ import { Transform, Type } from 'class-transformer';
 import {
 	IsArray,
 	IsBoolean,
+	IsDateString,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -113,6 +114,22 @@ export class ScanAssetImportDto {
 	@IsNotEmpty()
 	@IsUUID()
 	targetTenantId: string;
+
+	@ApiPropertyOptional({
+		description: 'Ngày chuyển quyền cho trends/usage (YYYY-MM-DD)',
+		example: '2026-09-01',
+	})
+	@IsOptional()
+	@IsDateString()
+	effectiveDate?: string;
+
+	@ApiPropertyOptional({
+		description: 'Tháng bắt đầu ghi nhận revenue cho owner mới (YYYY-MM-01). Mặc định là tháng của effectiveDate.',
+		example: '2026-09-01',
+	})
+	@IsOptional()
+	@IsDateString()
+	revenueEffectiveFrom?: string;
 
 	@ApiPropertyOptional({ type: AssetImportOptionsDto })
 	@IsOptional()

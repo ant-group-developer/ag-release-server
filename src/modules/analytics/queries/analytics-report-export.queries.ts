@@ -14,9 +14,9 @@ export function getRawDetailsPageQuery(
       ${resolvedDspName} AS dsp_name,
       s.territory_code AS territory,
       s.isrc AS isrc,
-      any(t.tenant_id) AS tenant_id,
+      any(coalesce(nullIf(o.tenant_id, ''), t.tenant_id)) AS tenant_id,
       any(t.release_id) AS release_id,
-      any(t.label_id) AS label_id,
+      any(coalesce(nullIf(o.label_id, ''), t.label_id)) AS label_id,
       any(s.upc) AS fallback_upc,
       any(s.track_title) AS fallback_track_title,
       any(s.album_title) AS fallback_album_title,
@@ -94,7 +94,7 @@ export function getUniqueIdentifiersQuery(
 	return `
     SELECT
       s.isrc AS isrc,
-      any(t.tenant_id) AS tenant_id
+      any(coalesce(nullIf(o.tenant_id, ''), t.tenant_id)) AS tenant_id
     FROM ${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY} s
     ${commonJoinsSql}
     ${whereSql}

@@ -123,6 +123,7 @@ export function getRevenueTopDspTotalQuery(
 }
 
 export function getRevenueTopArtistCountQuery(
+	joinSql: string,
 	filterSql: string,
 	hasKeywordFilter: boolean,
 ): string {
@@ -131,7 +132,7 @@ export function getRevenueTopArtistCountQuery(
     FROM (
       SELECT arrayJoin(t.artist_ids) AS artistId
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      ${joinSql}
       WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
@@ -142,6 +143,7 @@ export function getRevenueTopArtistCountQuery(
 }
 
 export function getRevenueTopArtistQuery(
+	joinSql: string,
 	filterSql: string,
 	hasKeywordFilter: boolean,
 	orderBy: 'revenue_usd' | 'quantity',
@@ -155,7 +157,7 @@ export function getRevenueTopArtistQuery(
       sum(s.total_quantity) AS quantity,
       uniq(s.isrc) AS track_count
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    ${joinSql}
     WHERE 1=1
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
@@ -168,6 +170,7 @@ export function getRevenueTopArtistQuery(
 }
 
 export function getRevenueTopArtistTotalQuery(
+	joinSql: string,
 	filterSql: string,
 	hasKeywordFilter: boolean,
 ): string {
@@ -176,7 +179,7 @@ export function getRevenueTopArtistTotalQuery(
       sum(s.total_quantity) AS total_qty,
       sum(s.total_revenue_usd) AS total_rev
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    ${joinSql}
     WHERE 1=1
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
@@ -276,11 +279,11 @@ export function getRevenueTopLabelCountQuery(
 	filterSql: string,
 ): string {
 	return `
-    SELECT uniq(t.label_id) AS total
+    SELECT uniq(coalesce(nullIf(o.label_id, ''), t.label_id)) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND t.label_id != ''
+      AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -296,7 +299,7 @@ export function getRevenueTopLabelQuery(
 ): string {
 	return `
     SELECT
-      t.label_id AS labelId,
+      coalesce(nullIf(o.label_id, ''), t.label_id) AS labelId,
       sum(s.total_revenue_usd) AS revenue_usd,
       sum(s.total_quantity) AS quantity,
       uniq(t.release_id) AS release_count,
@@ -304,7 +307,7 @@ export function getRevenueTopLabelQuery(
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND t.label_id != ''
+      AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -325,7 +328,7 @@ export function getRevenueTopLabelTotalQuery(
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND t.label_id != ''
+      AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -398,11 +401,11 @@ export function getRevenueTopTenantCountQuery(
 	filterSql: string,
 ): string {
 	return `
-    SELECT uniq(t.tenant_id) AS total
+    SELECT uniq(coalesce(nullIf(o.tenant_id, ''), t.tenant_id)) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND t.tenant_id != ''
+      AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -418,13 +421,13 @@ export function getRevenueTopTenantQuery(
 ): string {
 	return `
     SELECT
-      t.tenant_id AS tenantId,
+      coalesce(nullIf(o.tenant_id, ''), t.tenant_id) AS tenantId,
       sum(s.total_revenue_usd) AS revenue_usd,
       sum(s.total_quantity) AS quantity
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND t.tenant_id != ''
+      AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -445,7 +448,7 @@ export function getRevenueTopTenantTotalQuery(
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND t.tenant_id != ''
+      AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -508,11 +511,14 @@ export function getRevenueTopSourceTypeTotalQuery(
   `;
 }
 
-export function getRevenueTopReleaseCountQuery(filterSql: string): string {
+export function getRevenueTopReleaseCountQuery(
+	joinSql: string,
+	filterSql: string,
+): string {
 	return `
     SELECT uniq(t.release_id) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    ${joinSql}
     WHERE t.is_deleted = 0
       AND t.release_id != ''
       AND s.period >= toDate({from:String})
@@ -522,6 +528,7 @@ export function getRevenueTopReleaseCountQuery(filterSql: string): string {
 }
 
 export function getRevenueTopReleaseQuery(
+	joinSql: string,
 	filterSql: string,
 	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
@@ -546,7 +553,7 @@ export function getRevenueTopReleaseQuery(
       any(t.release_metadata_spotify) AS releaseMetadataSpotify,
       any(t.release_metadata_deezer) AS releaseMetadataDeezer
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    ${joinSql}
     WHERE t.is_deleted = 0
       AND t.release_id != ''
       AND s.period >= toDate({from:String})
@@ -558,13 +565,16 @@ export function getRevenueTopReleaseQuery(
   `;
 }
 
-export function getRevenueTopReleaseTotalQuery(filterSql: string): string {
+export function getRevenueTopReleaseTotalQuery(
+	joinSql: string,
+	filterSql: string,
+): string {
 	return `
     SELECT
       sum(s.total_quantity) AS total_qty,
       sum(s.total_revenue_usd) AS total_rev
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    ${joinSql}
     WHERE t.is_deleted = 0
       AND t.release_id != ''
       AND s.period >= toDate({from:String})
@@ -573,11 +583,14 @@ export function getRevenueTopReleaseTotalQuery(filterSql: string): string {
   `;
 }
 
-export function getRevenueTopReleaseVideoCountQuery(filterSql: string): string {
+export function getRevenueTopReleaseVideoCountQuery(
+	joinSql: string,
+	filterSql: string,
+): string {
 	return `
     SELECT uniq(t.release_id) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    ${joinSql}
     WHERE t.is_deleted = 0
       AND t.release_id != ''
       AND t.release_type = 'video'
@@ -588,6 +601,7 @@ export function getRevenueTopReleaseVideoCountQuery(filterSql: string): string {
 }
 
 export function getRevenueTopReleaseVideoQuery(
+	joinSql: string,
 	filterSql: string,
 	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
@@ -600,7 +614,7 @@ export function getRevenueTopReleaseVideoQuery(
       sum(s.total_revenue_usd) AS revenue_usd,
       sum(s.total_quantity) AS quantity
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    ${joinSql}
     WHERE t.is_deleted = 0
       AND t.release_id != ''
       AND t.release_type = 'video'
@@ -613,13 +627,16 @@ export function getRevenueTopReleaseVideoQuery(
   `;
 }
 
-export function getRevenueTopReleaseVideoTotalQuery(filterSql: string): string {
+export function getRevenueTopReleaseVideoTotalQuery(
+	joinSql: string,
+	filterSql: string,
+): string {
 	return `
     SELECT
       sum(s.total_quantity) AS total_qty,
       sum(s.total_revenue_usd) AS total_rev
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    ${joinSql}
     WHERE t.is_deleted = 0
       AND t.release_id != ''
       AND t.release_type = 'video'

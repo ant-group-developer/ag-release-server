@@ -55,10 +55,12 @@ describe('AssetImportApplyService', () => {
 		create: jest.Mock;
 		exists: jest.Mock;
 		createQueryBuilder: jest.Mock;
+		findOneOrFail: jest.Mock;
 	};
 	let dataSource: DataSource;
 	let releaseImport: { importRelease: jest.Mock };
 	let clickHouse: { insert: jest.Mock };
+	let assetOwnership: { transfer: jest.Mock; recordInitialOwnership: jest.Mock };
 	let service: AssetImportApplyService;
 
 	beforeEach(() => {
@@ -74,6 +76,11 @@ describe('AssetImportApplyService', () => {
 				andWhere: jest.fn().mockReturnThis(),
 				getOne: jest.fn().mockResolvedValue(null),
 			}),
+			findOneOrFail: jest.fn().mockResolvedValue({
+				id: 'rel1',
+				tenantId: WRONG_TENANT,
+				labelId: 'old-label',
+			}),
 		};
 
 		dataSource = {
@@ -84,11 +91,16 @@ describe('AssetImportApplyService', () => {
 			importRelease: jest.fn().mockResolvedValue({ id: 'rel-new' }),
 		};
 		clickHouse = { insert: jest.fn().mockResolvedValue(undefined) };
+		assetOwnership = {
+			transfer: jest.fn().mockResolvedValue(undefined),
+			recordInitialOwnership: jest.fn().mockResolvedValue(undefined),
+		};
 
 		service = new AssetImportApplyService(
 			dataSource,
 			releaseImport as any,
 			clickHouse as any,
+			assetOwnership as any,
 		);
 	});
 
@@ -127,12 +139,11 @@ describe('AssetImportApplyService', () => {
 		const result = await service.applyItem(item, makeBatch(), USER_ID);
 
 		expect(result.status).toBe(AssetImportItemStatus.APPLIED);
-		expect(manager.update).toHaveBeenCalledWith(
-			expect.anything(),
-			'rel1',
+		expect(assetOwnership.transfer).toHaveBeenCalledWith(
+			manager,
 			expect.objectContaining({
 				tenantId: TARGET_TENANT,
-				modifierId: USER_ID,
+				actorId: USER_ID,
 			}),
 		);
 	});
@@ -205,7 +216,11 @@ describe('AssetImportApplyService', () => {
 
 		await service.applyItem(item, makeBatch(), USER_ID);
 
-		expect(dataSource.transaction).not.toHaveBeenCalled();
+		expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+		expect(assetOwnership.recordInitialOwnership).toHaveBeenCalledWith(
+			manager,
+			expect.objectContaining({ releaseId: 'rel-new', actorId: USER_ID }),
+		);
 	});
 
 	it('CREATE dùng ISRC- làm UPC thay thế khi file không có UPC', async () => {
@@ -262,9 +277,8 @@ describe('AssetImportApplyService', () => {
 				isImportedFromReport: false,
 			}),
 		);
-		expect(manager.update).toHaveBeenCalledWith(
-			expect.anything(),
-			'rel1',
+		expect(assetOwnership.transfer).toHaveBeenCalledWith(
+			manager,
 			expect.objectContaining({ labelId: 'new-label' }),
 		);
 	});
