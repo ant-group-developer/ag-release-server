@@ -336,9 +336,11 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: DetailAnalyticsFilterQuery,
 		ownershipPeriod: 'trend' | 'revenue' = 'trend',
+		forceTrackJoin = false,
 	): { joinSql: string; filterSql: string; params: Record<string, any> } {
 		const isSystem = checkIsSystemTenant(tenantId);
 		const needsTrackJoin =
+			forceTrackJoin ||
 			!isSystem ||
 			!!(
 				query.tenantId ||
@@ -378,8 +380,14 @@ export class TimelineAnalyticsService {
 	private buildRevenueFilters(
 		tenantId: string,
 		query: TimelineQueryDto,
+		forceTrackJoin = false,
 	): { joinSql: string; filterSql: string; params: Record<string, any> } {
-		return this.buildDetailFilters(tenantId, query, 'revenue');
+		return this.buildDetailFilters(
+			tenantId,
+			query,
+			'revenue',
+			forceTrackJoin,
+		);
 	}
 
 	async getSummary(
@@ -736,37 +744,13 @@ export class TimelineAnalyticsService {
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { limit, offset, page, pageSize, isPaginated } =
 			this.getPaginationParams(query);
-		const isSystem = checkIsSystemTenant(tenantId);
-
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-		let filterSql = 'AND t.is_deleted = 0';
-
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
-		if (query.labelId) {
-			filterSql += ' AND t.label_id = {labelId:String}';
-			params.labelId = query.labelId;
-		}
-		if (query.releaseId) {
-			filterSql += ' AND t.release_id = {releaseId:String}';
-			params.releaseId = query.releaseId;
-		}
-		if (query.releaseType) {
-			filterSql += ' AND t.release_type = {releaseType:String}';
-			params.releaseType = query.releaseType;
-		}
-		if (query.importSource) {
-			filterSql += ' AND s.import_source = {importSource:String}';
-			params.importSource = query.importSource;
-		}
-		filterSql = this.appendDetailFilters(
+		let { joinSql, filterSql, params } = this.buildRevenueFilters(
 			tenantId,
 			query,
-			filterSql,
-			params,
+			true,
 		);
+		params.from = fromDate;
+		params.to = toDate;
 
 		if (query.keyword) {
 			let matchedArtistIds =
@@ -781,6 +765,7 @@ export class TimelineAnalyticsService {
 
 		// Count query
 		const countSql = queries.getRevenueTopArtistCountQuery(
+			joinSql,
 			filterSql,
 			!!query.keyword,
 		);
@@ -791,6 +776,7 @@ export class TimelineAnalyticsService {
 
 		// Data query
 		const sql = queries.getRevenueTopArtistQuery(
+			joinSql,
 			filterSql,
 			!!query.keyword,
 			this.revenueSortColumn(query),
@@ -831,7 +817,6 @@ export class TimelineAnalyticsService {
 
 			// groupBySource: fetch breakdown per artist
 			if (query.groupBySource) {
-				const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 				const breakdowns = await Promise.all(
 					items
 						.filter((item) => item.artistId !== 'other')
@@ -861,6 +846,7 @@ export class TimelineAnalyticsService {
 			if (shouldIncludeOther) {
 				// Calculate total overall from joined tracks table
 				const totalSql = queries.getRevenueTopArtistTotalQuery(
+					joinSql,
 					filterSql,
 					!!query.keyword,
 				);
@@ -903,7 +889,6 @@ export class TimelineAnalyticsService {
 						quantity: otherQty > 0 ? otherQty : 0,
 					};
 					if (query.groupBySource) {
-						const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 						const topArtistIds = items
 							.filter((it) => it.artistId !== 'other')
 							.map((it) => it.artistId);
@@ -965,61 +950,13 @@ export class TimelineAnalyticsService {
 		const { limit, offset, page, pageSize, isPaginated } =
 			this.getPaginationParams(query);
 		const isSystem = checkIsSystemTenant(tenantId);
-
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-
-		let joinSql = '';
-		let filterSql = '';
-
-		if (!isSystem) {
-			joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-			filterSql =
-				'AND t.is_deleted = 0 AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-
-			if (query.labelId) {
-				filterSql += ' AND t.label_id = {labelId:String}';
-				params.labelId = query.labelId;
-			}
-			if (query.releaseId) {
-				filterSql += ' AND t.release_id = {releaseId:String}';
-				params.releaseId = query.releaseId;
-			}
-			if (query.releaseType) {
-				filterSql += ' AND t.release_type = {releaseType:String}';
-				params.releaseType = query.releaseType;
-			}
-			if (query.importSource) {
-				filterSql += ' AND s.import_source = {importSource:String}';
-				params.importSource = query.importSource;
-			}
-		} else {
-			if (
-				query.labelId ||
-				query.releaseId ||
-				query.releaseType ||
-				query.importSource
-			) {
-				joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-				filterSql = 'AND t.is_deleted = 0';
-				if (query.labelId) {
-					filterSql += ' AND t.label_id = {labelId:String}';
-					params.labelId = query.labelId;
-				}
-				if (query.releaseId) {
-					filterSql += ' AND t.release_id = {releaseId:String}';
-					params.releaseId = query.releaseId;
-				}
-				if (query.releaseType) {
-					filterSql += ' AND t.release_type = {releaseType:String}';
-					params.releaseType = query.releaseType;
-				}
-				if (query.importSource) {
-					filterSql += ' AND s.import_source = {importSource:String}';
-					params.importSource = query.importSource;
-				}
-			}
-		}
+		let { joinSql, filterSql, params } = this.buildRevenueFilters(
+			tenantId,
+			query,
+			true,
+		);
+		params.from = fromDate;
+		params.to = toDate;
 
 		if (query.keyword) {
 			let matchedIsrcs =
@@ -1033,16 +970,6 @@ export class TimelineAnalyticsService {
 			params.matchedIsrcs = matchedIsrcs;
 		}
 
-		if (!joinSql) {
-			joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-			filterSql += ' AND t.is_deleted = 0';
-		}
-		filterSql = this.appendDetailFilters(
-			tenantId,
-			query,
-			filterSql,
-			params,
-		);
 		filterSql += ` ${this.validReleaseUpcFilter}`;
 
 		// Count query
@@ -1285,37 +1212,13 @@ export class TimelineAnalyticsService {
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { limit, offset, page, pageSize, isPaginated } =
 			this.getPaginationParams(query);
-		const isSystem = checkIsSystemTenant(tenantId);
-
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-		let filterSql = 'AND t.is_deleted = 0';
-
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
-		if (query.labelId) {
-			filterSql += ' AND t.label_id = {labelId:String}';
-			params.labelId = query.labelId;
-		}
-		if (query.releaseId) {
-			filterSql += ' AND t.release_id = {releaseId:String}';
-			params.releaseId = query.releaseId;
-		}
-		if (query.releaseType) {
-			filterSql += ' AND t.release_type = {releaseType:String}';
-			params.releaseType = query.releaseType;
-		}
-		if (query.importSource) {
-			filterSql += ' AND s.import_source = {importSource:String}';
-			params.importSource = query.importSource;
-		}
-		filterSql = this.appendDetailFilters(
+		let { joinSql, filterSql, params } = this.buildRevenueFilters(
 			tenantId,
 			query,
-			filterSql,
-			params,
+			true,
 		);
+		params.from = fromDate;
+		params.to = toDate;
 
 		if (query.keyword) {
 			let matchedLabelIds =
@@ -1325,11 +1228,10 @@ export class TimelineAnalyticsService {
 			if (matchedLabelIds.length === 0) {
 				matchedLabelIds = ['__none__'];
 			}
-			filterSql += ' AND t.label_id IN ({matchedLabelIds:Array(String)})';
+			filterSql +=
+				" AND coalesce(nullIf(o.label_id, ''), t.label_id) IN ({matchedLabelIds:Array(String)})";
 			params.matchedLabelIds = matchedLabelIds;
 		}
-
-		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 
 		// Count query
 		const countSql = queries.getRevenueTopLabelCountQuery(
@@ -1392,7 +1294,7 @@ export class TimelineAnalyticsService {
 								joinSql,
 								filterSql,
 								{ ...params },
-								'AND t.label_id = {_labelId:String}',
+								"AND coalesce(nullIf(o.label_id, ''), t.label_id) = {_labelId:String}",
 								{ _labelId: item.labelId },
 								true,
 							),
@@ -1459,7 +1361,7 @@ export class TimelineAnalyticsService {
 							filterSql,
 							{ ...params },
 							topLabelIds.length > 0
-								? 'AND t.label_id NOT IN ({_topLabelIds:Array(String)})'
+								? "AND coalesce(nullIf(o.label_id, ''), t.label_id) NOT IN ({_topLabelIds:Array(String)})"
 								: '',
 							topLabelIds.length > 0
 								? { _topLabelIds: topLabelIds }
@@ -1506,36 +1408,13 @@ export class TimelineAnalyticsService {
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { limit, offset, page, pageSize, isPaginated } =
 			this.getPaginationParams(query);
-		const isSystem = checkIsSystemTenant(tenantId);
-
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-		let filterSql = 'AND t.is_deleted = 0';
-
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
-		if (query.labelId) {
-			filterSql += ' AND t.label_id = {labelId:String}';
-			params.labelId = query.labelId;
-		}
-		if (query.releaseId) {
-			filterSql += ' AND t.release_id = {releaseId:String}';
-			params.releaseId = query.releaseId;
-		}
-		// releaseType khong can - channel_id chi co o video
-		if (query.importSource) {
-			filterSql += ' AND s.import_source = {importSource:String}';
-			params.importSource = query.importSource;
-		}
-		filterSql = this.appendDetailFilters(
+		const { joinSql, filterSql, params } = this.buildRevenueFilters(
 			tenantId,
 			query,
-			filterSql,
-			params,
+			true,
 		);
-
-		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+		params.from = fromDate;
+		params.to = toDate;
 
 		// Count query
 		const countSql = queries.getRevenueTopChannelCountQuery(
@@ -1714,30 +1593,13 @@ export class TimelineAnalyticsService {
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { limit, offset, page, pageSize, isPaginated } =
 			this.getPaginationParams(query);
-		const isSystem = checkIsSystemTenant(tenantId);
-
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-		let filterSql = 'AND t.is_deleted = 0';
-
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
-
-		if (query.releaseType) {
-			filterSql += ' AND t.release_type = {releaseType:String}';
-			params.releaseType = query.releaseType;
-		}
-		if (query.importSource) {
-			filterSql += ' AND s.import_source = {importSource:String}';
-			params.importSource = query.importSource;
-		}
-		filterSql = this.appendDetailFilters(
+		let { joinSql, filterSql, params } = this.buildRevenueFilters(
 			tenantId,
 			query,
-			filterSql,
-			params,
+			true,
 		);
+		params.from = fromDate;
+		params.to = toDate;
 
 		if (query.keyword) {
 			let matchedTenantIds =
@@ -1748,11 +1610,9 @@ export class TimelineAnalyticsService {
 				matchedTenantIds = ['__none__'];
 			}
 			filterSql +=
-				' AND t.tenant_id IN ({matchedTenantIds:Array(String)})';
+				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) IN ({matchedTenantIds:Array(String)})";
 			params.matchedTenantIds = matchedTenantIds;
 		}
-
-		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 
 		// Count query
 		const countSql = queries.getRevenueTopTenantCountQuery(
@@ -1811,7 +1671,7 @@ export class TimelineAnalyticsService {
 								joinSql,
 								filterSql,
 								{ ...params },
-								'AND t.tenant_id = {_tenantId:String}',
+								"AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {_tenantId:String}",
 								{ _tenantId: item.tenantId },
 								true,
 							),
@@ -1878,7 +1738,7 @@ export class TimelineAnalyticsService {
 							filterSql,
 							{ ...params },
 							topTenantIds.length > 0
-								? 'AND t.tenant_id NOT IN ({_topTenantIds:Array(String)})'
+								? "AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) NOT IN ({_topTenantIds:Array(String)})"
 								: '',
 							topTenantIds.length > 0
 								? { _topTenantIds: topTenantIds }
@@ -1929,26 +1789,13 @@ export class TimelineAnalyticsService {
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { limit, offset, page, pageSize, isPaginated } =
 			this.getPaginationParams(query);
-		const isSystem = checkIsSystemTenant(tenantId);
-
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-		let filterSql = 'AND t.is_deleted = 0';
-
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
-
-		if (query.releaseType) {
-			filterSql += ' AND t.release_type = {releaseType:String}';
-			params.releaseType = query.releaseType;
-		}
-		filterSql = this.appendDetailFilters(
+		let { joinSql, filterSql, params } = this.buildRevenueFilters(
 			tenantId,
 			query,
-			filterSql,
-			params,
+			true,
 		);
+		params.from = fromDate;
+		params.to = toDate;
 
 		if (query.keyword) {
 			let matchedTenantIds =
@@ -1959,11 +1806,9 @@ export class TimelineAnalyticsService {
 				matchedTenantIds = ['__none__'];
 			}
 			filterSql +=
-				' AND t.tenant_id IN ({matchedTenantIds:Array(String)})';
+				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) IN ({matchedTenantIds:Array(String)})";
 			params.matchedTenantIds = matchedTenantIds;
 		}
-
-		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 
 		// Count query
 		const countSql = queries.getRevenueTopSourceTypeCountQuery(
@@ -2147,37 +1992,14 @@ export class TimelineAnalyticsService {
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { limit, offset, page, pageSize, isPaginated } =
 			this.getPaginationParams(query);
-		const isSystem = checkIsSystemTenant(tenantId);
-
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-		let filterSql = `AND t.is_deleted = 0 ${this.validReleaseUpcFilter}`;
-
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
-		if (query.labelId) {
-			filterSql += ' AND t.label_id = {labelId:String}';
-			params.labelId = query.labelId;
-		}
-		if (query.releaseId) {
-			filterSql += ' AND t.release_id = {releaseId:String}';
-			params.releaseId = query.releaseId;
-		}
-		if (query.releaseType) {
-			filterSql += ' AND t.release_type = {releaseType:String}';
-			params.releaseType = query.releaseType;
-		}
-		if (query.importSource) {
-			filterSql += ' AND s.import_source = {importSource:String}';
-			params.importSource = query.importSource;
-		}
-		filterSql = this.appendDetailFilters(
+		let { joinSql, filterSql, params } = this.buildRevenueFilters(
 			tenantId,
 			query,
-			filterSql,
-			params,
+			true,
 		);
+		params.from = fromDate;
+		params.to = toDate;
+		filterSql += ` ${this.validReleaseUpcFilter}`;
 
 		if (query.keyword) {
 			let matchedReleaseIds =
@@ -2193,7 +2015,10 @@ export class TimelineAnalyticsService {
 		}
 
 		// Count query
-		const countSql = queries.getRevenueTopReleaseCountQuery(filterSql);
+		const countSql = queries.getRevenueTopReleaseCountQuery(
+			joinSql,
+			filterSql,
+		);
 		const countResult = await this.clickHouseService.query<{
 			total: string;
 		}>(countSql, params);
@@ -2201,6 +2026,7 @@ export class TimelineAnalyticsService {
 
 		// Data query
 		const sql = queries.getRevenueTopReleaseQuery(
+			joinSql,
 			filterSql,
 			this.revenueSortColumn(query),
 			limit,
@@ -2226,7 +2052,7 @@ export class TimelineAnalyticsService {
 		}>(sql, params);
 
 		const items: RevenueReleaseItem[] = [];
-		const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+		const releaseJoinSql = joinSql;
 
 		if (rows.length > 0) {
 			const tenantMetadata =
@@ -2296,8 +2122,10 @@ export class TimelineAnalyticsService {
 				!isPaginated && query.includeOther === true;
 
 			if (shouldIncludeOther) {
-				const totalSql =
-					queries.getRevenueTopReleaseTotalQuery(filterSql);
+				const totalSql = queries.getRevenueTopReleaseTotalQuery(
+					joinSql,
+					filterSql,
+				);
 				const totalResult = await this.clickHouseService.query<{
 					total_qty: string;
 					total_rev: string;
@@ -2400,33 +2228,13 @@ export class TimelineAnalyticsService {
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { limit, offset, page, pageSize, isPaginated } =
 			this.getPaginationParams(query);
-		const isSystem = checkIsSystemTenant(tenantId);
-
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-		let filterSql = `AND t.is_deleted = 0`;
-
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
-		if (query.labelId) {
-			filterSql += ' AND t.label_id = {labelId:String}';
-			params.labelId = query.labelId;
-		}
-		if (query.releaseId) {
-			filterSql += ' AND t.release_id = {releaseId:String}';
-			params.releaseId = query.releaseId;
-		}
-		if (query.importSource) {
-			filterSql += ' AND s.import_source = {importSource:String}';
-			params.importSource = query.importSource;
-		}
-		filterSql = this.appendDetailFilters(
+		let { joinSql, filterSql, params } = this.buildRevenueFilters(
 			tenantId,
 			query,
-			filterSql,
-			params,
+			true,
 		);
+		params.from = fromDate;
+		params.to = toDate;
 
 		if (query.keyword) {
 			let matchedReleaseIds =
@@ -2442,7 +2250,10 @@ export class TimelineAnalyticsService {
 		}
 
 		// Count query
-		const countSql = queries.getRevenueTopReleaseVideoCountQuery(filterSql);
+		const countSql = queries.getRevenueTopReleaseVideoCountQuery(
+			joinSql,
+			filterSql,
+		);
 		const countResult = await this.clickHouseService.query<{
 			total: string;
 		}>(countSql, params);
@@ -2450,6 +2261,7 @@ export class TimelineAnalyticsService {
 
 		// Data query
 		const sql = queries.getRevenueTopReleaseVideoQuery(
+			joinSql,
 			filterSql,
 			this.revenueSortColumn(query),
 			limit,
@@ -2463,7 +2275,7 @@ export class TimelineAnalyticsService {
 		}>(sql, params);
 
 		const items: RevenueReleaseVideoItem[] = [];
-		const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+		const releaseJoinSql = joinSql;
 
 		if (rows.length > 0) {
 			const releaseIds = rows.map((r) => r.releaseId);
@@ -2547,8 +2359,10 @@ export class TimelineAnalyticsService {
 				!isPaginated && query.includeOther === true;
 
 			if (shouldIncludeOther) {
-				const totalSql =
-					queries.getRevenueTopReleaseVideoTotalQuery(filterSql);
+				const totalSql = queries.getRevenueTopReleaseVideoTotalQuery(
+					joinSql,
+					filterSql,
+				);
 				const totalResult = await this.clickHouseService.query<{
 					total_qty: string;
 					total_rev: string;
