@@ -1106,6 +1106,7 @@ export class ReleaseService {
 			case 'processing':
 			case 'pending':
 			case 'needs_tx':
+			case 'has_tx':
 			case 'in_progress':
 			case 'queued':
 			case 'waiting':
@@ -1199,28 +1200,24 @@ export class ReleaseService {
 			return ReleaseStatus.PROCESSING;
 		}
 
-		if (statuses.includes(ReleaseDspStatus.ISSUES)) {
+		const hasDistributed = statuses.includes(ReleaseDspStatus.DISTRIBUTED);
+		const hasTakenDown = statuses.includes(ReleaseDspStatus.TAKEN_DOWN);
+		const hasIssues = statuses.includes(ReleaseDspStatus.ISSUES);
+
+		if (hasIssues && (hasDistributed || hasTakenDown)) {
+			return ReleaseStatus.PARTIAL_DONE;
+		}
+
+		if (hasDistributed) {
+			return ReleaseStatus.DISTRIBUTED;
+		}
+
+		if (hasTakenDown) {
+			return ReleaseStatus.TAKEN_DOWN;
+		}
+
+		if (hasIssues) {
 			return ReleaseStatus.FAILED;
-		}
-
-		if (
-			statuses.every((status) => status === ReleaseDspStatus.DISTRIBUTED)
-		) {
-			return ReleaseStatus.DISTRIBUTED;
-		}
-
-		if (
-			statuses.every((status) => status === ReleaseDspStatus.TAKEN_DOWN)
-		) {
-			return ReleaseStatus.TAKEN_DOWN;
-		}
-
-		if (statuses.includes(ReleaseDspStatus.DISTRIBUTED)) {
-			return ReleaseStatus.DISTRIBUTED;
-		}
-
-		if (statuses.includes(ReleaseDspStatus.TAKEN_DOWN)) {
-			return ReleaseStatus.TAKEN_DOWN;
 		}
 
 		if (
