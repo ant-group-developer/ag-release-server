@@ -1105,6 +1105,7 @@ export class ReleaseService {
 
 			case 'processing':
 			case 'pending':
+			case 'needs_tx':
 			case 'in_progress':
 			case 'queued':
 			case 'waiting':
