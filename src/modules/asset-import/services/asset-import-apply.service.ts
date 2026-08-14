@@ -22,6 +22,7 @@ import {
 	AssetImportItemStatus,
 } from '../enum/asset-import.enum';
 import { AssetImportChange } from '../interfaces/asset-import.interface';
+import { AssetOwnershipService } from './asset-ownership.service';
 
 /** Một dòng audit ghi vào ClickHouse metadata_enrichment_log. */
 interface EnrichmentLogRow extends Record<string, unknown> {
@@ -55,6 +56,7 @@ export class AssetImportApplyService {
 		private readonly dataSource: DataSource,
 		private readonly releaseReportImportService: ReleaseReportImportService,
 		private readonly clickHouseService: ClickHouseService,
+		private readonly assetOwnershipService: AssetOwnershipService,
 	) {}
 
 	/**
@@ -174,6 +176,29 @@ export class AssetImportApplyService {
 			}
 		}
 
+		const ownershipChanged =
+			Object.prototype.hasOwnProperty.call(releasePatch, 'tenantId') ||
+			Object.prototype.hasOwnProperty.call(releasePatch, 'labelId');
+		const ownershipTenantId = releasePatch.tenantId;
+		const ownershipLabelId = releasePatch.labelId;
+		delete releasePatch.tenantId;
+		delete releasePatch.labelId;
+
+		if (ownershipChanged) {
+			const release = await manager.findOneOrFail(Release, {
+				where: { id: item.matchedReleaseId },
+			});
+			await this.assetOwnershipService.transfer(manager, {
+				releaseId: release.id,
+				tenantId: ownershipTenantId ?? release.tenantId,
+				labelId: ownershipLabelId ?? release.labelId ?? null,
+				effectiveDate: batch.effectiveDate,
+				revenueEffectiveFrom: batch.revenueEffectiveFrom,
+				assetImportItemId: item.id,
+				actorId: userId,
+			});
+		}
+
 		if (Object.keys(releasePatch).length) {
 			releasePatch.modifierId = userId;
 			await manager.update(Release, item.matchedReleaseId, releasePatch);
@@ -253,6 +278,18 @@ export class AssetImportApplyService {
 			importFileName: batch.fileName,
 			importJobId: batch.applyJobId ?? batch.id,
 		});
+
+		await this.dataSource.transaction((manager) =>
+			this.assetOwnershipService.recordInitialOwnership(manager, {
+				releaseId: release.id,
+				tenantId: release.tenantId,
+				labelId: release.labelId ?? null,
+				effectiveDate: batch.effectiveDate,
+				revenueEffectiveFrom: batch.revenueEffectiveFrom,
+				assetImportItemId: item.id,
+				actorId: userId,
+			}),
+		);
 
 		// Lúc scan chưa biết id của label sẽ tạo, nên log sẽ ghi rỗng nếu không
 		// đọc lại từ release vừa tạo.

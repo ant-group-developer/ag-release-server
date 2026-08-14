@@ -283,4 +283,19 @@ export class RankingController {
 			data: { message: 'Full sync started in background' },
 		});
 	}
+
+	@Post('/admin/resync-asset-ownership')
+	@ApiOperation({
+		summary:
+			'[System only] Force re-sync ownership history from PostgreSQL to ClickHouse',
+	})
+	async resyncAssetOwnership(@Req() req: Request) {
+		if (!checkIsSystemTenant(req.user!.tenantId)) {
+			throw new ForbiddenException('System tenant only');
+		}
+		this.syncService.performFullOwnershipSync().catch(() => {});
+		return new ResponseSuccess({
+			data: { message: 'Asset ownership sync started in background' },
+		});
+	}
 }

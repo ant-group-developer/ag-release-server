@@ -278,11 +278,13 @@ export class TimelineAnalyticsService {
 
 		const effectiveTenantId = isSystem ? query.tenantId : tenantId;
 		if (effectiveTenantId) {
-			filterSql += ' AND t.tenant_id = {detailTenantId:String}';
+			filterSql +=
+				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {detailTenantId:String}";
 			params.detailTenantId = effectiveTenantId;
 		}
 		if (query.labelId) {
-			filterSql += ' AND t.label_id = {detailLabelId:String}';
+			filterSql +=
+				" AND coalesce(nullIf(o.label_id, ''), t.label_id) = {detailLabelId:String}";
 			params.detailLabelId = query.labelId;
 		}
 		if (query.artistId) {
@@ -333,6 +335,7 @@ export class TimelineAnalyticsService {
 	private buildDetailFilters(
 		tenantId: string,
 		query: DetailAnalyticsFilterQuery,
+		ownershipPeriod: 'trend' | 'revenue' = 'trend',
 	): { joinSql: string; filterSql: string; params: Record<string, any> } {
 		const isSystem = checkIsSystemTenant(tenantId);
 		const needsTrackJoin =
@@ -346,10 +349,21 @@ export class TimelineAnalyticsService {
 				query.channelId ||
 				query.isrc
 			);
+		const ownershipDate =
+			ownershipPeriod === 'revenue'
+				? 's.period >= o.revenue_effective_from AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)'
+				: 's.reporting_date >= o.effective_from AND (o.effective_to IS NULL OR s.reporting_date < o.effective_to)';
 		const joinSql = needsTrackJoin
-			? `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`
+			? `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+         LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND ${ownershipDate}`
 			: '';
-		let filterSql = needsTrackJoin ? ' AND t.is_deleted = 0' : '';
+		// A legacy asset has no ledger row until it is first transferred/backfilled.
+		// Keep its existing pg_tracks_sync attribution, but never fall back for an
+		// ISRC that already has ownership history (that would reassign old facts).
+		let filterSql = needsTrackJoin
+			? ` AND t.is_deleted = 0
+          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`
+			: '';
 		const params: Record<string, any> = {};
 
 		filterSql = this.appendDetailFilters(
@@ -365,7 +379,7 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: TimelineQueryDto,
 	): { joinSql: string; filterSql: string; params: Record<string, any> } {
-		return this.buildDetailFilters(tenantId, query);
+		return this.buildDetailFilters(tenantId, query, 'revenue');
 	}
 
 	async getSummary(
@@ -386,17 +400,19 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: AnalyticsSummaryQueryDto,
 	): Promise<AnalyticsSummaryResponse> {
-		const { joinSql, filterSql, params } = this.buildDetailFilters(
+		const trendFilters = this.buildDetailFilters(tenantId, query);
+		const salesFilters = this.buildDetailFilters(
 			tenantId,
 			query,
+			'revenue',
 		);
 		const trendParams = {
-			...params,
+			...trendFilters.params,
 			from: query.fromDate,
 			to: query.toDate,
 		};
 		const salesParams = {
-			...params,
+			...salesFilters.params,
 			from: normalizeDateToFirstOfMonth(query.fromDate),
 			to: normalizeDateToFirstOfMonth(query.toDate),
 		};
@@ -404,20 +420,20 @@ export class TimelineAnalyticsService {
 		const trendSql = `
       SELECT sum(s.total_quantity) AS total_trend_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-      ${joinSql}
+			${trendFilters.joinSql}
       WHERE s.reporting_date >= toDate({from:String})
         AND s.reporting_date <= toDate({to:String})
-        ${filterSql}
+			${trendFilters.filterSql}
     `;
 		const salesSql = `
       SELECT
         sum(s.total_quantity) AS total_usage,
         sum(s.total_revenue_usd) AS total_revenue_usd
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      ${joinSql}
+			${salesFilters.joinSql}
       WHERE s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
-        ${filterSql}
+			${salesFilters.filterSql}
     `;
 
 		const [trendRows, salesRows] = await Promise.all([
@@ -2828,6 +2844,7 @@ export class TimelineAnalyticsService {
 		const { joinSql, filterSql, params } = this.buildDetailFilters(
 			tenantId,
 			query,
+			'revenue',
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -2875,6 +2892,7 @@ export class TimelineAnalyticsService {
 		const { joinSql, filterSql, params } = this.buildDetailFilters(
 			tenantId,
 			query,
+			'revenue',
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -2979,6 +2997,7 @@ export class TimelineAnalyticsService {
 		const { joinSql, filterSql, params } = this.buildDetailFilters(
 			tenantId,
 			query,
+			'revenue',
 		);
 		params.from = fromDate;
 		params.to = toDate;

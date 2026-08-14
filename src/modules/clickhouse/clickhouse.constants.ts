@@ -8,6 +8,7 @@ export const CLICKHOUSE_TABLES = {
 	TRENDS_ISRC_DAILY_CUBE: 'trends_isrc_daily_cube',
 	TRENDS_DSP_DAILY_CUBE: 'trends_dsp_daily_cube',
 	PG_TRACKS_SYNC: 'pg_tracks_sync',
+	PG_ASSET_OWNERSHIP_SYNC: 'pg_asset_ownership_sync',
 	PG_DSPS_SYNC: 'pg_dsps_sync',
 	DSPS_REPORT: 'dsps_report',
 	DSP_REPORT_STATS: 'dsp_report_stats',

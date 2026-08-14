@@ -599,6 +599,7 @@ export class ExportRunner {
 		const filters: string[] = [
 			's.period >= toDate({from:String})',
 			's.period <= toDate({to:String})',
+			`(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`,
 		];
 
 		const resolvedTenantIds = dto.tenantIds?.length
@@ -609,13 +610,17 @@ export class ExportRunner {
 
 		if (resolvedTenantIds.length > 0) {
 			filters.push('t.is_deleted = 0');
-			filters.push('t.tenant_id IN ({tenantIds:Array(String)})');
+			filters.push(
+				"coalesce(nullIf(o.tenant_id, ''), t.tenant_id) IN ({tenantIds:Array(String)})",
+			);
 			params.tenantIds = resolvedTenantIds;
 		}
 
 		if (dto.labelId) {
 			filters.push('t.is_deleted = 0');
-			filters.push('t.label_id = {labelId:String}');
+			filters.push(
+				"coalesce(nullIf(o.label_id, ''), t.label_id) = {labelId:String}",
+			);
 			params.labelId = dto.labelId;
 		}
 
@@ -670,6 +675,10 @@ export class ExportRunner {
 
 	private getCommonJoins() {
 		return `
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o
+        ON s.isrc = o.isrc
+        AND s.period >= o.revenue_effective_from
+        AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL) r ON s.dsp_id = r.id_dsps_report
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid

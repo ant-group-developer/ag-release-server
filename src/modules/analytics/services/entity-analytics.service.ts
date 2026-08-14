@@ -122,6 +122,10 @@ export class EntityAnalyticsService {
 		releaseType?: 'audio' | 'video',
 		importSource?: string,
 		analyticsScope?: AnalyticsVideoScope,
+		ownershipPeriod: 'trend' | 'revenue' = 'trend',
+		factDateExpression = ownershipPeriod === 'revenue'
+			? 's.period'
+			: 's.reporting_date',
 	): {
 		joinSql: string;
 		filterSql: string;
@@ -146,11 +150,19 @@ export class EntityAnalyticsService {
 			return { joinSql: '', filterSql, params };
 		}
 
-		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-		let filterSql = 'AND t.is_deleted = 0';
+		const ownershipDate =
+			ownershipPeriod === 'revenue'
+				? 's.period >= o.revenue_effective_from AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)'
+				: `${factDateExpression} >= o.effective_from AND (o.effective_to IS NULL OR ${factDateExpression} < o.effective_to)`;
+		const joinSql = `
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND ${ownershipDate}`;
+		let filterSql = `AND t.is_deleted = 0
+      AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`;
 
 		if (!isSystem && entityType !== 'tenant') {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
+			filterSql +=
+				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {tenantId:String}";
 			params.tenantId = tenantId;
 		}
 
@@ -159,7 +171,8 @@ export class EntityAnalyticsService {
 				filterSql += ' AND t.release_id = {entityId:String}';
 				break;
 			case 'label':
-				filterSql += ' AND t.label_id = {entityId:String}';
+				filterSql +=
+					" AND coalesce(nullIf(o.label_id, ''), t.label_id) = {entityId:String}";
 				break;
 			case 'artist':
 				filterSql += ' AND has(t.artist_ids, {entityId:String})';
@@ -168,7 +181,8 @@ export class EntityAnalyticsService {
 				filterSql += ' AND s.isrc = {entityId:String}';
 				break;
 			case 'tenant':
-				filterSql += ' AND t.tenant_id = {entityId:String}';
+				filterSql +=
+					" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {entityId:String}";
 				break;
 			case 'channel':
 				filterSql += ' AND t.channel_id = {entityId:String}';
@@ -319,7 +333,7 @@ export class EntityAnalyticsService {
 		dto: AnalyticsSummaryQueryDto,
 		tenantId: string,
 	): Promise<AnalyticsSummaryResponse> {
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
+		const trendFilters = this.buildEntityFilters(
 			tenantId,
 			entityType,
 			entityId,
@@ -327,30 +341,43 @@ export class EntityAnalyticsService {
 			dto.importSource,
 			getAnalyticsVideoScope(dto),
 		);
+		const salesFilters = this.buildEntityFilters(
+			tenantId,
+			entityType,
+			entityId,
+			dto.releaseType,
+			dto.importSource,
+			getAnalyticsVideoScope(dto),
+			'revenue',
+		);
 		const salesParams = {
-			...params,
+			...salesFilters.params,
 			from: normalizeDateToFirstOfMonth(dto.fromDate),
 			to: normalizeDateToFirstOfMonth(dto.toDate),
 		};
-		const trendParams = { ...params, from: dto.fromDate, to: dto.toDate };
+		const trendParams = {
+			...trendFilters.params,
+			from: dto.fromDate,
+			to: dto.toDate,
+		};
 
 		const trendSql = `
       SELECT sum(s.total_quantity) AS total_trend_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-      ${joinSql}
+      ${trendFilters.joinSql}
       WHERE s.reporting_date >= toDate({from:String})
         AND s.reporting_date <= toDate({to:String})
-        ${filterSql}
+        ${trendFilters.filterSql}
     `;
 		const salesSql = `
       SELECT
         sum(s.total_quantity) AS total_usage,
         sum(s.total_revenue_usd) AS total_revenue_usd
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      ${joinSql}
+      ${salesFilters.joinSql}
       WHERE s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
-        ${filterSql}
+        ${salesFilters.filterSql}
     `;
 
 		const [trendRows, salesRows] = await Promise.all([
@@ -384,32 +411,47 @@ export class EntityAnalyticsService {
 	): Promise<EntityOverviewResponse> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
+		const trendFilters = this.buildEntityFilters(
 			tenantId,
 			entityType,
 			entityId,
 			dto.releaseType,
 			dto.importSource,
 			getAnalyticsVideoScope(dto),
+			'trend',
+			's.period',
 		);
-		params.from = fromDate;
-		params.to = toDate;
+		const salesFilters = this.buildEntityFilters(
+			tenantId,
+			entityType,
+			entityId,
+			dto.releaseType,
+			dto.importSource,
+			getAnalyticsVideoScope(dto),
+			'revenue',
+		);
+		const params = { ...trendFilters.params, from: fromDate, to: toDate };
+		const salesParams = {
+			...salesFilters.params,
+			from: fromDate,
+			to: toDate,
+		};
 
 		const trendSql = `
       SELECT sum(s.total_quantity) AS total_trend_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
-      ${joinSql}
+			${trendFilters.joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
-        ${filterSql}
+			${trendFilters.filterSql}
     `;
 		const salesSql = `
       SELECT
         sum(s.total_quantity) AS total_sales_views,
         sum(s.total_revenue_usd) AS total_revenue_usd
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      ${joinSql}
+			${salesFilters.joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
-        ${filterSql}
+			${salesFilters.filterSql}
     `;
 
 		const [trendRows, salesRows] = await Promise.all([
@@ -420,7 +462,7 @@ export class EntityAnalyticsService {
 			this.clickHouseService.query<{
 				total_sales_views: string;
 				total_revenue_usd: string;
-			}>(salesSql, params),
+			}>(salesSql, salesParams),
 		]);
 
 		let artistMeta = null;
@@ -591,6 +633,7 @@ export class EntityAnalyticsService {
 			dto.releaseType,
 			dto.importSource,
 			getAnalyticsVideoScope(dto),
+			'revenue',
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -842,6 +885,7 @@ export class EntityAnalyticsService {
 			dto.releaseType,
 			dto.importSource,
 			getAnalyticsVideoScope(dto),
+			'revenue',
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -965,6 +1009,7 @@ export class EntityAnalyticsService {
 			dto.releaseType,
 			dto.importSource,
 			getAnalyticsVideoScope(dto),
+			'revenue',
 		);
 		params.from = fromDate;
 		params.to = toDate;
