@@ -45,7 +45,10 @@ import { ReleaseReviewsModule } from './modules/release-reviews/release-reviews.
 import { ReleaseDdexService } from './services/release-ddex.service';
 // import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
 // import { ReleaseSpotifyService2 } from './services/release.ddex-spotify2.service';
+import { ReleaseCiStatusSyncScheduleController } from './controllers/release-ci-status-sync-schedule.controller';
 import { ReleaseDspDeliveryController } from './controllers/release-dsp-delivery.controller';
+import { ReleaseCiStatusSyncSchedule } from './entities/release-ci-status-sync-schedule.entity';
+import { ReleaseCiStatusSyncScheduleService } from './services/release-ci-status-sync-schedule.service';
 import { ReleaseDspDeliveryQueryService } from './services/release-dsp-services/release-dsp-delivery-query.service';
 import { ReleaseDspDeliveryService } from './services/release-dsp-services/release-dsp-delivery.service';
 import { ReleaseReportImportService } from './services/release-report-import.service';
@@ -114,6 +117,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 			PriceTier,
 			Country,
 			ReleaseDspDelivery,
+			ReleaseCiStatusSyncSchedule,
 			ReleaseLog,
 			ReleaseEnrichment,
 			MetadataScanSession,
@@ -180,6 +184,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseController,
 		ReleaseDraftController,
 		ReleaseDspDeliveryController,
+		ReleaseCiStatusSyncScheduleController,
 
 		ReleaseExecutionController,
 
@@ -197,6 +202,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseDdexService,
 		ReleaseDspDeliveryService,
 		ReleaseDspDeliveryQueryService,
+		ReleaseCiStatusSyncScheduleService,
 		ReportEntityExtractorService,
 
 		// v1
