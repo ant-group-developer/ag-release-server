@@ -4,6 +4,7 @@ import {
 	OnModuleDestroy,
 	OnModuleInit,
 } from '@nestjs/common';
+import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { Subscription } from 'rxjs';
@@ -52,8 +53,34 @@ export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 		const fromEnv = Number(process.env.EXPORT_WORKER_THREADS);
 		if (Number.isFinite(fromEnv) && fromEnv >= 1)
 			return Math.floor(fromEnv);
-		// Mặc định: chừa 1 core cho event loop HTTP.
+
+		const cgroupLimit = this.readCgroupCpuLimit();
+		if (cgroupLimit !== null) return cgroupLimit;
+
 		return Math.max(1, (os.cpus()?.length ?? 2) - 1);
+	}
+
+	private readCgroupCpuLimit(): number | null {
+		try {
+			const [quota, period] = fs
+				.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8')
+				.trim()
+				.split(/\s+/);
+			if (quota === 'max') return null;
+			const quotaMicros = Number(quota);
+			const periodMicros = Number(period);
+			if (
+				!Number.isFinite(quotaMicros) ||
+				!Number.isFinite(periodMicros) ||
+				quotaMicros <= 0 ||
+				periodMicros <= 0
+			) {
+				return null;
+			}
+			return Math.max(1, Math.floor(quotaMicros / periodMicros));
+		} catch {
+			return null;
+		}
 	}
 
 	async onModuleInit() {

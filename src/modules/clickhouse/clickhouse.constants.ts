@@ -18,6 +18,7 @@ export const CLICKHOUSE_TABLES = {
 	TRENDS_TER_MONTHLY: 'trends_ter_monthly_cube',
 	TRENDS_TER_DAILY_CUBE: 'trends_ter_daily_cube',
 	IMPORT_JOBS: 'import_jobs',
+	REPORT_SOURCE_CONFIGS: 'report_source_configs',
 	EXCHANGE_RATES: 'exchange_rates',
 	FTP_EXCLUDE_PATTERNS: 'ftp_exclude_patterns',
 	FTP_DSP_PARSER_CONFIGS: 'ftp_dsp_parser_configs',
@@ -27,7 +28,8 @@ export const CLICKHOUSE_TABLES = {
 	FTP_REPORT_FILE_RULES: 'ftp_report_file_rules',
 	FTP_REPORT_FILE_SCAN_RUNS: 'ftp_report_file_scan_runs',
 	FTP_REPORT_FILE_DISCOVERY_CONFIG: 'ftp_report_file_discovery_config',
-	FTP_REPORT_FILE_DISCOVERY_CHECKPOINTS: 'ftp_report_file_discovery_checkpoints',
+	FTP_REPORT_FILE_DISCOVERY_CHECKPOINTS:
+		'ftp_report_file_discovery_checkpoints',
 	FTP_REPORT_FILE_PERIOD_OBSERVATIONS: 'ftp_report_file_period_observations',
 	FTP_REPORT_SAMPLE_TASKS: 'ftp_report_sample_tasks',
 	METADATA_ENRICHMENT_LOG: 'metadata_enrichment_log',

@@ -9,6 +9,7 @@ import {
 import {
 	CreateImportJobInput,
 	ImportJob,
+	ImportJobReportSource,
 	ImportJobRow,
 	ImportJobSourceType,
 	ImportJobStatus,
@@ -459,21 +460,11 @@ export class ImportJobsService implements OnModuleInit {
 		const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
 		const offset = Math.max(filters.offset ?? 0, 0);
 
-		const where: string[] = [];
-		const params: Record<string, unknown> = { limit, offset };
-		if (filters.sourceType) {
-			where.push('source_type = {sourceType:String}');
-			params.sourceType = filters.sourceType;
-		}
-		if (filters.status) {
-			where.push('status = {status:String}');
-			params.status = filters.status;
-		}
-		if (filters.tenantId) {
-			where.push('tenant_id = {tenantId:String}');
-			params.tenantId = filters.tenantId;
-		}
-		const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+		const { whereClause, params } = await this.buildListWhere(
+			filters,
+			limit,
+			offset,
+		);
 
 		// Query 1: Count total jobs
 		const countSql = `
@@ -535,6 +526,80 @@ export class ImportJobsService implements OnModuleInit {
 			params,
 		);
 		return { items: rows.map(rowToDomain), totalItems };
+	}
+
+	private async buildListWhere(
+		filters: ListImportJobsFilters,
+		limit: number,
+		offset: number,
+	): Promise<{ whereClause: string; params: Record<string, unknown> }> {
+		const where: string[] = [];
+		const params: Record<string, unknown> = { limit, offset };
+
+		if (filters.sourceType) {
+			where.push('source_type = {sourceType:String}');
+			params.sourceType = filters.sourceType;
+		}
+		if (filters.status) {
+			where.push('status = {status:String}');
+			params.status = filters.status;
+		}
+		if (filters.tenantId) {
+			where.push('tenant_id = {tenantId:String}');
+			params.tenantId = filters.tenantId;
+		}
+
+		if (filters.reportSource === ImportJobReportSource.MERLIN) {
+			where.push('source_type IN ({merlinSourceTypes:Array(String)})');
+			params.merlinSourceTypes = [
+				ImportJobSourceType.FTP_SYNC_PERIOD,
+				ImportJobSourceType.FTP_SYNC_ALL,
+				ImportJobSourceType.FTP_RETRY,
+				ImportJobSourceType.FTP_AUTO_CRON,
+			];
+		} else if (filters.reportSource) {
+			const sourceCode =
+				filters.reportSource === ImportJobReportSource.SPOTIFY
+					? 'spotify'
+					: 'wmg';
+			const filePatterns =
+				await this.getActiveReportSourcePatterns(sourceCode);
+
+			if (filePatterns.length === 0) {
+				// Do not treat every REPORT_UPLOAD as Spotify/Warner when configuration
+				// is unavailable; a restrictive filter is safer than a broad result.
+				where.push('0');
+			} else {
+				where.push('source_type = {reportUploadSourceType:String}');
+				where.push(
+					"arrayExists(pattern -> match(file_name, concat('(?i)', pattern)), {reportSourcePatterns:Array(String)})",
+				);
+				params.reportUploadSourceType =
+					ImportJobSourceType.REPORT_UPLOAD;
+				params.reportSourcePatterns = filePatterns;
+			}
+		}
+
+		return {
+			whereClause: where.length ? `WHERE ${where.join(' AND ')}` : '',
+			params,
+		};
+	}
+
+	private async getActiveReportSourcePatterns(
+		sourceCode: 'spotify' | 'wmg',
+	): Promise<string[]> {
+		const rows = await this.clickHouseService.query<{
+			file_patterns: string[];
+		}>(
+			`SELECT file_patterns FROM music_analytics.${CLICKHOUSE_TABLES.REPORT_SOURCE_CONFIGS} FINAL WHERE source_code = {sourceCode:String} AND is_active = 1`,
+			{ sourceCode },
+		);
+		return rows.flatMap((row) =>
+			Array.isArray(row.file_patterns)
+				? row.file_patterns.filter((pattern) => !!pattern)
+				: [],
+		);
 	}
 
 	async findRecoverableReportUploadJobs(): Promise<ImportJob[]> {

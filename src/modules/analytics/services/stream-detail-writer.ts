@@ -30,7 +30,8 @@ function csvEscape(value: unknown): string {
 }
 
 export interface IStreamDetailWriter {
-	appendRow(row: DetailRowLike): void;
+	appendRow(row: DetailRowLike): boolean;
+	ready(): Promise<void>;
 	flush(): Promise<void>;
 }
 
@@ -41,18 +42,38 @@ export class CsvStreamDetailWriter implements IStreamDetailWriter {
 	private headerWritten = false;
 	private flushPromise?: Promise<void>;
 
-	constructor(filePath: string) {
-		this.stream = fs.createWriteStream(filePath, { encoding: 'utf8' });
+	constructor(filePath: string, append = false) {
+		this.headerWritten = append;
+		this.stream = fs.createWriteStream(filePath, {
+			encoding: 'utf8',
+			flags: append ? 'a' : 'w',
+		});
 	}
 
-	appendRow(row: DetailRowLike): void {
+	appendRow(row: DetailRowLike): boolean {
+		let ready = true;
 		if (!this.headerWritten) {
 			const headers = DETAIL_COLUMNS.map((c) => csvEscape(c.header));
-			this.stream.write(`\uFEFF${headers.join(',')}\n`);
+			ready = this.stream.write(`\uFEFF${headers.join(',')}\n`);
 			this.headerWritten = true;
 		}
 		const values = DETAIL_COLUMNS.map((c) => csvEscape(row[c.key]));
-		this.stream.write(`${values.join(',')}\n`);
+		return this.stream.write(`${values.join(',')}\n`) && ready;
+	}
+
+	async ready(): Promise<void> {
+		if (!this.stream.writableNeedDrain) return;
+		await new Promise<void>((resolve, reject) => {
+			const onDrain = () => done(resolve);
+			const onError = (error: Error) => done(() => reject(error));
+			const done = (callback: () => void) => {
+				this.stream.off('drain', onDrain);
+				this.stream.off('error', onError);
+				callback();
+			};
+			this.stream.once('drain', onDrain);
+			this.stream.once('error', onError);
+		});
 	}
 
 	async flush(): Promise<void> {
@@ -89,8 +110,13 @@ export class XlsxStreamDetailWriter implements IStreamDetailWriter {
 		}));
 	}
 
-	appendRow(row: DetailRowLike): void {
+	appendRow(row: DetailRowLike): boolean {
 		this.sheet.addRow(row).commit();
+		return true;
+	}
+
+	async ready(): Promise<void> {
+		// ExcelJS commits rows synchronously to its streaming writer.
 	}
 
 	async flush(): Promise<void> {
@@ -224,15 +250,18 @@ export function updateAccumulator(
 }
 
 export interface GroupState {
-	writer: IStreamDetailWriter;
+	writer?: IStreamDetailWriter;
 	summary: SummaryAccumulator;
+	detailFilePath: string;
+	hasWrittenDetailFile: boolean;
 }
 
 export function createStreamWriter(
 	filePath: string,
 	format: 'csv' | 'xlsx',
+	append = false,
 ): IStreamDetailWriter {
 	return format === 'csv'
-		? new CsvStreamDetailWriter(filePath)
+		? new CsvStreamDetailWriter(filePath, append)
 		: new XlsxStreamDetailWriter(filePath);
 }
