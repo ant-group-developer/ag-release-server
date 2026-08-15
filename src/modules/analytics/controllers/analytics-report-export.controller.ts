@@ -11,8 +11,15 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { concat, from, interval, merge, Observable, of } from 'rxjs';
-import { map, switchMap, takeWhile } from 'rxjs/operators';
+import { concat, EMPTY, from, interval, merge, Observable, of } from 'rxjs';
+import {
+	catchError,
+	distinctUntilChanged,
+	filter,
+	map,
+	switchMap,
+	takeWhile,
+} from 'rxjs/operators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { ImportJob } from 'src/modules/etl/interfaces';
 import {
@@ -151,6 +158,28 @@ export class AnalyticsReportExportController {
 			})),
 		);
 
+		// Poll fallback: lưới an toàn nếu một event pub/sub bị mất. Không có nó,
+		// mất đúng event `completed` là client treo ở "preparing download" mãi.
+		// Dedupe theo (status, progressCurrent, processedRows) để không spam client.
+		const poll$ = interval(2000).pipe(
+			switchMap(() =>
+				from(this.importJobsService.findById(jobId)).pipe(
+					catchError(() => EMPTY),
+				),
+			),
+			filter((job): job is ImportJob => !!job),
+			distinctUntilChanged(
+				(a, b) =>
+					a.status === b.status &&
+					a.progressCurrent === b.progressCurrent &&
+					a.processedRows === b.processedRows,
+			),
+			map((job) => ({
+				type: mapStatusToEventType(job.status),
+				data: formatExportJob(job),
+			})),
+		);
+
 		const heartbeat$ = interval(20000).pipe(
 			map(() => ({
 				type: 'heartbeat',
@@ -158,7 +187,13 @@ export class AnalyticsReportExportController {
 			})),
 		);
 
-		const initial$ = from(this.importJobsService.findById(jobId)).pipe(
+		const initial$ = from(
+			this.importJobsService
+				.findById(jobId)
+				.then(
+					(job) => job ?? this.importJobsService.getSnapshot(jobId),
+				),
+		).pipe(
 			switchMap((job) => {
 				this.assertReadableJob(job, req.user!.tenantId, jobId);
 
@@ -175,7 +210,7 @@ export class AnalyticsReportExportController {
 					return of(snapshotEvt);
 				}
 
-				return concat(of(snapshotEvt), updates$);
+				return concat(of(snapshotEvt), merge(updates$, poll$));
 			}),
 		);
 
@@ -238,6 +273,23 @@ export class AnalyticsReportExportController {
 		if (!checkIsSystemTenant(tenantId) && job.tenantId !== tenantId) {
 			throw new NotFoundException(`Export job not found: ${jobId}`);
 		}
+	}
+}
+
+/**
+ * Map job status → SSE event type. Phải khớp với logic trong
+ * ImportJobsService.persist() để `takeWhile` ở stream đóng connection đúng lúc.
+ */
+function mapStatusToEventType(status: string): string {
+	switch (status) {
+		case 'COMPLETED':
+			return 'completed';
+		case 'FAILED':
+			return 'failed';
+		case 'CANCELLED':
+			return 'cancelled';
+		default:
+			return 'progress';
 	}
 }
 
