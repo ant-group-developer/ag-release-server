@@ -41,7 +41,7 @@ export class ReleaseCiStatusSyncSchedule extends BaseUUIDEntity {
 		name: 'release_statuses',
 		type: 'varchar',
 		array: true,
-		default: () => "ARRAY['issue', 'processing']::varchar[]",
+		default: () => "ARRAY['processing', 'failed']::varchar[]",
 		comment: 'Danh sách trạng thái release cần đồng bộ từ CI',
 	})
 	releaseStatuses: ReleaseStatus[];

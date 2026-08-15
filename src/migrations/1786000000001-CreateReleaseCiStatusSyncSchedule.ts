@@ -15,7 +15,7 @@ export class CreateReleaseCiStatusSyncSchedule1786000000001
 				"sync_status_enabled" boolean NOT NULL DEFAULT false,
 				"cron_expression" character varying(100) NOT NULL DEFAULT '0 6 * * *',
 				"timezone" character varying(80) NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
-				"release_statuses" character varying[] NOT NULL DEFAULT ARRAY['submitted', 'processing']::varchar[],
+				"release_statuses" character varying[] NOT NULL DEFAULT ARRAY['processing', 'failed']::varchar[],
 				"batch_size" integer NOT NULL DEFAULT 100,
 				"concurrency" integer NOT NULL DEFAULT 3,
 				"is_running" boolean NOT NULL DEFAULT false,
@@ -49,7 +49,7 @@ export class CreateReleaseCiStatusSyncSchedule1786000000001
 				false,
 				'0 6 * * *',
 				'Asia/Ho_Chi_Minh',
-				ARRAY['submitted', 'processing']::varchar[],
+				ARRAY['processing', 'failed']::varchar[],
 				100,
 				3
 			WHERE NOT EXISTS (

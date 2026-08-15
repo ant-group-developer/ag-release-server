@@ -48,7 +48,7 @@ export class UpdateReleaseCiStatusSyncScheduleDto {
 	@ApiPropertyOptional({
 		enum: ReleaseStatus,
 		isArray: true,
-		example: [ReleaseStatus.SUBMITTED, ReleaseStatus.PROCESSING],
+		example: [ReleaseStatus.PROCESSING, ReleaseStatus.FAILED],
 		description: 'Các trạng thái release cần đồng bộ từ CI',
 	})
 	@IsOptional()

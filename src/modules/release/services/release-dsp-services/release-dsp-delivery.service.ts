@@ -739,18 +739,29 @@ export class ReleaseDspDeliveryService {
 			reason: SyncStatusSkipReason;
 			detail: Record<string, unknown>;
 		}[] = [];
+		const staleLiveDspIds = new Set<string>();
 
 		for (const item of mappedCandidates) {
+			const mappedStatus =
+				this.releaseService.mapCiDspStatusToReleaseDspStatus(
+					item.ciStatus,
+				);
 			const skipReason = this.resolveCiSyncSkipReason({
 				ciStatus: item.ciStatus,
 				lastEnqueuedAt: gateMap.get(item.dspId)?.lastEnqueuedAt ?? null,
 			});
 
 			if (skipReason) {
+				// A stale CI result must not overwrite the status of the current
+				// execution. It can still confirm that an older/live version exists.
+				if (mappedStatus === ReleaseDspStatus.DISTRIBUTED) {
+					staleLiveDspIds.add(item.dspId);
+				}
+
 				skipped.push({
 					dspCode: item.dspCode,
 					reason: skipReason.reason,
-					detail: skipReason.detail,
+					detail: { ...skipReason.detail, mappedStatus },
 				});
 				this.logger.log(
 					`[syncStatusFromCi] SKIP reason=${skipReason.reason} ` +
@@ -771,11 +782,21 @@ export class ReleaseDspDeliveryService {
 			applied.push({
 				dspId: item.dspId,
 				dspCode: item.dspCode,
-				status: this.releaseService.mapCiDspStatusToReleaseDspStatus(
-					item.ciStatus,
-				),
+				status: mappedStatus,
 				deliveredAt: item.ciStatus.deliveredAt,
 			});
+		}
+
+		let liveVersionRestored = 0;
+		if (staleLiveDspIds.size) {
+			const result = await this.repo.update(
+				{
+					releaseId,
+					dspId: In([...staleLiveDspIds]),
+				},
+				{ hasLiveVersion: true },
+			);
+			liveVersionRestored = result.affected ?? 0;
 		}
 
 		if (applied.length) {
@@ -801,6 +822,7 @@ export class ReleaseDspDeliveryService {
 			releaseStatus: updatedRelease?.status,
 			applied: applied.length,
 			skipped: skipped.length,
+			liveVersionRestored,
 			skippedItems: skipped,
 			ciStatuses,
 		};
