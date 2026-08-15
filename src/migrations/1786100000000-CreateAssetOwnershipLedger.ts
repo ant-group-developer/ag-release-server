@@ -4,7 +4,6 @@ export class CreateAssetOwnershipLedger1786100000000 implements MigrationInterfa
 	name = 'CreateAssetOwnershipLedger1786100000000';
 
 	public async up(queryRunner: QueryRunner): Promise<void> {
-		await queryRunner.query('CREATE EXTENSION IF NOT EXISTS btree_gist');
 		await queryRunner.query(`
 			CREATE TABLE asset_ownership_transfer_events (
 				id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -31,13 +30,43 @@ export class CreateAssetOwnershipLedger1786100000000 implements MigrationInterfa
 				CONSTRAINT chk_asset_ownership_revenue_range CHECK (revenue_effective_to IS NULL OR revenue_effective_to > revenue_effective_from)
 			)
 		`);
-		await queryRunner.query(`
-			ALTER TABLE asset_ownership_periods ADD CONSTRAINT asset_ownership_periods_no_overlap
-			EXCLUDE USING gist (release_id WITH =, daterange(effective_from, effective_to, '[)') WITH &&)
-		`);
 		await queryRunner.query('CREATE INDEX idx_asset_ownership_period_release_from ON asset_ownership_periods(release_id, effective_from)');
 		await queryRunner.query('CREATE INDEX idx_asset_ownership_period_tenant_from ON asset_ownership_periods(tenant_id, effective_from)');
 		await queryRunner.query('CREATE INDEX idx_asset_ownership_period_label_from ON asset_ownership_periods(label_id, effective_from)');
+		await queryRunner.query(`
+			CREATE FUNCTION prevent_asset_ownership_period_overlap()
+			RETURNS trigger
+			LANGUAGE plpgsql
+			AS $$
+			BEGIN
+				-- Serialize changes for one release so concurrent writes cannot bypass
+				-- the overlap check between their respective SELECT and INSERT/UPDATE.
+				PERFORM pg_advisory_xact_lock(hashtext(NEW.release_id::text));
+
+				IF EXISTS (
+					SELECT 1
+					FROM asset_ownership_periods AS existing
+					WHERE existing.release_id = NEW.release_id
+						AND existing.id <> NEW.id
+						AND existing.effective_from < COALESCE(NEW.effective_to, 'infinity'::date)
+						AND NEW.effective_from < COALESCE(existing.effective_to, 'infinity'::date)
+				) THEN
+					RAISE EXCEPTION USING
+						ERRCODE = '23P01',
+						MESSAGE = 'Asset ownership effective periods cannot overlap for the same release';
+				END IF;
+
+				RETURN NEW;
+			END;
+			$$
+		`);
+		await queryRunner.query(`
+			CREATE TRIGGER asset_ownership_periods_prevent_overlap
+			BEFORE INSERT OR UPDATE OF release_id, effective_from, effective_to
+			ON asset_ownership_periods
+			FOR EACH ROW
+			EXECUTE FUNCTION prevent_asset_ownership_period_overlap()
+		`);
 		await queryRunner.query(`
 			INSERT INTO asset_ownership_periods
 				(release_id, tenant_id, label_id, effective_from, revenue_effective_from)
@@ -53,6 +82,7 @@ export class CreateAssetOwnershipLedger1786100000000 implements MigrationInterfa
 		await queryRunner.query('ALTER TABLE asset_import_batches DROP COLUMN IF EXISTS revenue_effective_from');
 		await queryRunner.query('ALTER TABLE asset_import_batches DROP COLUMN IF EXISTS effective_date');
 		await queryRunner.query('DROP TABLE IF EXISTS asset_ownership_periods');
+		await queryRunner.query('DROP FUNCTION IF EXISTS prevent_asset_ownership_period_overlap()');
 		await queryRunner.query('DROP TABLE IF EXISTS asset_ownership_transfer_events');
 	}
 }
