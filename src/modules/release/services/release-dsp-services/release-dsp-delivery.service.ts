@@ -657,17 +657,11 @@ export class ReleaseDspDeliveryService {
 	 */
 	async syncStatusFromCi(releaseId: string) {
 		// 1. Lấy releaseFormatId từ CI
-		let releaseFormatId: string;
-		try {
-			releaseFormatId = await this.releaseService.getReleaseFormatId(
-				releaseId,
-				{ reloadFromCi: false },
-			);
-		} catch (error) {
-			throw new Error(
-				`Release chưa có releaseFormatId từ CI: ${error.message}`,
-			);
-		}
+
+		const releaseFormatId = await this.releaseService.getReleaseFormatId(
+			releaseId,
+			{ reloadFromCi: false },
+		);
 
 		// 2. Lấy status từ CI
 		const ciStatuses = await this.ciExportService.getStatusDsps({
