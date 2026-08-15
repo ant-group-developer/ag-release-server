@@ -32,6 +32,7 @@ services:
         environment:
             - TZ=${TZ:-Asia/Ho_Chi_Minh}
             - APP_ROLE=worker
+            - EXPORT_WORKER_THREADS=1
         command: yarn start:prod
         restart: unless-stopped
         volumes:

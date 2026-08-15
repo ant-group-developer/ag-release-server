@@ -158,7 +158,7 @@ export class JobController {
 	@ApiOperation({
 		summary: 'List recent import/sync jobs',
 		description:
-			'Filter by status / sourceType / tenantId. Sorted by createdAt DESC.',
+			'Filter by status / sourceType / reportSource / tenantId. Sorted by createdAt DESC.',
 	})
 	async listJobs(
 		@Query() query: QueryGetListJobsDto,
@@ -166,6 +166,7 @@ export class JobController {
 		const {
 			status,
 			sourceType,
+			reportSource,
 			tenantId,
 			page,
 			pageSize,
@@ -175,6 +176,7 @@ export class JobController {
 		const result = await this.importJobsService.list({
 			status,
 			sourceType,
+			reportSource,
 			tenantId,
 			limit: pageSize,
 			offset: (page - 1) * pageSize,

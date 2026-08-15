@@ -9,6 +9,7 @@ import {
 import {
 	CreateImportJobInput,
 	ImportJob,
+	ImportJobReportSource,
 	ImportJobRow,
 	ImportJobSourceType,
 	ImportJobStatus,
@@ -33,7 +34,10 @@ export class ImportJobsService implements OnModuleInit {
 	private readonly logger = new Logger(ImportJobsService.name);
 	private readonly snapshots = new Map<string, ImportJob>();
 	private readonly lastFlushAt = new Map<string, number>();
+	/** Thời điểm snapshot được tạo — dùng cho TTL sweep, xem sweepStaleSnapshots(). */
+	private readonly snapshotCreatedAt = new Map<string, number>();
 	private static readonly PROGRESS_FLUSH_MS = 1000;
+	private static readonly SNAPSHOT_TTL_MS = 30 * 60 * 1000;
 
 	constructor(
 		private readonly clickHouseService: ClickHouseService,
@@ -48,6 +52,9 @@ export class ImportJobsService implements OnModuleInit {
 	}
 
 	private async initializeJobsInBackground() {
+		// Chỉ worker được sweep. Nếu container `api` cũng chạy, restart `api` sẽ
+		// mark FAILED các job đang PROCESSING thật sự của container `worker`.
+		if (process.env.APP_ROLE !== 'worker') return;
 		await this.clickHouseMigrationService.waitForMigrations();
 		await this.markStaleAsFailed();
 	}
@@ -82,9 +89,37 @@ export class ImportJobsService implements OnModuleInit {
 			updatedAt: now,
 		};
 		this.snapshots.set(job.id, job);
-		await this.persist(job);
+		this.snapshotCreatedAt.set(job.id, Date.now());
+		// wait: row phải visible trước khi caller enqueue sang Redis.
+		await this.persist(job, true);
 		this.logger.log(`Job ${job.id} created (${job.sourceType})`);
 		return job;
+	}
+
+	/**
+	 * Xoá snapshot quá hạn.
+	 *
+	 * `cleanup()` chỉ chạy ở process thực thi job. Process tạo job (container `api`)
+	 * không bao giờ thấy transition terminal nên snapshot của nó nằm lại vĩnh viễn
+	 * → memory leak tỉ lệ với số job đã tạo. Snapshot chỉ cần sống đủ lâu để che
+	 * khoảng race ReplacingMergeTree ngay sau create, nên TTL 30 phút là thoải mái.
+	 */
+	@Cron('*/10 * * * *')
+	sweepStaleSnapshots(): void {
+		const cutoff = Date.now() - ImportJobsService.SNAPSHOT_TTL_MS;
+		let removed = 0;
+
+		for (const [id, createdAt] of this.snapshotCreatedAt) {
+			if (createdAt >= cutoff) continue;
+			this.snapshots.delete(id);
+			this.lastFlushAt.delete(id);
+			this.snapshotCreatedAt.delete(id);
+			removed++;
+		}
+
+		if (removed > 0) {
+			this.logger.log(`Swept ${removed} stale job snapshot(s)`);
+		}
 	}
 
 	async markProcessing(id: string): Promise<void> {
@@ -99,7 +134,9 @@ export class ImportJobsService implements OnModuleInit {
 		job.startedAt = job.startedAt ?? nowDt64();
 		job.finishedAt = null;
 		job.errorMessage = '';
-		await this.persist(job);
+		// wait: nếu insert này mất, reaper sẽ thấy job vẫn QUEUED và re-enqueue
+		// một job đang chạy → duplicate execution.
+		await this.persist(job, true);
 	}
 
 	async markQueued(id: string): Promise<ImportJob> {
@@ -109,7 +146,8 @@ export class ImportJobsService implements OnModuleInit {
 		job.finishedAt = null;
 		job.durationMs = 0;
 		job.errorMessage = '';
-		await this.persist(job);
+		// wait: worker sẽ dequeue ngay sau đây và đọc bằng FINAL.
+		await this.persist(job, true);
 		return job;
 	}
 
@@ -195,7 +233,7 @@ export class ImportJobsService implements OnModuleInit {
 			job.totalRows = job.processedRows;
 		}
 
-		await this.persist(job);
+		await this.persist(job, true);
 		this.cleanup(id);
 		this.logger.log(`Job ${id} COMPLETED in ${job.durationMs}ms`);
 	}
@@ -218,7 +256,7 @@ export class ImportJobsService implements OnModuleInit {
 		if (job.totalRows === 0 && job.processedRows > 0) {
 			job.totalRows = job.processedRows;
 		}
-		await this.persist(job);
+		await this.persist(job, true);
 		this.cleanup(id);
 		this.logger.error(`Job ${id} FAILED: ${job.errorMessage}`);
 	}
@@ -245,7 +283,7 @@ export class ImportJobsService implements OnModuleInit {
 			job.totalRows = job.processedRows;
 		}
 
-		await this.persist(job);
+		await this.persist(job, true);
 		this.cleanup(id);
 		this.logger.warn(`Job ${id} CANCELLED: ${reason}`);
 		return job;
@@ -391,10 +429,18 @@ export class ImportJobsService implements OnModuleInit {
 		return this.snapshots.get(id) ?? null;
 	}
 
+	/**
+	 * Đọc state cuối cùng từ ClickHouse (FINAL).
+	 *
+	 * KHÔNG đọc in-memory snapshot. Với deployment nhiều process, job chạy ở
+	 * container `worker` nhưng SSE serve ở container `api` — container `api` giữ
+	 * snapshot QUEUED từ lúc create và không bao giờ được update (mọi markX() xảy
+	 * ra ở process khác), nên cache-first sẽ trả status/rows sai vĩnh viễn.
+	 *
+	 * Caller nào thực sự cần snapshot local (chống race ReplacingMergeTree ngay sau
+	 * create) thì gọi `getSnapshot()` tường minh — xem ReportImportService.startJob.
+	 */
 	async findById(id: string): Promise<ImportJob | null> {
-		const cached = this.snapshots.get(id);
-		if (cached) return cached;
-
 		const sql = `
       SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
       WHERE id = {id:String}
@@ -414,21 +460,11 @@ export class ImportJobsService implements OnModuleInit {
 		const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
 		const offset = Math.max(filters.offset ?? 0, 0);
 
-		const where: string[] = [];
-		const params: Record<string, unknown> = { limit, offset };
-		if (filters.sourceType) {
-			where.push('source_type = {sourceType:String}');
-			params.sourceType = filters.sourceType;
-		}
-		if (filters.status) {
-			where.push('status = {status:String}');
-			params.status = filters.status;
-		}
-		if (filters.tenantId) {
-			where.push('tenant_id = {tenantId:String}');
-			params.tenantId = filters.tenantId;
-		}
-		const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+		const { whereClause, params } = await this.buildListWhere(
+			filters,
+			limit,
+			offset,
+		);
 
 		// Query 1: Count total jobs
 		const countSql = `
@@ -492,6 +528,80 @@ export class ImportJobsService implements OnModuleInit {
 		return { items: rows.map(rowToDomain), totalItems };
 	}
 
+	private async buildListWhere(
+		filters: ListImportJobsFilters,
+		limit: number,
+		offset: number,
+	): Promise<{ whereClause: string; params: Record<string, unknown> }> {
+		const where: string[] = [];
+		const params: Record<string, unknown> = { limit, offset };
+
+		if (filters.sourceType) {
+			where.push('source_type = {sourceType:String}');
+			params.sourceType = filters.sourceType;
+		}
+		if (filters.status) {
+			where.push('status = {status:String}');
+			params.status = filters.status;
+		}
+		if (filters.tenantId) {
+			where.push('tenant_id = {tenantId:String}');
+			params.tenantId = filters.tenantId;
+		}
+
+		if (filters.reportSource === ImportJobReportSource.MERLIN) {
+			where.push('source_type IN ({merlinSourceTypes:Array(String)})');
+			params.merlinSourceTypes = [
+				ImportJobSourceType.FTP_SYNC_PERIOD,
+				ImportJobSourceType.FTP_SYNC_ALL,
+				ImportJobSourceType.FTP_RETRY,
+				ImportJobSourceType.FTP_AUTO_CRON,
+			];
+		} else if (filters.reportSource) {
+			const sourceCode =
+				filters.reportSource === ImportJobReportSource.SPOTIFY
+					? 'spotify'
+					: 'wmg';
+			const filePatterns =
+				await this.getActiveReportSourcePatterns(sourceCode);
+
+			if (filePatterns.length === 0) {
+				// Do not treat every REPORT_UPLOAD as Spotify/Warner when configuration
+				// is unavailable; a restrictive filter is safer than a broad result.
+				where.push('0');
+			} else {
+				where.push('source_type = {reportUploadSourceType:String}');
+				where.push(
+					"arrayExists(pattern -> match(file_name, concat('(?i)', pattern)), {reportSourcePatterns:Array(String)})",
+				);
+				params.reportUploadSourceType =
+					ImportJobSourceType.REPORT_UPLOAD;
+				params.reportSourcePatterns = filePatterns;
+			}
+		}
+
+		return {
+			whereClause: where.length ? `WHERE ${where.join(' AND ')}` : '',
+			params,
+		};
+	}
+
+	private async getActiveReportSourcePatterns(
+		sourceCode: 'spotify' | 'wmg',
+	): Promise<string[]> {
+		const rows = await this.clickHouseService.query<{
+			file_patterns: string[];
+		}>(
+			`SELECT file_patterns FROM music_analytics.${CLICKHOUSE_TABLES.REPORT_SOURCE_CONFIGS} FINAL WHERE source_code = {sourceCode:String} AND is_active = 1`,
+			{ sourceCode },
+		);
+		return rows.flatMap((row) =>
+			Array.isArray(row.file_patterns)
+				? row.file_patterns.filter((pattern) => !!pattern)
+				: [],
+		);
+	}
+
 	async findRecoverableReportUploadJobs(): Promise<ImportJob[]> {
 		const sql = `
       SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
@@ -532,14 +642,21 @@ export class ImportJobsService implements OnModuleInit {
 
 	@Cron('*/1 * * * *') // every 1 minute
 	async checkPendingTimeout(): Promise<void> {
+		// Gate worker role: 2 container cùng chạy cron này sẽ double-transition.
+		if (process.env.APP_ROLE !== 'worker') return;
 		const sql = `
       SELECT id, created_at FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
       WHERE status = {status:String}
+        AND source_type != {analyticsExportSourceType:String}
     `;
 		const pending = await this.clickHouseService.query<{
 			id: string;
 			created_at: string;
-		}>(sql, { status: ImportJobStatus.PENDING });
+		}>(sql, {
+			status: ImportJobStatus.PENDING,
+			analyticsExportSourceType:
+				ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+		});
 
 		if (!pending.length) return;
 
@@ -620,18 +737,37 @@ export class ImportJobsService implements OnModuleInit {
 		}
 	}
 
-	private async persist(job: ImportJob): Promise<void> {
+	/**
+	 * Ghi state job vào ClickHouse + emit event.
+	 *
+	 * `wait = false` (default): fire-and-forget, dùng cho progress update ở hot path
+	 * — mất một cái không sao vì SSE có poll fallback.
+	 *
+	 * `wait = true`: await insert và KHÔNG swallow lỗi. Bắt buộc cho create/enqueue
+	 * và các transition terminal. Nếu không await, `createExportJob` return trong
+	 * vài ms rồi enqueue Redis, worker dequeue gần như tức thì và `findById` trả
+	 * null (row chưa visible qua FINAL, lại thêm `async_insert: 1`) → job bị ack
+	 * im lặng, đứng QUEUED vĩnh viễn.
+	 */
+	private async persist(job: ImportJob, wait = false): Promise<void> {
 		job.updatedAt = nowDt64();
-		this.clickHouseService
-			.insert(CLICKHOUSE_TABLES.IMPORT_JOBS, [
-				domainToRow(job),
-			] as unknown as Record<string, unknown>[])
-			.catch((err) => {
-				this.logger.error(
-					`Failed to persist job ${job.id} to ClickHouse: ${err.message}`,
-					err.stack,
-				);
-			});
+		const rows = [domainToRow(job)] as unknown as Record<string, unknown>[];
+
+		if (wait) {
+			await this.clickHouseService.insert(
+				CLICKHOUSE_TABLES.IMPORT_JOBS,
+				rows,
+			);
+		} else {
+			this.clickHouseService
+				.insert(CLICKHOUSE_TABLES.IMPORT_JOBS, rows)
+				.catch((err) => {
+					this.logger.error(
+						`Failed to persist job ${job.id} to ClickHouse: ${err.message}`,
+						err.stack,
+					);
+				});
+		}
 		this.lastFlushAt.set(job.id, Date.now());
 
 		this.jobEvents.emit({
@@ -687,12 +823,14 @@ export class ImportJobsService implements OnModuleInit {
 		const fromDb = await this.findById(id);
 		if (!fromDb) throw new Error(`ImportJob ${id} not found`);
 		this.snapshots.set(id, fromDb);
+		this.snapshotCreatedAt.set(id, Date.now());
 		return fromDb;
 	}
 
 	private cleanup(id: string): void {
 		this.snapshots.delete(id);
 		this.lastFlushAt.delete(id);
+		this.snapshotCreatedAt.delete(id);
 	}
 }
 

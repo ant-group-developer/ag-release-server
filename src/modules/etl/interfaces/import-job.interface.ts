@@ -22,6 +22,13 @@ export enum ImportJobStatus {
 	CANCELLED = 'CANCELLED',
 }
 
+/** High-level origin used to filter import jobs in the ETL job list. */
+export enum ImportJobReportSource {
+	MERLIN = 'MERLIN',
+	SPOTIFY = 'SPOTIFY',
+	WARNER = 'WARNER',
+}
+
 /**
  * Row đúng theo schema ClickHouse `music_analytics.import_jobs`.
  * `params` / `result` là JSON string (ClickHouse không có native object column).
@@ -121,6 +128,7 @@ export interface UpdateProgressPatch {
 
 export interface ListImportJobsFilters {
 	sourceType?: ImportJobSourceType;
+	reportSource?: ImportJobReportSource;
 	status?: ImportJobStatus;
 	tenantId?: string;
 	limit?: number;

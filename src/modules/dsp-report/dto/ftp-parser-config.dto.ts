@@ -57,6 +57,15 @@ export class FtpParserFieldMappingDto {
 	@IsString()
 	reportColumn: string;
 
+	@ApiPropertyOptional({
+		description:
+			'Optional internal parser header to populate before parsing. Use the same value as reportColumn to apply only the target-field override without aliasing another parser input.',
+		example: 'ISRC',
+	})
+	@IsOptional()
+	@IsString()
+	parserColumn?: string;
+
 	@ApiProperty({
 		description: 'Destination column in the target ClickHouse fact table',
 		example: 'isrc',

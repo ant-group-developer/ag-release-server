@@ -31,6 +31,7 @@ services:
         environment:
             - TZ=${TZ:-Asia/Ho_Chi_Minh}
             - APP_ROLE=worker
+            - EXPORT_WORKER_THREADS=2
         command: yarn start:prod
         restart: unless-stopped
         volumes:
@@ -40,4 +41,4 @@ services:
             - ./database.rclone.conf:/app/database.rclone.conf:ro
             - ./release_parsed:${RELEASE_PARSED_DIR}
         mem_limit: 2g
-        cpus: 2  
+        cpus: 2

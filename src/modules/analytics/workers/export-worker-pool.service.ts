@@ -4,10 +4,14 @@ import {
 	OnModuleDestroy,
 	OnModuleInit,
 } from '@nestjs/common';
+import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { Subscription } from 'rxjs';
+import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
 import { ImportJobStatus } from 'src/modules/etl/interfaces';
 import { ImportJobsService } from 'src/modules/etl/services/import-jobs/import-jobs.service';
+import { JobEventsGateway } from 'src/modules/etl/services/import-jobs/job-events.gateway';
 import { Worker } from 'worker_threads';
 import { AnalyticsReportExportDto } from '../dto/analytics-report-export.dto';
 import { ExportProgressPatch } from '../interfaces/analytics-report-export.interface';
@@ -32,25 +36,75 @@ interface RunningJob {
 export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger(ExportWorkerPoolService.name);
 	private readonly maxThreads = this.resolveMaxThreads();
+	private static readonly MAX_MISSING_ROW_ATTEMPTS = 5;
 	private activeCount = 0;
 	private isRunning = false;
 	private readonly running = new Map<string, RunningJob>();
+	private cancelSub?: Subscription;
 
 	constructor(
 		private readonly importJobsService: ImportJobsService,
 		private readonly exportQueueService: ExportQueueService,
+		private readonly jobEvents: JobEventsGateway,
+		private readonly r2Service: BucketR2Service,
 	) {}
 
 	private resolveMaxThreads(): number {
 		const fromEnv = Number(process.env.EXPORT_WORKER_THREADS);
 		if (Number.isFinite(fromEnv) && fromEnv >= 1)
 			return Math.floor(fromEnv);
-		// Mặc định: chừa 1 core cho event loop HTTP.
+
+		const cgroupLimit = this.readCgroupCpuLimit();
+		if (cgroupLimit !== null) return cgroupLimit;
+
 		return Math.max(1, (os.cpus()?.length ?? 2) - 1);
 	}
 
+	private readCgroupCpuLimit(): number | null {
+		try {
+			const [quota, period] = fs
+				.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8')
+				.trim()
+				.split(/\s+/);
+			if (quota === 'max') return null;
+			const quotaMicros = Number(quota);
+			const periodMicros = Number(period);
+			if (
+				!Number.isFinite(quotaMicros) ||
+				!Number.isFinite(periodMicros) ||
+				quotaMicros <= 0 ||
+				periodMicros <= 0
+			) {
+				return null;
+			}
+			return Math.max(1, Math.floor(quotaMicros / periodMicros));
+		} catch {
+			return null;
+		}
+	}
+
 	async onModuleInit() {
+		// Chỉ container APP_ROLE=worker được chạy pool. Trước đây thiếu gate này
+		// nên cả container `api` lẫn `worker` cùng RPOPLPUSH trên queue → container
+		// nào thắng là random, và mọi state/event của job nằm in-memory ở container
+		// đó → SSE ở container kia treo vĩnh viễn.
+		if (process.env.APP_ROLE !== 'worker') {
+			this.logger.log(
+				`Export worker pool disabled on role=${process.env.APP_ROLE || 'api'}`,
+			);
+			return;
+		}
+
 		await this.exportQueueService.redeliverStuck();
+
+		// Cancel đến từ HTTP handler ở container `api` → nhận qua Redis pub/sub.
+		this.cancelSub = this.jobEvents.onCancelRequest().subscribe((jobId) => {
+			if (this.running.has(jobId)) {
+				this.logger.log(`Cancel request received for job ${jobId}`);
+				this.requestCancel(jobId);
+			}
+		});
+
 		this.isRunning = true;
 		this.logger.log(
 			`Export worker pool started with ${this.maxThreads} thread(s)`,
@@ -60,6 +114,7 @@ export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 
 	async onModuleDestroy() {
 		this.isRunning = false;
+		this.cancelSub?.unsubscribe();
 		for (const [, job] of this.running) {
 			await job.worker.terminate().catch(() => undefined);
 		}
@@ -104,13 +159,29 @@ export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 
 	private async runJob(jobId: string): Promise<void> {
 		this.activeCount++;
+		// Khi row chưa visible qua FINAL, ta nack để retry → KHÔNG được ack ở finally
+		// (ack sẽ xoá job khỏi processing set mà nack vừa đẩy lại vào queue).
+		let requeued = false;
+
 		try {
 			const job = await this.importJobsService.findById(jobId);
-			if (!job || this.isTerminalStatus(job.status)) {
-				await this.exportQueueService.ack(jobId);
+
+			if (!job) {
+				requeued = await this.requeueForMissingRow(jobId);
 				return;
 			}
 
+			if (this.isTerminalStatus(job.status)) {
+				this.logger.log(
+					`Job ${jobId} already ${job.status}. Acking without run.`,
+				);
+				return;
+			}
+
+			await this.exportQueueService.clearMissingRowAttempts(jobId);
+			// Nếu job được reaper cứu trước đó thì đã chạy trở lại bình thường;
+			// không giữ retry history cũ cho lần orphan sau.
+			await this.exportQueueService.clearRequeueAttempts(jobId);
 			await this.importJobsService.markProcessing(jobId);
 			await this.spawnAndWait(
 				jobId,
@@ -119,15 +190,57 @@ export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 			);
 		} catch (err: any) {
 			this.logger.error(`Job ${jobId} failed: ${err.message}`, err.stack);
-			await this.importJobsService.markFailed(
-				jobId,
-				err instanceof Error ? err : String(err),
-			);
+			// markFailed giờ await persist và không swallow lỗi → phải catch ở đây,
+			// nếu không sẽ thành unhandled rejection (runJob được gọi bằng `void`).
+			await this.importJobsService
+				.markFailed(jobId, err instanceof Error ? err : String(err))
+				.catch((markErr) => {
+					this.logger.error(
+						`Failed to mark job ${jobId} as FAILED: ${markErr.message}`,
+					);
+				});
 		} finally {
-			await this.exportQueueService.ack(jobId).catch(() => undefined);
+			if (!requeued) {
+				await this.exportQueueService.ack(jobId).catch(() => undefined);
+			}
 			this.running.delete(jobId);
 			this.activeCount--;
 		}
+	}
+
+	/**
+	 * Worker dequeue được jobId nhưng `findById` trả null — thường là race
+	 * ReplacingMergeTree ngay sau create. Trước đây chỗ này ack im lặng → job biến
+	 * mất khỏi queue, đứng QUEUED vĩnh viễn, không log gì.
+	 *
+	 * Trả về true nếu đã nack (caller không được ack nữa).
+	 */
+	private async requeueForMissingRow(jobId: string): Promise<boolean> {
+		const attempts = await this.exportQueueService
+			.incrementMissingRowAttempt(jobId)
+			.catch(() => Number.MAX_SAFE_INTEGER);
+
+		if (attempts > ExportWorkerPoolService.MAX_MISSING_ROW_ATTEMPTS) {
+			this.logger.error(
+				`Job ${jobId} not found in ClickHouse after ${attempts} attempt(s). Giving up.`,
+			);
+			await this.exportQueueService
+				.clearMissingRowAttempts(jobId)
+				.catch(() => undefined);
+			await this.importJobsService
+				.markFailed(jobId, 'Job row not found in ClickHouse')
+				.catch(() => undefined);
+			return false;
+		}
+
+		// Backoff tuyến tính: 1s, 2s, 3s... trước khi đẩy lại vào queue.
+		const backoffMs = attempts * 1000;
+		this.logger.warn(
+			`Job ${jobId} row not visible yet (attempt ${attempts}). Requeue in ${backoffMs}ms.`,
+		);
+		await this.sleep(backoffMs);
+		await this.exportQueueService.nack(jobId).catch(() => undefined);
+		return true;
 	}
 
 	private spawnAndWait(
@@ -199,7 +312,20 @@ export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 					.updateFileName(jobId, msg.fileName)
 					.catch(() => undefined);
 				break;
-			case 'done':
+			case 'done': {
+				// Job có thể đã bị cancel TRONG LÚC worker đang zip/upload. Khi đó
+				// markCompleted() bị skip (giữ nguyên CANCELLED) → file vừa upload
+				// nằm lại R2 vĩnh viễn vì cleanup cron chỉ quét job COMPLETED.
+				const current = await this.importJobsService
+					.findById(jobId)
+					.catch(() => null);
+
+				if (current?.status === ImportJobStatus.CANCELLED) {
+					await this.discardOrphanExportFile(jobId, msg.result?.key);
+					done(resolve);
+					break;
+				}
+
 				await this.importJobsService
 					.markCompleted(jobId, {
 						...msg.result,
@@ -208,6 +334,7 @@ export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 					.catch(() => undefined);
 				done(resolve);
 				break;
+			}
 			case 'cancelled':
 				await this.importJobsService
 					.markCancelled(jobId, 'Cancelled by user')
@@ -222,6 +349,30 @@ export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 					reject(new Error(msg.message || 'Export worker error')),
 				);
 				break;
+		}
+	}
+
+	/** Xoá file đã upload của job bị cancel giữa chừng (tránh rác trên R2). */
+	private async discardOrphanExportFile(
+		jobId: string,
+		key?: unknown,
+	): Promise<void> {
+		if (typeof key !== 'string' || !key) {
+			this.logger.warn(
+				`Job ${jobId} cancelled after upload but result.key missing — cannot clean R2`,
+			);
+			return;
+		}
+
+		try {
+			await this.r2Service.deletePrivate(key);
+			this.logger.log(
+				`Discarded orphan export file for cancelled job ${jobId}: ${key}`,
+			);
+		} catch (err) {
+			this.logger.warn(
+				`Failed to discard orphan export file ${key} for job ${jobId}: ${err instanceof Error ? err.message : String(err)}`,
+			);
 		}
 	}
 
