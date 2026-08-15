@@ -97,4 +97,24 @@ describe('AnalyticsReportExportService.reapStuckQueuedJobs', () => {
 		).not.toHaveBeenCalled();
 		expect(exportQueueService.enqueue).not.toHaveBeenCalled();
 	});
+
+	it('fails an export job still pending after one hour', async () => {
+		process.env.APP_ROLE = 'worker';
+		const { clickHouseService, importJobsService, service } =
+			createService();
+		clickHouseService.query.mockResolvedValue([
+			{ id: 'stale-pending-job' },
+		]);
+		importJobsService.markFailed.mockResolvedValue(undefined);
+
+		await service.failStuckPendingExportJobs();
+
+		expect(importJobsService.markFailed).toHaveBeenCalledWith(
+			'stale-pending-job',
+			'Export job remained PENDING for over 60 minutes',
+		);
+		expect(clickHouseService.query.mock.calls[0][1]).toMatchObject({
+			minutes: 60,
+		});
+	});
 });

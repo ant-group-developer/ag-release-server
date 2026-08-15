@@ -34,6 +34,7 @@ export class AnalyticsReportExportService {
 	/** Ngưỡng coi job QUEUED là mắc kẹt. Job lớn vẫn ở QUEUED khi pool đầy nên
 	 *  không đặt quá thấp; reaper cũng đã bỏ qua job còn trong Redis. */
 	private readonly stuckQueuedMinutes = 15;
+	private readonly pendingExportTimeoutMinutes = 60;
 	private readonly maxRequeueAttempts = 3;
 
 	constructor(
@@ -245,6 +246,43 @@ export class AnalyticsReportExportService {
 			this.logger.log(
 				`Stuck QUEUED export reaper: requeued=${requeued}, failed=${failed}`,
 			);
+		}
+	}
+
+	/** Fail export jobs that were created but never reached the queue within one hour. */
+	@Cron('*/2 * * * *')
+	async failStuckPendingExportJobs(): Promise<void> {
+		if (process.env.APP_ROLE !== 'worker') return;
+
+		const sql = `
+      SELECT id FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+      WHERE source_type = {sourceType:String}
+        AND status = {status:String}
+        AND created_at < now64(3) - toIntervalMinute({minutes:UInt16})
+      ORDER BY created_at ASC
+      LIMIT {limit:UInt32}
+    `;
+		const rows = await this.clickHouseService.query<{ id: string }>(sql, {
+			sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+			status: ImportJobStatus.PENDING,
+			minutes: this.pendingExportTimeoutMinutes,
+			limit: this.cleanupBatchSize,
+		});
+
+		for (const { id } of rows) {
+			try {
+				await this.importJobsService.markFailed(
+					id,
+					`Export job remained PENDING for over ${this.pendingExportTimeoutMinutes} minutes`,
+				);
+				this.logger.warn(
+					`Marked stale PENDING export job ${id} as FAILED`,
+				);
+			} catch (err) {
+				this.logger.error(
+					`Failed to mark stale PENDING export job ${id}: ${err instanceof Error ? err.message : String(err)}`,
+				);
+			}
 		}
 	}
 

@@ -647,11 +647,16 @@ export class ImportJobsService implements OnModuleInit {
 		const sql = `
       SELECT id, created_at FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
       WHERE status = {status:String}
+        AND source_type != {analyticsExportSourceType:String}
     `;
 		const pending = await this.clickHouseService.query<{
 			id: string;
 			created_at: string;
-		}>(sql, { status: ImportJobStatus.PENDING });
+		}>(sql, {
+			status: ImportJobStatus.PENDING,
+			analyticsExportSourceType:
+				ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+		});
 
 		if (!pending.length) return;
 
