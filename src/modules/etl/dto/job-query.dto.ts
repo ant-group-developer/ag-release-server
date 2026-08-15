@@ -2,7 +2,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { OrderDirection } from 'src/common/enums/common';
-import { ImportJobSourceType, ImportJobStatus } from '../interfaces';
+import {
+	ImportJobReportSource,
+	ImportJobSourceType,
+	ImportJobStatus,
+} from '../interfaces';
 
 export class QueryGetListJobsDto extends BaseQueryDto {
 	@ApiPropertyOptional({
@@ -22,6 +26,16 @@ export class QueryGetListJobsDto extends BaseQueryDto {
 	@IsOptional()
 	@IsEnum(ImportJobSourceType)
 	sourceType?: ImportJobSourceType;
+
+	@ApiPropertyOptional({
+		description:
+			'Filter imported reports by origin. MERLIN groups FTP sync jobs; SPOTIFY and WARNER match REPORT_UPLOAD filenames against active report-source configuration patterns.',
+		enum: ImportJobReportSource,
+		example: ImportJobReportSource.SPOTIFY,
+	})
+	@IsOptional()
+	@IsEnum(ImportJobReportSource)
+	reportSource?: ImportJobReportSource;
 
 	@ApiPropertyOptional({
 		description: 'Filter jobs by tenant ID',

@@ -68,6 +68,18 @@ interface DspSyncRow {
 	updated_at: string;
 }
 
+interface AssetOwnershipSyncRow extends Record<string, unknown> {
+	isrc: string;
+	release_id: string;
+	tenant_id: string;
+	label_id: string;
+	effective_from: string;
+	effective_to: string | null;
+	revenue_effective_from: string;
+	revenue_effective_to: string | null;
+	updated_at: string;
+}
+
 @Injectable()
 export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger(ClickHouseSyncService.name);
@@ -109,14 +121,19 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 		// 1. Sync dsps from PostgreSQL to ClickHouse pg_dsps_sync on startup
 		await this.syncDspsOnStartup();
 
-		// 2. Dong bo du lieu lich su (neu can)
-		await this.runInitialSyncIfNeeded();
-
-		// 3. Quet bu outbox (truong hop server chet truoc do)
+		// Ownership is a compact financial dimension. It must not wait behind the
+		// potentially long pg_tracks_sync backfill, otherwise a completed asset
+		// transfer can be missing from reports for many minutes after a restart.
+		await this.performFullOwnershipSync();
 		await this.processOutboxQueue();
-
-		// 4. Bat dau lang nghe thoi gian thuc
 		await this.startListening();
+
+		// Full backfill can take a long time on a large catalogue. It must not
+		// delay LISTEN/NOTIFY, otherwise normal release edits and asset transfers
+		// wait behind the whole catalogue on every worker restart.
+		this.runInitialSyncIfNeeded().catch((err) => {
+			this.logger.error(`Initial sync failed: ${err.message}`, err.stack);
+		});
 	}
 
 	private async syncDspsOnStartup() {
@@ -140,78 +157,33 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			const forceSync =
 				this.configService.get<string>('FORCE_INITIAL_SYNC') === 'true';
 
-			// Dem so ban ghi hien co tren ClickHouse
+			// Only seed an empty ClickHouse table automatically. Metadata can
+			// legitimately be blank and ReplacingMergeTree's non-FINAL row count
+			// includes old versions, therefore neither is a safe full-rebuild signal.
+			// Ongoing edits are covered by the PostgreSQL outbox instead.
 			const countResult = await this.clickHouseService.query<{
 				c: string;
-				with_release_upc: string;
-				empty_title: string;
-				metadata_rows: string;
 			}>(
-				`SELECT
-					count() AS c,
-					countIf(release_upc != '') AS with_release_upc,
-					countIf(track_title = '' AND is_deleted = 0) AS empty_title,
-					countIf(
-						track_metadata_spotify != '' OR track_metadata_deezer != ''
-						OR release_metadata_spotify != '' OR release_metadata_deezer != ''
-					) AS metadata_rows
-				 FROM ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} WHERE is_deleted = 0`,
+				`SELECT count() AS c
+				 FROM ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL
+				 WHERE is_deleted = 0`,
 			);
 			const chCount = Number(countResult[0]?.c ?? 0);
-			const chWithReleaseUpc = Number(
-				countResult[0]?.with_release_upc ?? 0,
-			);
-			const chEmptyTitle = Number(countResult[0]?.empty_title ?? 0);
-			const chMetadataRows = Number(countResult[0]?.metadata_rows ?? 0);
-
-			// Dem so ISRC hop le tren Postgres (tracks + videos)
 			const pgCountResult = await this.entityManager.query(
-				`SELECT
-					COUNT(DISTINCT isrc) AS c,
-					COUNT(DISTINCT isrc) FILTER (
-						WHERE track_metadata_spotify IS NOT NULL
-							OR track_metadata_deezer IS NOT NULL
-							OR release_metadata_spotify IS NOT NULL
-							OR release_metadata_deezer IS NOT NULL
-					) AS metadata_rows
-         FROM (
-           SELECT
-             t.isrc,
-             t.metadata_spotify AS track_metadata_spotify,
-             t.metadata_deezer AS track_metadata_deezer,
-             r.metadata_spotify AS release_metadata_spotify,
-             r.metadata_deezer AS release_metadata_deezer
-           FROM tracks t
-           INNER JOIN releases r ON r.id = t.release_id
-           WHERE t.isrc IS NOT NULL AND t.isrc != ''
-           UNION
-           SELECT
-             v.isrc,
-             NULL::jsonb AS track_metadata_spotify,
-             NULL::jsonb AS track_metadata_deezer,
-             r.metadata_spotify AS release_metadata_spotify,
-             r.metadata_deezer AS release_metadata_deezer
-           FROM videos v
-           INNER JOIN releases r ON r.id = v.release_id
-           WHERE v.isrc IS NOT NULL AND v.isrc != ''
-         ) AS combined`,
+				`SELECT COUNT(DISTINCT isrc) AS c
+				 FROM (
+				   SELECT isrc FROM tracks WHERE isrc IS NOT NULL AND isrc != ''
+				   UNION
+				   SELECT isrc FROM videos WHERE isrc IS NOT NULL AND isrc != ''
+				 ) AS combined`,
 			);
 			const pgCount = Number(pgCountResult[0]?.c ?? 0);
-			const pgMetadataRows = Number(pgCountResult[0]?.metadata_rows ?? 0);
 
 			this.logger.log(
-				`Initial sync check: ClickHouse=${chCount} rows, ClickHouse empty_title=${chEmptyTitle} rows, ClickHouse release_upc=${chWithReleaseUpc} rows, ClickHouse metadata=${chMetadataRows} rows, Postgres=${pgCount} ISRCs, Postgres metadata=${pgMetadataRows} rows, forceSync=${forceSync}`,
+				`Initial sync check: ClickHouse FINAL=${chCount} ISRCs, Postgres=${pgCount} ISRCs, forceSync=${forceSync}`,
 			);
 
-			// Neu ClickHouse trong, thieu du lieu (so voi Postgres) hoac bi rong track_title, hoac forceSync = true
-			if (
-				forceSync ||
-				chCount === 0 ||
-				chCount < pgCount ||
-				chWithReleaseUpc < pgCount ||
-				chMetadataRows < pgMetadataRows ||
-				(chEmptyTitle > 0 && pgCount > 0)
-			) {
+			if (forceSync || (chCount === 0 && pgCount > 0)) {
 				this.logger.log(
 					`Starting full initial sync from Postgres to ClickHouse (${pgCount} ISRCs)...`,
 				);
@@ -219,7 +191,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				this.logger.log('Full initial sync completed successfully.');
 			} else {
 				this.logger.log(
-					'ClickHouse data is up to date, skipping initial sync.',
+					'ClickHouse is already seeded; changes will be handled incrementally by the outbox.',
 				);
 			}
 		} catch (err: any) {
@@ -229,7 +201,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	async performFullSync() {
-		let offset = 0;
+		let lastIsrc = '';
 		let totalSynced = 0;
 
 		while (true) {
@@ -349,10 +321,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            INNER JOIN releases r ON r.id = v.release_id
            LEFT JOIN labels l ON l.id = r.label_id
            WHERE v.isrc IS NOT NULL AND v.isrc != ''
-         ) AS combined
+			 ) AS combined
+         WHERE isrc > $2
          ORDER BY isrc
-         LIMIT $1 OFFSET $2`,
-				[INITIAL_SYNC_BATCH_SIZE, offset],
+         LIMIT $1`,
+				[INITIAL_SYNC_BATCH_SIZE, lastIsrc],
 			);
 
 			if (rows.length === 0) break;
@@ -396,7 +369,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			);
 
 			totalSynced += rows.length;
-			offset += INITIAL_SYNC_BATCH_SIZE;
+			lastIsrc = rows[rows.length - 1].isrc;
 
 			this.logger.log(
 				`Initial sync progress: ${totalSynced} ISRCs synced`,
@@ -536,7 +509,19 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			.filter((j) => j.entity_name === 'dsps' && j.action !== 'DELETE')
 			.map((j) => j.entity_id);
 
+		const ownershipReleaseIds = jobs
+			.filter(
+				(j) =>
+					j.entity_name === 'asset_ownership_periods' &&
+					j.action !== 'DELETE',
+			)
+			.map((j) => j.entity_id);
+
 		const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+		if (ownershipReleaseIds.length > 0) {
+			await this.syncOwnershipForReleases(ownershipReleaseIds);
+		}
 
 		// 1a. Xu ly INSERT/UPDATE cho tracks
 		if (trackUpsertIds.length > 0) {
@@ -899,6 +884,83 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					chData,
 				);
 			}
+		}
+	}
+
+	/** Sync all ISRCs of each release against every ownership window. */
+	private async syncOwnershipForReleases(
+		releaseIds: string[],
+	): Promise<void> {
+		const rows = await this.entityManager.query(
+			`SELECT DISTINCT p.id, x.isrc, p.release_id, p.tenant_id, COALESCE(p.label_id, '') AS label_id,
+			        p.effective_from, p.effective_to, p.revenue_effective_from, p.revenue_effective_to,
+			        p.updated_at
+			 FROM asset_ownership_periods p
+			 INNER JOIN (
+			   SELECT release_id, isrc FROM tracks WHERE isrc IS NOT NULL AND isrc != ''
+			   UNION
+			   SELECT release_id, isrc FROM videos WHERE isrc IS NOT NULL AND isrc != ''
+			 ) x ON x.release_id = p.release_id
+			 WHERE p.release_id = ANY($1)`,
+			[releaseIds],
+		);
+		if (!rows.length) return;
+		const data: AssetOwnershipSyncRow[] = rows.map((row: any) => ({
+			isrc: row.isrc,
+			release_id: row.release_id,
+			tenant_id: row.tenant_id,
+			label_id: row.label_id ?? '',
+			effective_from: this.toClickHouseDate(row.effective_from),
+			effective_to: row.effective_to
+				? this.toClickHouseDate(row.effective_to)
+				: null,
+			revenue_effective_from: this.toClickHouseDate(
+				row.revenue_effective_from,
+			),
+			revenue_effective_to: row.revenue_effective_to
+				? this.toClickHouseDate(row.revenue_effective_to)
+				: null,
+			updated_at: new Date().toISOString().slice(0, 23).replace('T', ' '),
+		}));
+		await this.clickHouseService.insert(
+			CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC,
+			data,
+		);
+	}
+
+	private toClickHouseDate(value: string | Date): string {
+		if (value instanceof Date) return value.toISOString().slice(0, 10);
+		const parsed = new Date(value);
+		if (!Number.isNaN(parsed.getTime())) {
+			return parsed.toISOString().slice(0, 10);
+		}
+		throw new Error(
+			`Invalid ownership date received from PostgreSQL: ${value}`,
+		);
+	}
+
+	async performFullOwnershipSync(): Promise<void> {
+		let offset = 0;
+		let syncedReleaseCount = 0;
+		while (true) {
+			const rows = await this.entityManager.query(
+				`SELECT DISTINCT release_id
+				 FROM asset_ownership_periods
+				 ORDER BY release_id
+				 LIMIT $1 OFFSET $2`,
+				[INITIAL_SYNC_BATCH_SIZE, offset],
+			);
+			if (!rows.length) {
+				this.logger.log(
+					`Asset ownership sync completed: ${syncedReleaseCount} release(s)`,
+				);
+				return;
+			}
+			await this.syncOwnershipForReleases(
+				rows.map((row: any) => row.release_id),
+			);
+			syncedReleaseCount += rows.length;
+			offset += rows.length;
 		}
 	}
 

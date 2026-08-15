@@ -14,9 +14,9 @@ export function getRawDetailsPageQuery(
       ${resolvedDspName} AS dsp_name,
       s.territory_code AS territory,
       s.isrc AS isrc,
-      any(t.tenant_id) AS tenant_id,
+      any(coalesce(nullIf(o.tenant_id, ''), t.tenant_id)) AS tenant_id,
       any(t.release_id) AS release_id,
-      any(t.label_id) AS label_id,
+      any(coalesce(nullIf(o.label_id, ''), t.label_id)) AS label_id,
       any(s.upc) AS fallback_upc,
       any(s.track_title) AS fallback_track_title,
       any(s.album_title) AS fallback_album_title,
@@ -28,7 +28,6 @@ export function getRawDetailsPageQuery(
     ${commonJoinsSql}
     ${whereSql}
     GROUP BY date, start_date, end_date, s.dsp_id, dsp_name, territory, isrc
-    ORDER BY date ASC, dsp_name ASC, territory ASC, isrc ASC
   `;
 }
 
@@ -84,20 +83,5 @@ export function getReleaseMetadataByUpcQuery(): string {
     LEFT JOIN artists a ON a.id = ra.artist_id
     WHERE r.upc = ANY($1)
     GROUP BY r.upc, ten.title, ten.name, r.title, r.catalog_id, r.release_date, l.name
-  `;
-}
-
-export function getUniqueIdentifiersQuery(
-	commonJoinsSql: string,
-	whereSql: string,
-): string {
-	return `
-    SELECT
-      s.isrc AS isrc,
-      any(t.tenant_id) AS tenant_id
-    FROM ${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY} s
-    ${commonJoinsSql}
-    ${whereSql}
-    GROUP BY s.isrc
   `;
 }

@@ -1,5 +1,6 @@
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
+import { LRUCache } from 'lru-cache';
 import * as os from 'os';
 import * as path from 'path';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
@@ -21,7 +22,6 @@ import {
 	getReleaseMetadataByUpcQuery,
 	getTenantNamesQuery,
 	getTrackMetadataQuery,
-	getUniqueIdentifiersQuery,
 } from '../queries/analytics-report-export.queries';
 import {
 	appendAnalyticsVideoScopeFilter,
@@ -29,6 +29,7 @@ import {
 } from './analytics-video-scope.service';
 import {
 	GroupState,
+	IStreamDetailWriter,
 	SummaryAccumulator,
 	createEmptyAccumulator,
 	createStreamWriter,
@@ -79,6 +80,18 @@ export interface ExportRunnerDeps {
 	isCancelled?(): Promise<boolean>;
 }
 
+interface MissingCacheValue {
+	missing: true;
+}
+
+const MISSING_CACHE_VALUE: MissingCacheValue = { missing: true };
+
+interface MetadataCache {
+	trackMeta: LRUCache<string, MetadataRow | MissingCacheValue>;
+	releaseMeta: LRUCache<string, MetadataRow | MissingCacheValue>;
+	tenantNames: LRUCache<string, string | MissingCacheValue>;
+}
+
 /**
  * ExportRunner — toàn bộ logic export analytics report, framework-agnostic.
  * Chỉ phụ thuộc các callback trong ExportRunnerDeps nên chạy được ở cả main
@@ -86,6 +99,13 @@ export interface ExportRunnerDeps {
  */
 export class ExportRunner {
 	private readonly sanitizedNamesCache = new Map<string, string>();
+	private static readonly METADATA_WINDOW_SIZE = 20_000;
+	private static readonly METADATA_QUERY_BATCH_SIZE = 5_000;
+	private static readonly TRACK_METADATA_CACHE_SIZE = 50_000;
+	private static readonly RELEASE_METADATA_CACHE_SIZE = 50_000;
+	private static readonly TENANT_NAME_CACHE_SIZE = 10_000;
+	private static readonly MAX_OPEN_CSV_WRITERS = 256;
+	private static readonly PROGRESS_INTERVAL_MS = 2_000;
 
 	constructor(
 		private readonly deps: ExportRunnerDeps,
@@ -103,7 +123,7 @@ export class ExportRunner {
 		dto: AnalyticsReportExportDto,
 	): Promise<AnalyticsReportExportResult> {
 		await this.throwIfCancelled();
-		const range = this.getMonthRange(dto);
+		this.getMonthRange(dto);
 		const trackIsrc = await this.resolveTrackIsrc(dto.trackId);
 		if (dto.trackId && !trackIsrc) {
 			throw new Error('trackId does not have a valid ISRC');
@@ -120,92 +140,124 @@ export class ExportRunner {
 		const key = `exports/analytics/${tenantId}/${uuidv4()}-${fileName}`;
 		const format = dto.format ?? 'csv';
 		const groups = new Map<string, GroupState>();
-		const cache = {
-			trackMeta: new Map<string, MetadataRow>(),
-			releaseMeta: new Map<string, MetadataRow>(),
-			tenantNames: new Map<string, string>(),
-		};
+		const openCsvWriters = new Map<string, GroupState>();
+		const cache = this.createMetadataCache();
+		cache.tenantNames.set(tenantId, tenantName);
 
 		try {
 			await fs.promises.mkdir(tempDir, { recursive: true });
 
 			// Step 1: Pre-fetch metadata vào cache job-local
 			await this.deps.onProgress?.(
-				{ progressCurrent: 1, progressLabel: 'Pre-fetching metadata' },
+				{ progressCurrent: 1, progressLabel: 'Preparing data stream' },
 				true,
 			);
 			await this.throwIfCancelled();
-			await this.prefetchMetadata(tenantId, dto, trackIsrc, cache);
 
 			// Step 2: Stream 1-pass → enrich → ghi trực tiếp vào file group
 			await this.deps.onProgress?.(
-				{ progressCurrent: 2, progressLabel: 'Streaming data' },
+				{ progressCurrent: 2, progressLabel: 'Querying ClickHouse' },
 				true,
 			);
 			const stringPool = new Map<string, string>();
 			let totalRows = 0;
 			let sinceYield = 0;
-			let sinceProgress = 0;
+			let lastProgressAt = Date.now();
+			let receivedFirstRows = false;
+			const emitStreamingProgress = async () => {
+				if (
+					Date.now() - lastProgressAt <
+					ExportRunner.PROGRESS_INTERVAL_MS
+				)
+					return;
+				lastProgressAt = Date.now();
+				await this.deps.onProgress?.(
+					{
+						progressCurrent: 2,
+						progressLabel: `Streaming data (${totalRows} rows)`,
+						processedRows: totalRows,
+					},
+					false,
+				);
+			};
 
 			await this.streamRawDetails(
 				tenantId,
 				dto,
 				trackIsrc,
 				async (rawRows) => {
-					for (const raw of rawRows) {
-						const detail = this.enrichSingleRow(
-							raw,
-							stringPool,
-							cache,
+					if (!receivedFirstRows) {
+						receivedFirstRows = true;
+						await this.deps.onProgress?.(
+							{
+								progressCurrent: 2,
+								progressLabel: 'Streaming data',
+							},
+							true,
 						);
-						const groupKeys = this.getRowGroupKeys(detail, dto);
+					}
+					for (
+						let start = 0;
+						start < rawRows.length;
+						start += ExportRunner.METADATA_WINDOW_SIZE
+					) {
+						const window = rawRows.slice(
+							start,
+							start + ExportRunner.METADATA_WINDOW_SIZE,
+						);
+						await this.hydrateMetadataWindow(window, cache);
 
-						for (const gk of groupKeys) {
-							let group = groups.get(gk);
-							if (!group) {
-								const groupFolder = path.join(tempDir, gk);
-								await fs.promises.mkdir(groupFolder, {
-									recursive: true,
-								});
-								group = {
-									writer: createStreamWriter(
-										path.join(
+						for (const raw of window) {
+							const detail = this.enrichSingleRow(
+								raw,
+								stringPool,
+								cache,
+							);
+							const groupKeys = this.getRowGroupKeys(detail, dto);
+
+							for (const gk of groupKeys) {
+								let group = groups.get(gk);
+								if (!group) {
+									const groupFolder = path.join(tempDir, gk);
+									await fs.promises.mkdir(groupFolder, {
+										recursive: true,
+									});
+									group = {
+										summary: createEmptyAccumulator(),
+										detailFilePath: path.join(
 											groupFolder,
 											`detail.${format}`,
 										),
-										format,
-									),
-									summary: createEmptyAccumulator(),
-								};
-								groups.set(gk, group);
+										hasWrittenDetailFile: false,
+									};
+									groups.set(gk, group);
+								}
+								const writer = await this.acquireWriter(
+									gk,
+									group,
+									format,
+									openCsvWriters,
+								);
+								if (!writer.appendRow(detail as any)) {
+									await writer.ready();
+								}
+								updateAccumulator(group.summary, detail as any);
 							}
-							group.writer.appendRow(detail as any);
-							updateAccumulator(group.summary, detail as any);
-						}
-						totalRows++;
-						sinceYield++;
-						sinceProgress++;
+							totalRows++;
+							sinceYield++;
 
-						if (sinceYield >= 1000) {
-							sinceYield = 0;
-							await new Promise((resolve) =>
-								setImmediate(resolve),
-							);
+							if (sinceYield >= 1000) {
+								sinceYield = 0;
+								await new Promise((resolve) =>
+									setImmediate(resolve),
+								);
+								await emitStreamingProgress();
+							}
 						}
 					}
 
 					await this.throwIfCancelled();
-					if (sinceProgress >= 50_000) {
-						sinceProgress = 0;
-						await this.deps.onProgress?.(
-							{
-								progressCurrent: 2,
-								progressLabel: `Streaming data (${totalRows} rows)`,
-								processedRows: totalRows,
-							},
-							false,
-						);
-					}
+					await emitStreamingProgress();
 				},
 			);
 			stringPool.clear();
@@ -220,7 +272,8 @@ export class ExportRunner {
 			);
 			for (const [gk, group] of groups) {
 				await this.throwIfCancelled();
-				await group.writer.flush();
+				await group.writer?.flush();
+				group.writer = undefined;
 				const summary = this.buildSummaryFromAccumulator(
 					group.summary,
 					gk,
@@ -273,7 +326,7 @@ export class ExportRunner {
 		} finally {
 			this.sanitizedNamesCache.clear();
 			for (const [, g] of groups) {
-				await g.writer.flush().catch(() => {});
+				await g.writer?.flush().catch(() => {});
 			}
 			await fs.promises
 				.rm(tempDir, { recursive: true, force: true })
@@ -283,6 +336,49 @@ export class ExportRunner {
 	}
 
 	// PLACEHOLDER_HELPERS
+
+	/**
+	 * CSV writers can be safely closed and reopened in append mode. Keeping only
+	 * a bounded LRU set avoids exhausting file descriptors for wide exports.
+	 * XLSX cannot append after commit, so its existing one-writer-per-group
+	 * behaviour is intentionally retained.
+	 */
+	private async acquireWriter(
+		groupKey: string,
+		group: GroupState,
+		format: 'csv' | 'xlsx',
+		openCsvWriters: Map<string, GroupState>,
+	): Promise<IStreamDetailWriter> {
+		if (group.writer) {
+			if (format === 'csv') {
+				openCsvWriters.delete(groupKey);
+				openCsvWriters.set(groupKey, group);
+			}
+			return group.writer;
+		}
+
+		if (format === 'csv') {
+			while (openCsvWriters.size >= ExportRunner.MAX_OPEN_CSV_WRITERS) {
+				const oldest = openCsvWriters.entries().next().value as
+					| [string, GroupState]
+					| undefined;
+				if (!oldest) break;
+				const [oldestKey, oldestGroup] = oldest;
+				await oldestGroup.writer?.flush();
+				oldestGroup.writer = undefined;
+				openCsvWriters.delete(oldestKey);
+			}
+		}
+
+		group.writer = createStreamWriter(
+			group.detailFilePath,
+			format,
+			group.hasWrittenDetailFile,
+		);
+		group.hasWrittenDetailFile = true;
+		if (format === 'csv') openCsvWriters.set(groupKey, group);
+		return group.writer;
+	}
 
 	private getRowGroupKeys(
 		row: DetailRow,
@@ -411,74 +507,142 @@ export class ExportRunner {
 
 	// PLACEHOLDER_METADATA
 
-	private async prefetchMetadata(
-		tenantId: string,
-		dto: AnalyticsReportExportDto,
-		trackIsrc: string | null,
-		cache: {
-			trackMeta: Map<string, MetadataRow>;
-			releaseMeta: Map<string, MetadataRow>;
-			tenantNames: Map<string, string>;
-		},
+	private createMetadataCache(): MetadataCache {
+		return {
+			trackMeta: new LRUCache<string, MetadataRow | MissingCacheValue>({
+				max: ExportRunner.TRACK_METADATA_CACHE_SIZE,
+			}),
+			releaseMeta: new LRUCache<string, MetadataRow | MissingCacheValue>({
+				max: ExportRunner.RELEASE_METADATA_CACHE_SIZE,
+			}),
+			tenantNames: new LRUCache<string, string | MissingCacheValue>({
+				max: ExportRunner.TENANT_NAME_CACHE_SIZE,
+			}),
+		};
+	}
+
+	/**
+	 * Fetch only metadata referenced by this stream window. Missing values are cached too,
+	 * preventing repeated Postgres lookups for identifiers that have no metadata.
+	 */
+	private async hydrateMetadataWindow(
+		rawRows: RawDetailRow[],
+		cache: MetadataCache,
 	): Promise<void> {
-		const filters = this.buildFilters(tenantId, dto, trackIsrc);
-		const uniqueIdentifiersSql = getUniqueIdentifiersQuery(
-			this.getCommonJoins(),
-			filters.whereSql,
+		const missingIsrcs = Array.from(
+			new Set(
+				rawRows
+					.map((row) => row.isrc)
+					.filter((isrc) => isrc && !cache.trackMeta.has(isrc)),
+			),
 		);
+		await this.hydrateTrackMetadata(missingIsrcs, cache);
 
-		const rows = await this.deps.chQuery<any>(
-			uniqueIdentifiersSql,
-			filters.params,
-		);
-
-		const uniqueIsrcs = new Set<string>();
-		const uniqueTenantIds = new Set<string>();
-		for (const row of rows) {
-			if (row.isrc) uniqueIsrcs.add(row.isrc);
-			if (row.tenant_id) uniqueTenantIds.add(row.tenant_id);
+		const upcs = new Set<string>();
+		for (const raw of rawRows) {
+			const releaseUpc = raw.isrc
+				? this.unwrapMetadata(cache.trackMeta.get(raw.isrc))
+						?.release_upc
+				: undefined;
+			if (releaseUpc) upcs.add(releaseUpc);
 		}
+		await this.hydrateReleaseMetadata(
+			Array.from(upcs).filter((upc) => !cache.releaseMeta.has(upc)),
+			cache,
+		);
 
-		const isrcs = Array.from(uniqueIsrcs);
-		const tenantIds = Array.from(uniqueTenantIds);
+		const missingTenantIds = Array.from(
+			new Set(
+				rawRows
+					.map((row) => row.tenant_id)
+					.filter(
+						(tenantId) =>
+							tenantId && !cache.tenantNames.has(tenantId),
+					),
+			),
+		);
+		await this.hydrateTenantNames(missingTenantIds, cache);
+	}
 
-		const BATCH = 5000;
-		for (let i = 0; i < isrcs.length; i += BATCH) {
-			const batchIsrcs = isrcs.slice(i, i + BATCH);
-			const trackMap = await this.getTrackMetadata(batchIsrcs);
-
-			const upcsToFetch = new Set<string>();
-			for (const [isrc, track] of trackMap) {
-				cache.trackMeta.set(isrc, track);
-				if (track.release_upc) upcsToFetch.add(track.release_upc);
-			}
-
-			if (upcsToFetch.size > 0) {
-				const releaseMap = await this.getReleaseMetadataByUpc(
-					Array.from(upcsToFetch),
+	private async hydrateTrackMetadata(
+		isrcs: string[],
+		cache: MetadataCache,
+	): Promise<void> {
+		for (
+			let start = 0;
+			start < isrcs.length;
+			start += ExportRunner.METADATA_QUERY_BATCH_SIZE
+		) {
+			const batch = isrcs.slice(
+				start,
+				start + ExportRunner.METADATA_QUERY_BATCH_SIZE,
+			);
+			const metadata = await this.getTrackMetadata(batch);
+			for (const isrc of batch) {
+				cache.trackMeta.set(
+					isrc,
+					metadata.get(isrc) ?? MISSING_CACHE_VALUE,
 				);
-				for (const [upc, release] of releaseMap) {
-					cache.releaseMeta.set(upc, release);
-				}
 			}
 		}
+	}
 
-		if (tenantIds.length > 0) {
-			const tenantMap = await this.getTenantNames(tenantIds);
-			for (const [tid, tname] of tenantMap) {
-				cache.tenantNames.set(tid, tname);
+	private async hydrateReleaseMetadata(
+		upcs: string[],
+		cache: MetadataCache,
+	): Promise<void> {
+		for (
+			let start = 0;
+			start < upcs.length;
+			start += ExportRunner.METADATA_QUERY_BATCH_SIZE
+		) {
+			const batch = upcs.slice(
+				start,
+				start + ExportRunner.METADATA_QUERY_BATCH_SIZE,
+			);
+			const metadata = await this.getReleaseMetadataByUpc(batch);
+			for (const upc of batch) {
+				cache.releaseMeta.set(
+					upc,
+					metadata.get(upc) ?? MISSING_CACHE_VALUE,
+				);
 			}
 		}
+	}
+
+	private async hydrateTenantNames(
+		tenantIds: string[],
+		cache: MetadataCache,
+	): Promise<void> {
+		for (
+			let start = 0;
+			start < tenantIds.length;
+			start += ExportRunner.METADATA_QUERY_BATCH_SIZE
+		) {
+			const batch = tenantIds.slice(
+				start,
+				start + ExportRunner.METADATA_QUERY_BATCH_SIZE,
+			);
+			const names = await this.getTenantNames(batch);
+			for (const tenantId of batch) {
+				cache.tenantNames.set(
+					tenantId,
+					names.get(tenantId) ?? MISSING_CACHE_VALUE,
+				);
+			}
+		}
+	}
+
+	private unwrapMetadata(
+		value: MetadataRow | MissingCacheValue | undefined,
+	): MetadataRow | undefined {
+		return value && !('missing' in value) ? value : undefined;
 	}
 
 	private enrichSingleRow(
 		raw: RawDetailRow,
 		stringPool: Map<string, string>,
-		cache: {
-			trackMeta: Map<string, MetadataRow>;
-			releaseMeta: Map<string, MetadataRow>;
-			tenantNames: Map<string, string>;
-		},
+		cache: MetadataCache,
 	): DetailRow {
 		const pool = (val: string | null | undefined): string | undefined => {
 			if (!val) return undefined;
@@ -491,19 +655,25 @@ export class ExportRunner {
 		};
 
 		const isrc = raw.isrc;
-		const trackInfo = isrc ? cache.trackMeta.get(isrc) : null;
+		const trackInfo = isrc
+			? this.unwrapMetadata(cache.trackMeta.get(isrc))
+			: undefined;
 		const isStandardUpc = isValidStandardUpc(raw.fallback_upc || '');
 		const upcToLookup = isStandardUpc
 			? raw.fallback_upc
 			: trackInfo?.release_upc;
 		const releaseInfo = upcToLookup
-			? cache.releaseMeta.get(upcToLookup)
-			: null;
+			? this.unwrapMetadata(cache.releaseMeta.get(upcToLookup))
+			: undefined;
 
 		const baseInfo = trackInfo || releaseInfo;
-		const finalTenantName = raw.tenant_id
+		const cachedTenantName = raw.tenant_id
 			? cache.tenantNames.get(raw.tenant_id)
-			: baseInfo?.workspace_name;
+			: undefined;
+		const finalTenantName =
+			typeof cachedTenantName === 'string'
+				? cachedTenantName
+				: baseInfo?.workspace_name;
 
 		const artistNameRaw = pool(
 			raw.fallback_artist_name ||
@@ -599,6 +769,7 @@ export class ExportRunner {
 		const filters: string[] = [
 			's.period >= toDate({from:String})',
 			's.period <= toDate({to:String})',
+			`(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`,
 		];
 
 		const resolvedTenantIds = dto.tenantIds?.length
@@ -609,13 +780,17 @@ export class ExportRunner {
 
 		if (resolvedTenantIds.length > 0) {
 			filters.push('t.is_deleted = 0');
-			filters.push('t.tenant_id IN ({tenantIds:Array(String)})');
+			filters.push(
+				"coalesce(nullIf(o.tenant_id, ''), t.tenant_id) IN ({tenantIds:Array(String)})",
+			);
 			params.tenantIds = resolvedTenantIds;
 		}
 
 		if (dto.labelId) {
 			filters.push('t.is_deleted = 0');
-			filters.push('t.label_id = {labelId:String}');
+			filters.push(
+				"coalesce(nullIf(o.label_id, ''), t.label_id) = {labelId:String}",
+			);
 			params.labelId = dto.labelId;
 		}
 
@@ -670,9 +845,25 @@ export class ExportRunner {
 
 	private getCommonJoins() {
 		return `
-      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL) r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
+      LEFT JOIN (
+        SELECT isrc, tenant_id, label_id, revenue_effective_from, revenue_effective_to
+        FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
+      ) o
+        ON s.isrc = o.isrc
+        AND s.period >= o.revenue_effective_from
+        AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)
+      LEFT JOIN (
+        SELECT isrc, tenant_id, label_id, release_id, artist_ids, release_type, is_deleted
+        FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL
+      ) t ON s.isrc = t.isrc
+      LEFT JOIN (
+        SELECT id_dsps_report, pg_uuid, dsp_name
+        FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL
+      ) r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN (
+        SELECT pg_uuid, dsp_code, dsp_name
+        FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
+      ) p ON r.pg_uuid = p.pg_uuid
     `;
 	}
 

@@ -243,18 +243,13 @@ export class ReleaseExecution3Service {
 
 		await this.executionRepo.save(execution);
 
-		const initialDspStatus =
-			execution.type === ExecutionType.TAKEDOWN
-				? ReleaseDspStatus.PROCESSING
-				: ReleaseDspStatus.NEVER_DISTRIBUTED;
-
 		await this.releaseExecution3ResultService.updateExecutionOutputResult({
 			releaseExecutionId: execution.id,
 			releaseId: execution.metadata.input.releaseSnapshot.id,
 			results: allDeliveryDsps.map((dsp) => ({
 				dspId: dsp.id,
 				dspCode: dsp.code,
-				status: initialDspStatus,
+				status: ReleaseDspStatus.PROCESSING,
 			})),
 		});
 

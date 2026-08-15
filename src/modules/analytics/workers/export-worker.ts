@@ -3,6 +3,7 @@ import {
 	PutObjectCommand,
 	S3Client,
 } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ClickHouseClient, createClient } from '@clickhouse/client';
 import * as fs from 'fs';
@@ -39,6 +40,13 @@ interface WorkerInput {
 
 const input = workerData as WorkerInput;
 const env = input.env ?? process.env;
+const MULTIPART_UPLOAD_THRESHOLD_BYTES = 100 * 1024 * 1024;
+const MULTIPART_UPLOAD_PART_SIZE_BYTES = 10 * 1024 * 1024;
+
+function positiveEnvNumber(name: string, fallback: number): number {
+	const value = Number(env[name]);
+	return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
 
 function buildClickHouse(): ClickHouseClient {
 	return createClient({
@@ -92,6 +100,27 @@ async function main() {
 				query: sql,
 				query_params: params,
 				format: 'JSONEachRow',
+				// Guard non-streaming queries so a future metadata/query change cannot
+				// silently buffer an unbounded result set in this worker thread.
+				clickhouse_settings: {
+					max_memory_usage: String(
+						positiveEnvNumber(
+							'EXPORT_CLICKHOUSE_MAX_MEMORY_USAGE',
+							4 * 1024 * 1024 * 1024,
+						),
+					),
+					max_execution_time: positiveEnvNumber(
+						'EXPORT_CLICKHOUSE_MAX_EXECUTION_TIME',
+						900,
+					),
+					max_result_rows: String(
+						positiveEnvNumber(
+							'EXPORT_CLICKHOUSE_MAX_RESULT_ROWS',
+							200_000,
+						),
+					),
+					result_overflow_mode: 'throw',
+				},
 			});
 			return rs.json();
 		},
@@ -120,15 +149,44 @@ async function main() {
 		},
 		async r2Upload({ key, filePath, contentType }) {
 			const stat = await fs.promises.stat(filePath);
-			await s3.send(
-				new PutObjectCommand({
-					Bucket: privateBucket,
-					Key: key,
-					Body: fs.createReadStream(filePath),
-					ContentType: contentType,
-					ContentLength: stat.size,
-				}),
-			);
+			const uploadParams = {
+				Bucket: privateBucket,
+				Key: key,
+				Body: fs.createReadStream(filePath),
+				ContentType: contentType,
+				ContentLength: stat.size,
+			};
+
+			if (stat.size > MULTIPART_UPLOAD_THRESHOLD_BYTES) {
+				const upload = new Upload({
+					client: s3,
+					params: uploadParams,
+					partSize: MULTIPART_UPLOAD_PART_SIZE_BYTES,
+					queueSize: 4,
+				});
+				let lastProgressAt = 0;
+				upload.on('httpUploadProgress', (progress) => {
+					const now = Date.now();
+					if (now - lastProgressAt < 1_000) return;
+					lastProgressAt = now;
+					const loaded = progress.loaded ?? 0;
+					const percentage = Math.min(
+						100,
+						Math.floor((loaded / stat.size) * 100),
+					);
+					post({
+						type: 'progress',
+						patch: {
+							progressCurrent: 4,
+							progressLabel: `Uploading ZIP file (${percentage}%)`,
+						},
+						force: false,
+					});
+				});
+				await upload.done();
+			} else {
+				await s3.send(new PutObjectCommand(uploadParams));
+			}
 			return { bucketName: privateBucket, key };
 		},
 		async r2SignedUrlDown({ key, fileName }) {

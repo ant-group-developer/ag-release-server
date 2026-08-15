@@ -43,11 +43,21 @@ export class DashboardAnalyticsService {
 			return { joinSql: '', filterSql: '', params };
 		}
 
-		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-		filterSql += ' AND t.is_deleted = 0';
+		const ownershipDate =
+			query.type === 'stream'
+				? 's.period >= o.effective_from AND (o.effective_to IS NULL OR s.period < o.effective_to)'
+				: 's.period >= o.revenue_effective_from AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)';
+		const joinSql = `
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o
+        ON s.isrc = o.isrc
+        AND ${ownershipDate}`;
+		filterSql += ` AND t.is_deleted = 0
+      AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`;
 
 		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
+			filterSql +=
+				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {tenantId:String}";
 			params.tenantId = tenantId;
 		}
 
@@ -184,7 +194,8 @@ export class DashboardAnalyticsService {
 
 		let tenantFilter = '';
 		if (!isSystem) {
-			tenantFilter = 'AND t.tenant_id = {tenantId:String}';
+			tenantFilter =
+				"AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {tenantId:String}";
 			params.tenantId = tenantId;
 		}
 
@@ -205,11 +216,13 @@ export class DashboardAnalyticsService {
 			params.to = query.toDate;
 			sql = `
         SELECT
-          t.label_id AS labelId,
+          coalesce(nullIf(o.label_id, ''), t.label_id) AS labelId,
           sum(s.total_quantity) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} s
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-        WHERE t.is_deleted = 0 AND t.label_id != ''
+        LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND s.reporting_date >= o.effective_from AND (o.effective_to IS NULL OR s.reporting_date < o.effective_to)
+        WHERE t.is_deleted = 0 AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
+          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))
           AND s.reporting_date >= toDate({from:String})
           AND s.reporting_date <= toDate({to:String})
           ${tenantFilter}
@@ -222,11 +235,13 @@ export class DashboardAnalyticsService {
 			params.to = normalizeDateToFirstOfMonth(query.toDate);
 			sql = `
         SELECT
-          t.label_id AS labelId,
+          coalesce(nullIf(o.label_id, ''), t.label_id) AS labelId,
           sum(s.total_revenue_usd) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_ISRC_MONTHLY} s
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-        WHERE t.is_deleted = 0 AND t.label_id != ''
+        LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND s.period >= o.revenue_effective_from AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)
+        WHERE t.is_deleted = 0 AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
+          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))
           AND s.period >= toDate({from:String})
           AND s.period <= toDate({to:String})
           ${tenantFilter}
@@ -299,7 +314,8 @@ export class DashboardAnalyticsService {
 
 		let tenantFilter = '';
 		if (!isSystem) {
-			tenantFilter = 'AND t.tenant_id = {tenantId:String}';
+			tenantFilter =
+				"AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {tenantId:String}";
 			params.tenantId = tenantId;
 		}
 
@@ -324,7 +340,9 @@ export class DashboardAnalyticsService {
           sum(s.total_quantity) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} s
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+        LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND s.reporting_date >= o.effective_from AND (o.effective_to IS NULL OR s.reporting_date < o.effective_to)
         WHERE t.is_deleted = 0 AND artistId != ''
+          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))
           AND s.reporting_date >= toDate({from:String})
           AND s.reporting_date <= toDate({to:String})
           ${tenantFilter}
@@ -341,7 +359,9 @@ export class DashboardAnalyticsService {
           sum(s.total_revenue_usd) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_ISRC_MONTHLY} s
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+        LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND s.period >= o.revenue_effective_from AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)
         WHERE t.is_deleted = 0 AND artistId != ''
+          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))
           AND s.period >= toDate({from:String})
           AND s.period <= toDate({to:String})
           ${tenantFilter}

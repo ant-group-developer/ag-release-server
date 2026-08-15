@@ -135,6 +135,13 @@ export class AssetImportService {
 			...DEFAULT_OPTIONS,
 			...(dto.options ?? {}),
 		};
+		const effectiveDate = this.normalizeDate(
+			dto.effectiveDate ?? new Date().toISOString().slice(0, 10),
+			'effectiveDate',
+		);
+		const revenueEffectiveFrom = this.normalizeRevenueMonth(
+			dto.revenueEffectiveFrom ?? effectiveDate,
+		);
 
 		const job = await this.importJobsService.create({
 			sourceType: ImportJobSourceType.ASSET_IMPORT_SCAN,
@@ -147,6 +154,8 @@ export class AssetImportService {
 				targetTenantId: dto.targetTenantId,
 				r2Key: dto.r2Key,
 				options,
+				effectiveDate,
+				revenueEffectiveFrom,
 			},
 		});
 
@@ -158,6 +167,8 @@ export class AssetImportService {
 				// Label luôn lấy theo cột Label Name trong file; cột này giữ lại
 				// cho dữ liệu batch cũ nên từ nay luôn null.
 				targetLabelId: null,
+				effectiveDate,
+				revenueEffectiveFrom,
 				options,
 				status: AssetImportBatchStatus.SCANNING,
 				totalRows: rows.length,
@@ -247,6 +258,21 @@ export class AssetImportService {
 				processedRows: Math.min(i + chunk.length, items.length),
 			});
 		}
+	}
+
+	private normalizeDate(value: string, field: string): string {
+		if (
+			!/^\d{4}-\d{2}-\d{2}$/.test(value) ||
+			Number.isNaN(Date.parse(value))
+		) {
+			throw new BadRequestException(`${field} phải có dạng YYYY-MM-DD`);
+		}
+		return value;
+	}
+
+	private normalizeRevenueMonth(value: string): string {
+		const date = this.normalizeDate(value, 'revenueEffectiveFrom');
+		return `${date.slice(0, 7)}-01`;
 	}
 
 	// ── APPLY ─────────────────────────────────────────────────────────

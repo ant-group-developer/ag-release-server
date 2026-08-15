@@ -57,6 +57,7 @@ export class RankingService {
 	private buildTenantFilters(
 		tenantId: string,
 		query: RankingQueryDto,
+		forceTrackJoin = false,
 	): { joinSql: string; filterSql: string; params: Record<string, any> } {
 		const params: Record<string, any> = {};
 		let filterSql = '';
@@ -81,6 +82,7 @@ export class RankingService {
 		// A restricted video scope needs pg_tracks_sync even when the system
 		// tenant has no client-supplied sub-filter.
 		if (
+			!forceTrackJoin &&
 			isSystem &&
 			!hasSubFilter &&
 			getAnalyticsVideoScope(query)?.allowedChannelIds === undefined
@@ -93,17 +95,24 @@ export class RankingService {
 		}
 
 		// All other cases: JOIN pg_tracks_sync for tenant/label filtering
-		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-		filterSql += ' AND t.is_deleted = 0';
+		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o
+        ON s.isrc = o.isrc
+        AND s.reporting_date >= o.effective_from
+        AND (o.effective_to IS NULL OR s.reporting_date < o.effective_to)`;
+		filterSql += ` AND t.is_deleted = 0
+      AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`;
 
 		const effectiveTenantId = isSystem ? query.tenantId : tenantId;
 		if (effectiveTenantId) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
+			filterSql +=
+				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {tenantId:String}";
 			params.tenantId = effectiveTenantId;
 		}
 
 		if (query.labelId) {
-			filterSql += ' AND t.label_id = {labelId:String}';
+			filterSql +=
+				" AND coalesce(nullIf(o.label_id, ''), t.label_id) = {labelId:String}";
 			params.labelId = query.labelId;
 		}
 
@@ -233,14 +242,11 @@ export class RankingService {
 		let { joinSql, filterSql, params } = this.buildTenantFilters(
 			tenantId,
 			query,
+			true,
 		);
 		params.from = fromDate;
 		params.to = toDate;
 
-		if (!joinSql) {
-			joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-			filterSql += ' AND t.is_deleted = 0';
-		}
 		filterSql += ` ${this.validReleaseUpcFilter}`;
 
 		const dspFilter = this.buildDspFilter(query, params);
@@ -473,7 +479,11 @@ export class RankingService {
 		query: RankingQueryDto,
 	): Promise<PageDto<ReleaseRankingItem>> {
 		const { fromDate, toDate, page, pageSize } = query;
-		let { filterSql, params } = this.buildTenantFilters(tenantId, query);
+		let { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
+			true,
+		);
 		params.from = fromDate;
 		params.to = toDate;
 
@@ -501,7 +511,7 @@ export class RankingService {
 		const countSql = `
       SELECT uniq(t.release_id) AS total
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
         AND t.release_id != ''
         AND s.${dateCol} >= toDate({from:String})
@@ -540,7 +550,7 @@ export class RankingService {
         any(t.release_metadata_spotify) AS releaseMetadataSpotify,
         any(t.release_metadata_deezer) AS releaseMetadataDeezer
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
         AND t.release_id != ''
         AND s.${dateCol} >= toDate({from:String})
@@ -603,7 +613,7 @@ export class RankingService {
 
 		// groupBySource: fetch breakdown per release
 		if (query.groupBySource && items.length > 0) {
-			const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+			const releaseJoinSql = joinSql;
 			const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
 			const breakdowns = await Promise.all(
 				items.map((item) =>
@@ -644,7 +654,11 @@ export class RankingService {
 		query: RankingQueryDto,
 	): Promise<PageDto<ReleaseRankingVideoItem>> {
 		const { fromDate, toDate, page, pageSize } = query;
-		let { filterSql, params } = this.buildTenantFilters(tenantId, query);
+		let { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
+			true,
+		);
 		params.from = fromDate;
 		params.to = toDate;
 
@@ -671,7 +685,7 @@ export class RankingService {
 		const countSql = `
       SELECT uniq(t.release_id) AS total
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
         AND t.release_id != ''
         AND t.release_type = 'video'
@@ -708,7 +722,7 @@ export class RankingService {
         any(t.cover_300) AS cover300,
         any(t.cover_original) AS coverOriginal
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
         AND t.release_id != ''
         AND t.release_type = 'video'
@@ -792,7 +806,7 @@ export class RankingService {
 		});
 
 		if (query.groupBySource && items.length > 0) {
-			const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+			const releaseJoinSql = joinSql;
 			const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
 			const breakdowns = await Promise.all(
 				items.map((item) =>
@@ -833,7 +847,11 @@ export class RankingService {
 		query: RankingQueryDto,
 	): Promise<PageDto<LabelRankingItem>> {
 		const { fromDate, toDate, page, pageSize } = query;
-		let { filterSql, params } = this.buildTenantFilters(tenantId, query);
+		let { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
+			true,
+		);
 		params.from = fromDate;
 		params.to = toDate;
 
@@ -847,7 +865,8 @@ export class RankingService {
 			if (matchedLabelIds.length === 0) {
 				matchedLabelIds = ['__none__'];
 			}
-			filterSql += ' AND t.label_id IN ({matchedLabelIds:Array(String)})';
+			filterSql +=
+				" AND coalesce(nullIf(o.label_id, ''), t.label_id) IN ({matchedLabelIds:Array(String)})";
 			params.matchedLabelIds = matchedLabelIds;
 		}
 
@@ -858,11 +877,11 @@ export class RankingService {
 
 		// Query 1: Count unique labels
 		const countSql = `
-      SELECT uniq(t.label_id) AS total
+			SELECT uniq(coalesce(nullIf(o.label_id, ''), t.label_id)) AS total
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
-        AND t.label_id != ''
+				AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -883,15 +902,15 @@ export class RankingService {
 		// Query 2: Aggregate by label_id directly in ClickHouse
 		const dataSql = `
       SELECT
-        t.label_id AS labelId,
+			coalesce(nullIf(o.label_id, ''), t.label_id) AS labelId,
         uniq(t.release_id) AS releaseCount,
         uniq(s.isrc) AS trackCount,
         sum(s.total_quantity) AS totalViews,
         any(t.label_name) AS labelName
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
-        AND t.label_id != ''
+				AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -930,7 +949,7 @@ export class RankingService {
 
 		// groupBySource: fetch breakdown per label
 		if (query.groupBySource && items.length > 0) {
-			const labelJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+			const labelJoinSql = joinSql;
 			const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
 			const breakdowns = await Promise.all(
 				items.map((item) =>
@@ -940,7 +959,7 @@ export class RankingService {
 						dateFilterSql,
 						`${dspFilter} ${filterSql}`,
 						params,
-						'AND t.label_id = {_labelId:String}',
+						"AND coalesce(nullIf(o.label_id, ''), t.label_id) = {_labelId:String}",
 						{ _labelId: item.labelId },
 					),
 				),
@@ -971,7 +990,11 @@ export class RankingService {
 		query: RankingQueryDto,
 	): Promise<PageDto<ChannelRankingItem>> {
 		const { fromDate, toDate, page, pageSize } = query;
-		const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+		let { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
+			true,
+		);
 		params.from = fromDate;
 		params.to = toDate;
 
@@ -986,7 +1009,7 @@ export class RankingService {
 		const countSql = `
       SELECT uniq(t.channel_id) AS total
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
         AND t.channel_id != ''
         AND s.${dateCol} >= toDate({from:String})
@@ -1014,7 +1037,7 @@ export class RankingService {
         uniq(s.isrc) AS trackCount,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
         AND t.channel_id != ''
         AND s.${dateCol} >= toDate({from:String})
@@ -1053,7 +1076,7 @@ export class RankingService {
 
 		// groupBySource: fetch breakdown per channel
 		if (query.groupBySource && items.length > 0) {
-			const channelJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+			const channelJoinSql = joinSql;
 			const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
 			const breakdowns = await Promise.all(
 				items.map((item) =>
@@ -1094,7 +1117,11 @@ export class RankingService {
 		query: RankingQueryDto,
 	): Promise<PageDto<ArtistRankingItem>> {
 		const { fromDate, toDate, page, pageSize } = query;
-		let { filterSql, params } = this.buildTenantFilters(tenantId, query);
+		let { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
+			true,
+		);
 		params.from = fromDate;
 		params.to = toDate;
 
@@ -1124,7 +1151,7 @@ export class RankingService {
       FROM (
         SELECT arrayJoin(t.artist_ids) AS artistId
         FROM ${table} s
-        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+				${joinSql}
         WHERE t.is_deleted = 0
           AND s.${dateCol} >= toDate({from:String})
           AND s.${dateCol} <= toDate({to:String})
@@ -1152,7 +1179,7 @@ export class RankingService {
         uniq(s.isrc) AS trackCount,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
@@ -1192,7 +1219,7 @@ export class RankingService {
 
 		// groupBySource: fetch breakdown per artist
 		if (query.groupBySource && items.length > 0) {
-			const artistJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+			const artistJoinSql = joinSql;
 			const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
 			const breakdowns = await Promise.all(
 				items.map((item) =>
@@ -1233,7 +1260,11 @@ export class RankingService {
 		query: RankingQueryDto,
 	): Promise<PageDto<TenantRankingItem>> {
 		const { fromDate, toDate, page, pageSize } = query;
-		let { filterSql, params } = this.buildTenantFilters(tenantId, query);
+		let { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
+			true,
+		);
 		params.from = fromDate;
 		params.to = toDate;
 
@@ -1246,7 +1277,7 @@ export class RankingService {
 				matchedTenantIds = ['__none__'];
 			}
 			filterSql +=
-				' AND t.tenant_id IN ({matchedTenantIds:Array(String)})';
+				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) IN ({matchedTenantIds:Array(String)})";
 			params.matchedTenantIds = matchedTenantIds;
 		}
 
@@ -1259,11 +1290,11 @@ export class RankingService {
 
 		// Count query
 		const countSql = `
-      SELECT uniq(t.tenant_id) AS total
+			SELECT uniq(coalesce(nullIf(o.tenant_id, ''), t.tenant_id)) AS total
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
-        AND t.tenant_id != ''
+				AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) != ''
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -1284,12 +1315,12 @@ export class RankingService {
 		// Data query
 		const dataSql = `
       SELECT
-        t.tenant_id AS tenantId,
+			coalesce(nullIf(o.tenant_id, ''), t.tenant_id) AS tenantId,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
-        AND t.tenant_id != ''
+				AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) != ''
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -1321,7 +1352,7 @@ export class RankingService {
 
 		// groupBySource: fetch breakdown per tenant
 		if (query.groupBySource && items.length > 0) {
-			const tenantJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+			const tenantJoinSql = joinSql;
 			const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
 			const breakdowns = await Promise.all(
 				items.map((item) =>
@@ -1331,7 +1362,7 @@ export class RankingService {
 						dateFilterSql,
 						`${dspFilter} ${filterSql}`,
 						params,
-						'AND t.tenant_id = {_tenantId:String}',
+						"AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {_tenantId:String}",
 						{ _tenantId: item.tenantId },
 					),
 				),
@@ -1362,7 +1393,11 @@ export class RankingService {
 		query: RankingQueryDto,
 	): Promise<PageDto<SourceTypeRankingItem>> {
 		const { fromDate, toDate, page, pageSize } = query;
-		const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+		const { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
+			true,
+		);
 		params.from = fromDate;
 		params.to = toDate;
 
@@ -1377,7 +1412,7 @@ export class RankingService {
 		const countSql = `
       SELECT uniq(s.import_source) AS total
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
@@ -1402,7 +1437,7 @@ export class RankingService {
         s.import_source AS sourceType,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       WHERE t.is_deleted = 0
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
@@ -1447,24 +1482,13 @@ export class RankingService {
 		query: RankingQueryDto,
 	): Promise<PageDto<DspRankingItem>> {
 		const { fromDate, toDate, page, pageSize } = query;
-		const isSystem = checkIsSystemTenant(tenantId);
-
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-		let filterSql = 'AND t.is_deleted = 0';
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
-
-		if (query.releaseType) {
-			filterSql += ' AND t.release_type = {releaseType:String}';
-			params.releaseType = query.releaseType;
-		}
-
-		if (query.importSource) {
-			filterSql += ' AND s.import_source = {importSource:String}';
-			params.importSource = query.importSource;
-		}
+		let { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
+			true,
+		);
+		params.from = fromDate;
+		params.to = toDate;
 
 		const table = CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE;
 		const dateCol = 'reporting_date';
@@ -1485,7 +1509,7 @@ export class RankingService {
 		const countSql = `
       SELECT uniq(${resolvedDspName}) AS total
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       ${joinExpr}
       WHERE t.is_deleted = 0
         AND s.${dateCol} >= toDate({from:String})
@@ -1513,7 +1537,7 @@ export class RankingService {
         any(p.picture) AS imageUrl,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+			${joinSql}
       ${joinExpr}
       WHERE t.is_deleted = 0
         AND s.${dateCol} >= toDate({from:String})
@@ -1542,7 +1566,7 @@ export class RankingService {
 
 		// groupBySource: fetch breakdown per DSP
 		if (query.groupBySource && items.length > 0) {
-			const dspTenantJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc ${joinExpr}`;
+			const dspTenantJoinSql = `${joinSql} ${joinExpr}`;
 			const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
 			const breakdowns = await Promise.all(
 				items
