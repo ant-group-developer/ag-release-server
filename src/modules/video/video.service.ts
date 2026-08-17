@@ -173,6 +173,23 @@ export class VideoService {
 		const isIsrcChanging =
 			dto.isrc !== undefined && dto.isrc !== video.isrc;
 
+		const isAssigningChannelFirstTime = !video.channelId && !!dto.channelId;
+		const isAssigningIsrcFirstTime = !video.isrc && !!dto.isrc;
+
+		const isChangingExistingChannel =
+			!!video.channelId && isChannelChanging;
+		const isChangingExistingIsrc = !!video.isrc && isIsrcChanging;
+
+		if (
+			(isAssigningChannelFirstTime || isAssigningIsrcFirstTime) &&
+			!isChangingExistingChannel &&
+			!isChangingExistingIsrc
+		) {
+			Object.assign(video, dto);
+
+			return this.videoRepo.save(video);
+		}
+
 		if (isChannelChanging || isIsrcChanging) {
 			const isSent = await this.isMetadataSentToVevo(video.releaseId);
 			if (isSent) {
