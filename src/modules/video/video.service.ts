@@ -165,45 +165,39 @@ export class VideoService {
 	}
 
 	async update(id: string, dto: UpdateVideoDto) {
-		await this.ensureChannel(dto.channelId);
+		const { releaseId: _, ...safeDto } = dto;
+
+		await this.ensureChannel(safeDto.channelId);
 		const video = await this.findOne(id);
 
-		const isChannelChanging =
-			dto.channelId !== undefined && dto.channelId !== video.channelId;
-		const isIsrcChanging =
-			dto.isrc !== undefined && dto.isrc !== video.isrc;
+		const isChangingChannel =
+			safeDto.channelId !== undefined &&
+			safeDto.channelId !== video.channelId;
+		const isChangingIsrc =
+			safeDto.isrc !== undefined && safeDto.isrc !== video.isrc;
 
-		const isAssigningChannelFirstTime = !video.channelId && !!dto.channelId;
-		const isAssigningIsrcFirstTime = !video.isrc && !!dto.isrc;
+		if (isChangingChannel || isChangingIsrc) {
+			const isFirstAssignChannel =
+				!video.channelId && !!safeDto.channelId;
+			const isFirstAssignIsrc = !video.isrc && !!safeDto.isrc;
 
-		const isChangingExistingChannel =
-			!!video.channelId && isChannelChanging;
-		const isChangingExistingIsrc = !!video.isrc && isIsrcChanging;
+			const needCheckChannel = isChangingChannel && !isFirstAssignChannel;
+			const needCheckIsrc = isChangingIsrc && !isFirstAssignIsrc;
 
-		if (
-			(isAssigningChannelFirstTime || isAssigningIsrcFirstTime) &&
-			!isChangingExistingChannel &&
-			!isChangingExistingIsrc
-		) {
-			Object.assign(video, dto);
-
-			return this.videoRepo.save(video);
-		}
-
-		if (isChannelChanging || isIsrcChanging) {
-			const isSent = await this.isMetadataSentToVevo(video.releaseId);
-			if (isSent) {
-				if (isChannelChanging) {
-					throw VideoException.CANNOT_CHANGE_CHANNEL_AFTER_VEVO_SENT();
-				}
-				if (isIsrcChanging) {
-					throw VideoException.CANNOT_CHANGE_ISRC_AFTER_VEVO_SENT();
+			if (needCheckChannel || needCheckIsrc) {
+				const isSent = await this.isMetadataSentToVevo(video.releaseId);
+				if (isSent) {
+					if (needCheckChannel) {
+						throw VideoException.CANNOT_CHANGE_CHANNEL_AFTER_VEVO_SENT();
+					}
+					if (needCheckIsrc) {
+						throw VideoException.CANNOT_CHANGE_ISRC_AFTER_VEVO_SENT();
+					}
 				}
 			}
 		}
 
-		Object.assign(video, dto);
-
+		Object.assign(video, safeDto);
 		return this.videoRepo.save(video);
 	}
 
