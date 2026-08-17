@@ -25,7 +25,7 @@ samples
 
 # Logs
 
-\*.log
+*.log
 logs
 
 # Tests
@@ -36,7 +36,7 @@ coverage
 # Documentation
 
 docs
-\*.md
+*.md
 !README.md
 
 # Docker
@@ -48,10 +48,11 @@ docker-compose*
 # Misc
 
 .DS_Store
-\*.tsbuildinfo
+*.tsbuildinfo
 
 downloads
 download_unzip
 backups
 exports
 release_parsed
+analytics
