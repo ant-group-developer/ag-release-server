@@ -714,6 +714,12 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 						fieldMappings,
 					)
 				: [];
+			const catalogMap = usesDatabaseFieldMappings
+				? await this.findCatalogFieldMappings(config.parserCode, category)
+				: new Map<string, FtpParserFieldMapping[]>();
+			const catalogMappings = usesDatabaseFieldMappings
+				? catalogMap.get(`${config.parserCode}|${category}`) || []
+				: [];
 			return this.resolved(
 				dspReport,
 				category,
@@ -723,6 +729,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 							legacyParser,
 							category,
 							resolvedMappings,
+							catalogMappings,
 						)
 					: legacyParser,
 				config.configVersion,
@@ -762,12 +769,18 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 		const resolvedMappings = usesDatabaseFieldMappings
 			? await this.resolveParserColumns(parserCode, category, fieldMappings)
 			: [];
+		const catalogMap = usesDatabaseFieldMappings
+			? await this.findCatalogFieldMappings(parserCode, category)
+			: new Map<string, FtpParserFieldMapping[]>();
+		const catalogMappings = usesDatabaseFieldMappings
+			? catalogMap.get(`${parserCode}|${category}`) || []
+			: [];
 		return this.resolved(
 			dspReport,
 			category,
 			parserCode,
 			usesDatabaseFieldMappings
-				? this.applyDatabaseFieldMappings(entry.factory(), category, resolvedMappings)
+				? this.applyDatabaseFieldMappings(entry.factory(), category, resolvedMappings, catalogMappings)
 				: entry.factory(),
 			0,
 			true,
@@ -1140,7 +1153,11 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 				);
 			}
 			const target = mapping.targetColumn.trim();
-			if (!this.isWritableTargetColumn(category, target)) {
+			if (target === 'metadata') {
+				const derived = this.deriveMetadataKey(mapping);
+				mapping.targetColumn = `metadata.${derived}`;
+			}
+			if (!this.isWritableTargetColumn(category, mapping.targetColumn.trim())) {
 				throw new BadRequestException(
 					`Unsupported targetColumn: "${mapping.targetColumn}"`,
 				);
@@ -1175,14 +1192,41 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 		legacyParser: FtpParser,
 		category: FtpSourceCategory,
 		mappings: FtpParserFieldMapping[],
+		catalogMappings: FtpParserFieldMapping[] = [],
 	): FtpParser {
 		if (
 			legacyParser instanceof BaseParser ||
 			legacyParser instanceof BaseSalesParser
 		) {
-			return legacyParser.setFieldMappingOverrides(mappings);
+			legacyParser.setFieldMappingOverrides(mappings);
+			legacyParser.setCatalogMappings(catalogMappings);
+			return legacyParser;
 		}
 		return this.createDatabaseFieldMappingParser(category, mappings);
+	}
+
+	/**
+	 * Derive a metadata key from parserColumn (or reportColumn) when the FE sends
+	 * bare targetColumn='metadata'. Converts to snake_case: lowercase, replace
+	 * runs of non-alphanumeric chars with '_', trim leading/trailing underscores.
+	 */
+	private deriveMetadataKey(mapping: FtpParserFieldMapping): string {
+		const source = (mapping.parserColumn || mapping.reportColumn || '').trim();
+		if (!source) {
+			throw new BadRequestException(
+				'Cannot derive metadata key: parserColumn or reportColumn is required',
+			);
+		}
+		const derived = source
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '_')
+			.replace(/^_+|_+$/g, '');
+		if (!derived) {
+			throw new BadRequestException(
+				`Cannot derive metadata key from "${source}"`,
+			);
+		}
+		return derived;
 	}
 
 	private isWritableTargetColumn(

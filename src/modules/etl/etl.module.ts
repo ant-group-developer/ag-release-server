@@ -3,6 +3,7 @@ import { BucketModule2 } from '../bucket2/bucket2.module';
 import { ClickHouseModule } from '../clickhouse/clickhouse.module';
 import { DspReportModule } from '../dsp-report/dsp-report.module';
 import { DspModule } from '../dsp/dsp.module';
+import { FtpProviderConfigModule } from '../ftp-provider-config/ftp-provider-config.module';
 import { ReleaseModule } from '../release/release.module';
 import { ExchangeRateController } from './controllers/exchange-rate.controller';
 import { FtpReportFileDiscoveryController } from './controllers/ftp-report-file-discovery.controller';
@@ -32,6 +33,7 @@ import { SyncService } from './services/sync/sync.service';
 		ReleaseModule,
 		ImportJobsModule,
 		BucketModule2,
+		FtpProviderConfigModule,
 	],
 	controllers: [
 		ImportController,

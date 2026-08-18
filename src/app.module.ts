@@ -35,6 +35,7 @@ import { DspModule } from './modules/dsp/dsp.module';
 import { ErnModule } from './modules/ern/ern.module';
 import { EtlModule } from './modules/etl/etl.module';
 import { ExcelModule } from './modules/excel/excel.module';
+import { FtpProviderConfigModule } from './modules/ftp-provider-config/ftp-provider-config.module';
 import { IsrcModule } from './modules/external/isrc/isrc.module';
 import { UpcModule } from './modules/external/upc/upc.module';
 import { GenreModule } from './modules/genre/genre.module';
@@ -106,6 +107,7 @@ import { WebhookModule } from './modules/webhook/webhook.module';
 		DatabaseModule,
 		ClickHouseModule,
 		EtlModule,
+		FtpProviderConfigModule,
 		ReportImportModule,
 		// ... other modules
 
