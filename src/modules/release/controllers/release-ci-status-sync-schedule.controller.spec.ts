@@ -51,8 +51,11 @@ describe('ReleaseCiStatusSyncScheduleController', () => {
 			stoppedBecauseDisabled: false,
 		});
 
-		await controller.runNow();
+		const result = controller.runNow();
 
 		expect(scheduleService.runNow.mock.calls).toHaveLength(1);
+		expect(result).toMatchObject({
+			message: 'Thành công, tiến trình đang đồng bộ',
+		});
 	});
 });

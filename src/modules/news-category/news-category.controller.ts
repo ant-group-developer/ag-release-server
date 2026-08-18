@@ -12,7 +12,10 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
+import {
+	PublicRoute,
+	SystemAdminOnly,
+} from '../auth/decorators/auth.decorator';
 import { NewsCategoryResponse } from './constants/news-category.constant';
 import {
 	BulkUpdateNewsCategory,
@@ -35,6 +38,7 @@ export class NewsCategoryController {
 		return new ResponseSuccess(NewsCategoryResponse.CREATE_SUCCESS(result));
 	}
 
+	@PublicRoute()
 	@Get()
 	async getList(@Query() query: QueryGetListNewsCategoryDto) {
 		const result = await this.newsCategoryService.getList(query);
