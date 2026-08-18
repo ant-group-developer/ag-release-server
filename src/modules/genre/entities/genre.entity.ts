@@ -10,6 +10,7 @@ import { Track } from 'src/modules/track/entities/track.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { MediaUrlTransformer } from 'src/utils/util';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { GenreScope } from '../enum/genre.enum';
 
 @Entity('genres', {
 	comment: 'Danh mục thể loại nhạc, dùng cho release, track và artist',
@@ -47,6 +48,13 @@ export class Genre extends BaseUserTrackedCustomIDEntity {
 		comment: 'Mô tả ngắn cho thể loại',
 	})
 	description: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 20,
+		default: GenreScope.AUDIO,
+	})
+	scope: GenreScope;
 
 	@OneToMany(() => Release, (release) => release.primaryGenre)
 	primaryGenreReleases: Release[];

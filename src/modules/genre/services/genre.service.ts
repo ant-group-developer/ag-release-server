@@ -10,6 +10,7 @@ import {
 	UpdateGenreDto,
 } from '../dto/genre.dto';
 import { Genre } from '../entities/genre.entity';
+import { GenreScope } from '../enum/genre.enum';
 import { GenreQueryService } from './genre.query.service';
 
 @Injectable()
@@ -46,11 +47,12 @@ export class GenreService implements OnModuleInit {
 
 	// create
 	async create(data: CreateGenreDto, userId: string): Promise<Genre> {
-		const { name, code } = data;
+		const { name, code, scope } = data;
 		await this.genreQueryService.validate({ name, code });
 
 		const genre = this.genreRepo.create({
 			...data,
+			scope: scope ?? GenreScope.AUDIO,
 			creatorId: userId,
 			modifierId: userId,
 		});
@@ -94,8 +96,8 @@ export class GenreService implements OnModuleInit {
 		});
 	}
 
-	async getListSimple() {
-		return this.genreQueryService.getListSimple();
+	async getListSimple(scope: GenreScope) {
+		return this.genreQueryService.getListSimple(scope);
 	}
 
 	// update

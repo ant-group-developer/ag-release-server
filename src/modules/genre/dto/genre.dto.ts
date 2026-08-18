@@ -13,7 +13,7 @@ import {
 } from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
-import { FieldOrderGenre } from '../enum/genre.enum';
+import { FieldOrderGenre, GenreScope } from '../enum/genre.enum';
 
 export class CreateGenreDto {
 	@IsNotEmpty()
@@ -45,6 +45,14 @@ export class CreateGenreDto {
 	@IsString()
 	@MaxLength(200)
 	description: string | null;
+
+	@ApiPropertyOptional({
+		enum: GenreScope,
+		example: GenreScope.AUDIO,
+	})
+	@IsOptional()
+	@IsEnum(GenreScope)
+	scope: GenreScope;
 }
 
 export class UpdateGenreDto extends PartialType(CreateGenreDto) {
@@ -65,4 +73,8 @@ export class QueryGetListGenreDto extends BaseQueryDto {
 	@IsOptional()
 	@IsEnum(FieldOrderGenre)
 	fieldOrder: FieldOrderGenre = FieldOrderGenre.NAME;
+
+	@IsOptional()
+	@IsEnum(GenreScope)
+	scope: GenreScope;
 }
