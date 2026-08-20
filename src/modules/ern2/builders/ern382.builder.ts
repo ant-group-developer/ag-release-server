@@ -168,6 +168,24 @@ export class Ern382Builder2 {
 			da.ele('ArtistRole').txt(artist.role);
 		}
 
+		// FeaturedArtist stored in contributors -> render as DisplayArtist (only this case, additive)
+		if (track.contributors) {
+			for (const c of track.contributors) {
+				if (c.role === 'FeaturedArtist') {
+					const da = details.ele('DisplayArtist');
+					const pn = da.ele('PartyName');
+					if (c.languageAndScriptCode) {
+						pn.att(
+							'LanguageAndScriptCode',
+							c.languageAndScriptCode,
+						);
+					}
+					pn.ele('FullName').txt(c.name);
+					da.ele('ArtistRole').txt('FeaturedArtist');
+				}
+			}
+		}
+
 		// Role mapping
 		const resourceRoles = ['Producer', 'Mixer'];
 
@@ -190,9 +208,13 @@ export class Ern382Builder2 {
 		}
 
 		// Indirect resource contributors (composers, lyricists, etc.)
+		// Exclude FeaturedArtist (already rendered as DisplayArtist above)
 		if (track.contributors && track.contributors.length > 0) {
 			for (const contributor of track.contributors) {
-				if (!resourceRoles.includes(contributor.role)) {
+				if (
+					!resourceRoles.includes(contributor.role) &&
+					contributor.role !== 'FeaturedArtist'
+				) {
 					this.buildIndirectContributor(details, contributor);
 				}
 			}
@@ -431,6 +453,24 @@ export class Ern382Builder2 {
 			}
 			pn.ele('FullName').txt(artist.name);
 			da.ele('ArtistRole').txt(artist.role);
+		}
+
+		// FeaturedArtist stored in contributors -> render as DisplayArtist (only this case, additive)
+		if (track.contributors) {
+			for (const c of track.contributors) {
+				if (c.role === 'FeaturedArtist') {
+					const da = details.ele('DisplayArtist');
+					const pn = da.ele('PartyName');
+					if (c.languageAndScriptCode) {
+						pn.att(
+							'LanguageAndScriptCode',
+							c.languageAndScriptCode,
+						);
+					}
+					pn.ele('FullName').txt(c.name);
+					da.ele('ArtistRole').txt('FeaturedArtist');
+				}
+			}
 		}
 
 		// Related release (link back to main)
