@@ -186,8 +186,6 @@ export class Ern382Builder2 {
 			}
 		}
 
-		this.buildCombinedDisplayArtist(details, track);
-
 		// Role mapping
 		const resourceRoles = ['Producer', 'Mixer'];
 
@@ -330,23 +328,6 @@ export class Ern382Builder2 {
 		}
 	}
 
-	private buildCombinedDisplayArtist(
-		parent: ReturnType<typeof create>,
-		track: ErnTrackInput2,
-	): void {
-		const mains = track.artists.map((a) => a.name.trim()).filter(Boolean);
-		const featureds =
-			track.contributors
-				?.filter((c) => c.role === 'FeaturedArtist')
-				.map((c) => c.name.trim())
-				.filter(Boolean) ?? [];
-		if (mains.length === 0 || featureds.length === 0) return;
-		const combined = `${mains.join(', ')} feat. ${featureds.join(', ')}`;
-		const da = parent.ele('DisplayArtist');
-		da.ele('PartyName').ele('FullName').txt(combined);
-		da.ele('ArtistRole').txt('Artist');
-	}
-
 	private buildImage(parent: ReturnType<typeof create>): void {
 		const coverArt = this.input.release.coverArt!;
 		const ref = `A${this.input.tracks.length + 1}`;
@@ -458,9 +439,19 @@ export class Ern382Builder2 {
 			details.ele('TerritoryCode').txt(t);
 		}
 
-		// Display artist name
-		const artistName = track.artists.map((a) => a.name).join(', ');
-		details.ele('DisplayArtistName').txt(artistName);
+		// Display artist name (combined main feat. featured for DSP display)
+		const mainsDisplay = track.artists
+			.map((a) => a.name.trim())
+			.filter(Boolean);
+		const featuredsDisplay =
+			track.contributors
+				?.filter((c) => c.role === 'FeaturedArtist')
+				.map((c) => c.name.trim())
+				.filter(Boolean) ?? [];
+		const displayArtistName = featuredsDisplay.length
+			? `${mainsDisplay.join(', ')} feat. ${featuredsDisplay.join(', ')}`
+			: mainsDisplay.join(', ');
+		details.ele('DisplayArtistName').txt(displayArtistName);
 		details.ele('LabelName').txt(this.input.release.labelName);
 
 		// Display artists
@@ -491,8 +482,6 @@ export class Ern382Builder2 {
 				}
 			}
 		}
-
-		this.buildCombinedDisplayArtist(details, track);
 
 		// Related release (link back to main)
 		const related = details.ele('RelatedRelease');
