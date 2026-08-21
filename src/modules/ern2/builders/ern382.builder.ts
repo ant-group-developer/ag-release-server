@@ -186,6 +186,8 @@ export class Ern382Builder2 {
 			}
 		}
 
+		this.buildCombinedDisplayArtist(details, track);
+
 		// Role mapping
 		const resourceRoles = ['Producer', 'Mixer'];
 
@@ -326,6 +328,23 @@ export class Ern382Builder2 {
 				UserDefinedValue: contributor.role,
 			}).txt('UserDefined');
 		}
+	}
+
+	private buildCombinedDisplayArtist(
+		parent: ReturnType<typeof create>,
+		track: ErnTrackInput2,
+	): void {
+		const mains = track.artists.map((a) => a.name.trim()).filter(Boolean);
+		const featureds =
+			track.contributors
+				?.filter((c) => c.role === 'FeaturedArtist')
+				.map((c) => c.name.trim())
+				.filter(Boolean) ?? [];
+		if (mains.length === 0 || featureds.length === 0) return;
+		const combined = `${mains.join(', ')} feat. ${featureds.join(', ')}`;
+		const da = parent.ele('DisplayArtist');
+		da.ele('PartyName').ele('FullName').txt(combined);
+		da.ele('ArtistRole').txt('Artist');
 	}
 
 	private buildImage(parent: ReturnType<typeof create>): void {
@@ -472,6 +491,8 @@ export class Ern382Builder2 {
 				}
 			}
 		}
+
+		this.buildCombinedDisplayArtist(details, track);
 
 		// Related release (link back to main)
 		const related = details.ele('RelatedRelease');
