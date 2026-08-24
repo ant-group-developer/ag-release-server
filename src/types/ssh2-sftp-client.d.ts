@@ -37,6 +37,12 @@ declare module 'ssh2-sftp-client' {
 			options?: any,
 		): Promise<void>;
 
+		fastPut(
+			localPath: string,
+			remotePath: string,
+			options?: any,
+		): Promise<string>;
+
 		mkdir(path: string, recursive?: boolean): Promise<void>;
 		exists(path: string): Promise<boolean | 'd' | '-' | 'l'>;
 		rename(from: string, to: string): Promise<void>;
