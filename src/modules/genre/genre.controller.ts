@@ -51,8 +51,8 @@ export class GenreController {
 	}
 
 	@Get('simple')
-	async getListSimple() {
-		const result = await this.genreService.getListSimple();
+	async getListSimple(@Query() query: QueryGetListGenreDto) {
+		const result = await this.genreService.getListSimple(query.scope);
 		return new ResponseSuccess({ data: result });
 	}
 

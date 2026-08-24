@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import * as ftp from 'basic-ftp';
 import * as fs from 'fs';
 import * as path from 'path';
+import { connectFtpClient } from 'src/common/utils/ftp-client.util';
+import { FtpProviderConfigService } from '../../../ftp-provider-config/services/ftp-provider-config.service';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
 
 export interface FtpConfig {
@@ -12,8 +14,6 @@ export interface FtpConfig {
 	password: string;
 	secure: boolean;
 	basePath: string;
-	syncMode: string;
-	syncCron: string;
 }
 
 export interface FtpRemoteFolderFiles {
@@ -198,6 +198,7 @@ export class FtpService {
 	constructor(
 		private readonly configService: ConfigService,
 		private readonly excludePatternService: ExcludePatternService,
+		private readonly ftpProviderConfigService: FtpProviderConfigService,
 	) {
 		const configuredMax = Number(
 			this.configService.get<string>('FTP_MAX_CONNECTIONS') || 3,
@@ -210,24 +211,16 @@ export class FtpService {
 		);
 	}
 
-	private getConfig(): FtpConfig {
+	/** Reads the active provider's credentials from the DB (see FtpProviderConfigService, which caches this for 30s). */
+	private async getConfig(): Promise<FtpConfig> {
+		const active = await this.ftpProviderConfigService.getActiveConfig();
 		return {
-			host: this.configService.get<string>('FTP_HOST') || '',
-			port: parseInt(
-				this.configService.get<string>('FTP_PORT') || '21',
-				10,
-			),
-			user: this.configService.get<string>('FTP_USER') || '',
-			password: this.configService.get<string>('FTP_PASSWORD') || '',
-			secure:
-				this.configService.get<string>('FTP_SECURE') === 'true' ||
-				this.configService.get<string>('FTP_SECURE') === 'explicit',
-			basePath:
-				this.configService.get<string>('FTP_BASE_PATH') || '/root',
-			syncMode:
-				this.configService.get<string>('FTP_SYNC_MODE') || 'manual',
-			syncCron:
-				this.configService.get<string>('FTP_SYNC_CRON') || '0 2 * * *',
+			host: active.host,
+			port: active.port,
+			user: active.user,
+			password: active.password,
+			secure: active.secure,
+			basePath: active.basePath,
 		};
 	}
 
@@ -256,31 +249,26 @@ export class FtpService {
 	}
 
 	private async connectClient(): Promise<ftp.Client> {
-		const config = this.getConfig();
+		const config = await this.getConfig();
 		const maxAttempts = 3;
 		const retryDelayMs = 2000;
 		let lastError: Error | undefined;
 
 		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-			const client = new ftp.Client();
-			client.ftp.verbose = false;
-
 			try {
 				this.logger.log(
 					`Connecting to FTPS ${config.host}:${config.port}...${attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : ''}`,
 				);
-				await client.access({
+				const client = await connectFtpClient({
 					host: config.host,
 					port: config.port,
 					user: config.user,
 					password: config.password,
 					secure: config.secure,
-					secureOptions: { rejectUnauthorized: false },
 				});
 				this.logger.log('FTPS connected successfully');
 				return client;
 			} catch (err) {
-				client.close();
 				lastError = err as Error;
 				if (this.isAuthenticationError(lastError)) {
 					throw new FtpAuthenticationError(lastError.message);
@@ -374,7 +362,7 @@ export class FtpService {
 		// session this opens its own rather than reconnecting per category.
 		if (!session) return this.withSession((own) => this.listPeriods(own));
 
-		const config = this.getConfig();
+		const config = await this.getConfig();
 		const periods = new Set<string>();
 
 		for (const category of [
@@ -412,7 +400,7 @@ export class FtpService {
 		period: string,
 		session?: FtpSession,
 	): Promise<string[]> {
-		const config = this.getConfig();
+		const config = await this.getConfig();
 		const remotePath = `${config.basePath}/${category}/${period}`;
 
 		try {
@@ -443,7 +431,7 @@ export class FtpService {
 		applyGlobalExcludes = true,
 		session?: FtpSession,
 	): Promise<string[]> {
-		const config = this.getConfig();
+		const config = await this.getConfig();
 		const remotePath = `${config.basePath}/${category}/${period}/${dspFolder}`;
 
 		try {
@@ -505,7 +493,7 @@ export class FtpService {
 		minimumPeriod?: string,
 		session?: FtpSession,
 	): Promise<FtpRemoteCategoryFiles> {
-		const config = this.getConfig();
+		const config = await this.getConfig();
 		const folders: FtpRemoteFolderFiles[] = [];
 		const failedPaths: string[] = [];
 		const periodEntries = await this.withSessionRetry(session, (client) =>
@@ -701,7 +689,7 @@ export class FtpService {
 		localPath: string,
 		session?: FtpSession,
 	): Promise<void> {
-		const config = this.getConfig();
+		const config = await this.getConfig();
 		fs.mkdirSync(path.dirname(localPath), { recursive: true });
 		await this.withSessionRetry(session, (client) =>
 			client.downloadTo(
@@ -805,7 +793,7 @@ export class FtpService {
 		fileSelector?: (relativePath: string) => boolean,
 		session?: FtpSession,
 	): Promise<{ localPath: string; fileCount: number }> {
-		const config = this.getConfig();
+		const config = await this.getConfig();
 		const remotePath = `${config.basePath}/${category}/${period}/${dspFolder}`;
 		const localPath = path.join(tempDir, period, category, dspFolder);
 
@@ -845,7 +833,7 @@ export class FtpService {
 		items?: any[];
 	}> {
 		try {
-			const config = this.getConfig();
+			const config = await this.getConfig();
 			// close() in a finally: without it a failing list() would leak the
 			// connection slot it holds and shrink the pool for good.
 			const client = await this.connect('test-connection');

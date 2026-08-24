@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { GenreMessage } from '../constants/genre.constant';
 import { QueryGetListGenreDto } from '../dto/genre.dto';
 import { Genre } from '../entities/genre.entity';
+import { GenreScope } from '../enum/genre.enum';
 
 @Injectable()
 export class GenreQueryService {
@@ -16,6 +17,7 @@ export class GenreQueryService {
 	createQueryGetList(query: QueryGetListGenreDto) {
 		const {
 			keyword,
+			scope,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -34,6 +36,12 @@ export class GenreQueryService {
 		if (keyword) {
 			queryBuilder.andWhere('genre.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
+			});
+		}
+
+		if (scope) {
+			queryBuilder.andWhere('genre.scope IN (:...scopes)', {
+				scopes: [scope, GenreScope.BOTH],
 			});
 		}
 
@@ -132,11 +140,18 @@ export class GenreQueryService {
 		}
 	}
 
-	async getListSimple() {
-		return this.genreRepo
-			.createQueryBuilder('g')
-			.select(['g.id', 'g.name', 'g.code'])
-			.orderBy('g.name', 'ASC')
-			.getMany();
+	async getListSimple(scope?: GenreScope) {
+		const qb = this.genreRepo
+			.createQueryBuilder('genre')
+			.select(['genre.id', 'genre.name', 'genre.code', 'genre.scope'])
+			.orderBy('genre.name', 'ASC');
+
+		if (scope) {
+			qb.andWhere('genre.scope IN (:...scopes)', {
+				scopes: [scope, GenreScope.BOTH],
+			});
+		}
+
+		return qb.getMany();
 	}
 }

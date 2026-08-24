@@ -58,15 +58,62 @@ export class SftpConnectService {
 				`Bắt đầu tải lên SFTP: ${fileName} (${fileSizeMB} MB)`,
 			);
 
+			// Log check if error quá 5 phút không... (Có thể xoá 2 biến này)
+			let lastChunk = 0;
+			let lastProgressAt = Date.now();
+
 			const resetTimeout = () => {
 				if (timer) clearTimeout(timer);
 				timer = setTimeout(
 					() => {
-						reject(
-							new Error(
-								`SFTP upload timeout: Quá 5 phút không có dữ liệu mới được tải lên cho file ${fileName}`,
-							),
-						);
+						const errorMessage = `SFTP upload timeout: Quá 5 phút không có dữ liệu mới được tải lên cho file ${fileName}`;
+
+						// Log check time out (Có thể xoá)
+						this.logger.error({
+							message: errorMessage,
+							diagnostic: {
+								localPath,
+								remotePath,
+
+								fileSizeBytes: stats.size,
+								fileSizeMB: Number(
+									(stats.size / (1024 * 1024)).toFixed(2),
+								),
+
+								lastTransferredBytes: lastTransferred,
+								lastTransferredMB: Number(
+									(lastTransferred / (1024 * 1024)).toFixed(
+										2,
+									),
+								),
+
+								remainingBytes: Math.max(
+									stats.size - lastTransferred,
+									0,
+								),
+
+								progressPercent:
+									stats.size > 0
+										? Number(
+												(
+													(lastTransferred /
+														stats.size) *
+													100
+												).toFixed(2),
+											)
+										: 0,
+
+								lastChunkBytes: lastChunk,
+								lastProgressAt: new Date(
+									lastProgressAt,
+								).toISOString(),
+								idleMs: Date.now() - lastProgressAt,
+
+								processId: process.pid,
+								memoryUsage: process.memoryUsage(),
+							},
+						});
+						reject(new Error(errorMessage));
 					},
 					5 * 60 * 1000,
 				); // 5 minutes inactivity timeout
@@ -75,13 +122,22 @@ export class SftpConnectService {
 			resetTimeout();
 
 			let lastTransferred = 0;
+			let lastLoggedTransferred = 0;
+			const absoluteLocalPath = path.resolve(localPath);
+
 			client
-				.put(localPath, remotePath, {
+				.fastPut(absoluteLocalPath, remotePath, {
+					concurrency: 5,
+					chunkSize: 32768,
 					step: (
 						total_transferred: number,
 						chunk: number,
 						total_size: number,
 					) => {
+						lastTransferred = total_transferred;
+						lastChunk = chunk;
+						lastProgressAt = Date.now();
+
 						resetTimeout();
 						const percent =
 							total_size > 0
@@ -91,7 +147,7 @@ export class SftpConnectService {
 									).toFixed(1)
 								: '0';
 						if (
-							total_transferred - lastTransferred >
+							total_transferred - lastLoggedTransferred >=
 								5 * 1024 * 1024 ||
 							total_transferred === total_size
 						) {
@@ -101,7 +157,7 @@ export class SftpConnectService {
 									(1024 * 1024)
 								).toFixed(2)} MB / ${fileSizeMB} MB)`,
 							);
-							lastTransferred = total_transferred;
+							lastLoggedTransferred = total_transferred;
 						}
 					},
 				})

@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import * as ftp from 'basic-ftp';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
+import { FtpProviderConfigService } from '../../../ftp-provider-config/services/ftp-provider-config.service';
 import { FtpAuthenticationError, FtpService, FtpSession } from './ftp.service';
 
 jest.mock('basic-ftp');
@@ -30,14 +31,10 @@ describe('FtpService', () => {
 	let service: FtpService;
 	let clients: FakeClient[];
 
-	const configValues: Record<string, string> = {
-		FTP_HOST: 'ftp.example.com',
-		FTP_PORT: '21',
-		FTP_USER: 'user',
-		FTP_PASSWORD: 'secret',
-		FTP_SECURE: 'true',
-		FTP_BASE_PATH: '/root',
-	};
+	// FTP_MAX_CONNECTIONS is the only credential-unrelated key FtpService still
+	// reads from ConfigService directly; the rest now come from
+	// FtpProviderConfigService.getActiveConfig() (DB-backed).
+	const configValues: Record<string, string> = {};
 
 	beforeEach(async () => {
 		clients = [];
@@ -58,6 +55,19 @@ describe('FtpService', () => {
 					provide: ExcludePatternService,
 					useValue: {
 						shouldExclude: jest.fn().mockResolvedValue(false),
+					},
+				},
+				{
+					provide: FtpProviderConfigService,
+					useValue: {
+						getActiveConfig: jest.fn().mockResolvedValue({
+							host: 'ftp.example.com',
+							port: 21,
+							user: 'user',
+							password: 'secret',
+							secure: true,
+							basePath: '/root',
+						}),
 					},
 				},
 			],

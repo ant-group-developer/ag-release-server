@@ -28,6 +28,7 @@ export abstract class BaseSalesParser {
 	protected readonly logger: Logger;
 	protected readonly dspId: string;
 	private fieldMappingOverrides: ConfiguredFieldMapping[] = [];
+	private catalogMappings: ConfiguredFieldMapping[] = [];
 
 	/** Number of header rows to skip before the actual column header (default 0). */
 	protected skipHeaderRows = 0;
@@ -40,6 +41,18 @@ export abstract class BaseSalesParser {
 	/** Apply database mappings without replacing DSP-specific parser behaviour. */
 	setFieldMappingOverrides(mappings: ConfiguredFieldMapping[]): this {
 		this.fieldMappingOverrides = mappings;
+		return this;
+	}
+
+	/**
+	 * Catalog base mappings (hardcoded parser assignments stored in DB with
+	 * mapping_scope='catalog'). Used at runtime to detect which targetColumn
+	 * parseRow hardcoded for a given source column, so a DB override that
+	 * redirects that source to a different targetColumn can suppress the
+	 * hardcoded field.
+	 */
+	setCatalogMappings(mappings: ConfiguredFieldMapping[]): this {
+		this.catalogMappings = mappings;
 		return this;
 	}
 
@@ -275,6 +288,7 @@ export abstract class BaseSalesParser {
 		row: FactSalesRow,
 		record: Record<string, string>,
 	): FactSalesRow {
+		this.suppressRedirectedHardcodedTargets(row);
 		for (const mapping of this.fieldMappingOverrides) {
 			if (mapping.targetColumn === 'skip') continue;
 			const value = transformMappedValue(
@@ -316,6 +330,34 @@ export abstract class BaseSalesParser {
 			}
 		}
 		return row;
+	}
+
+	/**
+	 * Delete the hardcoded targetColumn that parseRow set when a DB override
+	 * redirects the same reportColumn to a different targetColumn. Without
+	 * this, the row would carry both the hardcoded field and the override
+	 * field — duplicate data.
+	 */
+	private suppressRedirectedHardcodedTargets(row: FactSalesRow): void {
+		if (!this.catalogMappings.length) return;
+		const suppressedTargets = new Set<string>();
+		for (const cat of this.catalogMappings) {
+			if (cat.targetColumn === 'skip') continue;
+			const redirected = this.fieldMappingOverrides.some(
+				(m) =>
+					m.targetColumn !== 'skip' &&
+					m.targetColumn !== cat.targetColumn &&
+					m.reportColumn === cat.reportColumn,
+			);
+			if (redirected) suppressedTargets.add(cat.targetColumn);
+		}
+		for (const target of suppressedTargets) {
+			if (target.startsWith('metadata.')) {
+				delete row.metadata[target.slice('metadata.'.length)];
+			} else {
+				delete (row as unknown as Record<string, unknown>)[target];
+			}
+		}
 	}
 
 	protected normalizeParsedRows(rows: FactSalesRow[]): FactSalesRow[] {

@@ -1144,24 +1144,6 @@ export class ReleaseService {
 			release,
 			dataDsp,
 		);
-		const consideredDeliveries =
-			release.releaseDspDeliveries
-				?.filter(
-					(delivery) =>
-						delivery.isSelected &&
-						(delivery.isActive ?? delivery.dsp?.isActive ?? true) &&
-						(!dataDsp ||
-							dataDsp.some(
-								(item) => item.dspCode === delivery.dsp?.code,
-							)),
-				)
-				.map((delivery) => ({
-					dspCode: delivery.dsp?.code,
-					status: delivery.status,
-					isSelected: delivery.isSelected,
-					isActive:
-						delivery.isActive ?? delivery.dsp?.isActive ?? true,
-				})) ?? [];
 
 		await this.releaseRepo.update(releaseId, { status: newStatus });
 
@@ -1177,20 +1159,21 @@ export class ReleaseService {
 		release: Release,
 		dataDsp?: ReleaseExecutionResultDto[],
 	): ReleaseStatus {
-		const activeDeliveries =
-			release.releaseDspDeliveries?.filter(
-				(delivery) =>
-					delivery.isSelected &&
-					(delivery.isActive ?? delivery.dsp?.isActive ?? true),
-			) ?? [];
+		const consideredDeliveries =
+			release.releaseDspDeliveries?.filter((delivery) => {
+				if (release.type === 'video') return true;
+				if (!delivery.isSelected) return false;
+
+				return delivery.dsp?.isActive ?? true;
+			}) ?? [];
 
 		const statuses = dataDsp
-			? (activeDeliveries
+			? (consideredDeliveries
 					?.filter((delivery) =>
 						dataDsp.some((d) => d.dspCode === delivery.dsp?.code),
 					)
 					.map((delivery) => delivery.status) ?? [])
-			: (activeDeliveries.map((delivery) => delivery.status) ?? []);
+			: (consideredDeliveries.map((delivery) => delivery.status) ?? []);
 
 		if (!statuses.length) {
 			return release.status;

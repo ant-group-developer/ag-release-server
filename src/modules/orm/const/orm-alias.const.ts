@@ -30,4 +30,5 @@ export enum OrmAlias {
 	aggregator = 'aggregator',
 	sftpConfig = 'sftpConfig',
 	dspRoutingConfig = 'dspRoutingConfig',
+	ftpProviderConfig = 'ftpProviderConfig',
 }

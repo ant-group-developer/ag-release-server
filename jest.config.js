@@ -6,6 +6,7 @@ module.exports = {
 		'^.+\\.(t|j)s$': 'ts-jest',
 	},
 	testEnvironment: 'node',
+	setupFiles: ['<rootDir>/jest.setup.js'],
 	moduleNameMapper: {
 		'^src/(.*)$': '<rootDir>/src/$1',
 	},
