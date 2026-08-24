@@ -157,61 +157,32 @@ export class Ern382Builder2 {
 			formalTitle.ele('SubTitle').txt(track.version);
 		}
 
-		// Display artists (inline) - combined Artist at top if feat., then MainArtist/FeaturedArtist with SequenceNumber
-		{
-			const mains = track.artists
-				.map((a) => a.name.trim())
-				.filter(Boolean);
-			const featureds =
-				track.contributors
-					?.filter((c) => c.role === 'FeaturedArtist')
-					.map((c) => ({
-						name: c.name.trim(),
-						lang: c.languageAndScriptCode,
-					}))
-					.filter((c) => !!c.name) ?? [];
-			const hasFeat = mains.length > 0 && featureds.length > 0;
-
-			// 1. Combined DisplayArtist (Role=Artist) at top, no SequenceNumber - only when feat.
-			if (hasFeat) {
-				const combined = `${mains.join(', ')} feat. ${featureds.map((f) => f.name).join(', ')}`;
-				const da = details.ele('DisplayArtist');
-				da.ele('PartyName').ele('FullName').txt(combined);
-				da.ele('ArtistRole').txt('Artist');
+		// Display artists (inline)
+		for (const artist of track.artists) {
+			const da = details.ele('DisplayArtist');
+			const pn = da.ele('PartyName');
+			if (artist.languageAndScriptCode) {
+				pn.att('LanguageAndScriptCode', artist.languageAndScriptCode);
 			}
+			pn.ele('FullName').txt(artist.name);
+			da.ele('ArtistRole').txt(artist.role);
+		}
 
-			// 2. MainArtists with SequenceNumber
-			let seq = 1;
-			for (const artist of track.artists) {
-				const da = details.ele('DisplayArtist', {
-					SequenceNumber: String(seq++),
-				});
-				const pn = da.ele('PartyName');
-				if (artist.languageAndScriptCode) {
-					pn.att(
-						'LanguageAndScriptCode',
-						artist.languageAndScriptCode,
-					);
+		// FeaturedArtist stored in contributors -> render as DisplayArtist (only this case, additive)
+		if (track.contributors) {
+			for (const c of track.contributors) {
+				if (c.role === 'FeaturedArtist') {
+					const da = details.ele('DisplayArtist');
+					const pn = da.ele('PartyName');
+					if (c.languageAndScriptCode) {
+						pn.att(
+							'LanguageAndScriptCode',
+							c.languageAndScriptCode,
+						);
+					}
+					pn.ele('FullName').txt(c.name);
+					da.ele('ArtistRole').txt('FeaturedArtist');
 				}
-				pn.ele('FullName').txt(artist.name.trim());
-				da.ele('ArtistRole').txt(artist.role);
-			}
-
-			// 3. FeaturedArtists with continued SequenceNumber
-			for (const c of featureds) {
-				const orig = track.contributors!.find(
-					(x) =>
-						x.role === 'FeaturedArtist' && x.name.trim() === c.name,
-				);
-				const da = details.ele('DisplayArtist', {
-					SequenceNumber: String(seq++),
-				});
-				const pn = da.ele('PartyName');
-				if (orig?.languageAndScriptCode) {
-					pn.att('LanguageAndScriptCode', orig.languageAndScriptCode);
-				}
-				pn.ele('FullName').txt(c.name);
-				da.ele('ArtistRole').txt('FeaturedArtist');
 			}
 		}
 
@@ -248,6 +219,20 @@ export class Ern382Builder2 {
 				}
 			}
 		}
+
+		// Display artist name (combined main feat. featured for DSP display)
+		const mainsDisplay = track.artists
+			.map((a) => a.name.trim())
+			.filter(Boolean);
+		const featuredsDisplay =
+			track.contributors
+				?.filter((c) => c.role === 'FeaturedArtist')
+				.map((c) => c.name.trim())
+				.filter(Boolean) ?? [];
+		const displayArtistName = featuredsDisplay.length
+			? `${mainsDisplay.join(', ')} feat. ${featuredsDisplay.join(', ')}`
+			: mainsDisplay.join(', ');
+		details.ele('DisplayArtistName').txt(displayArtistName);
 
 		// Label
 		details.ele('LabelName').txt(this.input.release.labelName);
@@ -477,60 +462,40 @@ export class Ern382Builder2 {
 				?.filter((c) => c.role === 'FeaturedArtist')
 				.map((c) => c.name.trim())
 				.filter(Boolean) ?? [];
+
 		const displayArtistName = featuredsDisplay.length
 			? `${mainsDisplay.join(', ')} feat. ${featuredsDisplay.join(', ')}`
 			: mainsDisplay.join(', ');
+
 		details.ele('DisplayArtistName').txt(displayArtistName);
 		details.ele('LabelName').txt(this.input.release.labelName);
 
-		// Display artists - combined Artist at top if feat., then MainArtist/FeaturedArtist with SequenceNumber
-		{
-			const mainsList = track.artists
-				.map((a) => ({
-					name: a.name.trim(),
-					lang: a.languageAndScriptCode,
-					role: a.role,
-				}))
-				.filter((a) => !!a.name);
-			const featuredsList =
-				track.contributors
-					?.filter((c) => c.role === 'FeaturedArtist')
-					.map((c) => ({
-						name: c.name.trim(),
-						lang: c.languageAndScriptCode,
-					}))
-					.filter((c) => !!c.name) ?? [];
-			const hasFeat = mainsList.length > 0 && featuredsList.length > 0;
-
-			// 1. Combined DisplayArtist (Role=Artist) at top, no SequenceNumber
-			if (hasFeat) {
-				const combined = `${mainsList.map((m) => m.name).join(', ')} feat. ${featuredsList.map((f) => f.name).join(', ')}`;
-				const da = details.ele('DisplayArtist');
-				da.ele('PartyName').ele('FullName').txt(combined);
-				da.ele('ArtistRole').txt('Artist');
+		// Display artists
+		for (const artist of track.artists) {
+			const da = details.ele('DisplayArtist');
+			const pn = da.ele('PartyName');
+			if (artist.languageAndScriptCode) {
+				pn.att('LanguageAndScriptCode', artist.languageAndScriptCode);
 			}
+			pn.ele('FullName').txt(artist.name);
+			da.ele('ArtistRole').txt(artist.role);
+		}
 
-			// 2. MainArtists with SequenceNumber
-			let seq = 1;
-			for (const artist of mainsList) {
-				const da = details.ele('DisplayArtist', {
-					SequenceNumber: String(seq++),
-				});
-				const pn = da.ele('PartyName');
-				if (artist.lang) pn.att('LanguageAndScriptCode', artist.lang);
-				pn.ele('FullName').txt(artist.name);
-				da.ele('ArtistRole').txt(artist.role);
-			}
-
-			// 3. FeaturedArtists with continued SequenceNumber
-			for (const c of featuredsList) {
-				const da = details.ele('DisplayArtist', {
-					SequenceNumber: String(seq++),
-				});
-				const pn = da.ele('PartyName');
-				if (c.lang) pn.att('LanguageAndScriptCode', c.lang);
-				pn.ele('FullName').txt(c.name);
-				da.ele('ArtistRole').txt('FeaturedArtist');
+		// FeaturedArtist stored in contributors -> render as DisplayArtist (only this case, additive)
+		if (track.contributors) {
+			for (const c of track.contributors) {
+				if (c.role === 'FeaturedArtist') {
+					const da = details.ele('DisplayArtist');
+					const pn = da.ele('PartyName');
+					if (c.languageAndScriptCode) {
+						pn.att(
+							'LanguageAndScriptCode',
+							c.languageAndScriptCode,
+						);
+					}
+					pn.ele('FullName').txt(c.name);
+					da.ele('ArtistRole').txt('FeaturedArtist');
+				}
 			}
 		}
 

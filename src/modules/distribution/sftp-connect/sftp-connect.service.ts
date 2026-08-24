@@ -122,9 +122,13 @@ export class SftpConnectService {
 			resetTimeout();
 
 			let lastTransferred = 0;
+			let lastLoggedTransferred = 0;
+			const absoluteLocalPath = path.resolve(localPath);
 
 			client
-				.put(localPath, remotePath, {
+				.fastPut(absoluteLocalPath, remotePath, {
+					concurrency: 5,
+					chunkSize: 32768,
 					step: (
 						total_transferred: number,
 						chunk: number,
@@ -143,7 +147,7 @@ export class SftpConnectService {
 									).toFixed(1)
 								: '0';
 						if (
-							total_transferred - lastTransferred >
+							total_transferred - lastLoggedTransferred >=
 								5 * 1024 * 1024 ||
 							total_transferred === total_size
 						) {
@@ -153,7 +157,7 @@ export class SftpConnectService {
 									(1024 * 1024)
 								).toFixed(2)} MB / ${fileSizeMB} MB)`,
 							);
-							lastTransferred = total_transferred;
+							lastLoggedTransferred = total_transferred;
 						}
 					},
 				})
