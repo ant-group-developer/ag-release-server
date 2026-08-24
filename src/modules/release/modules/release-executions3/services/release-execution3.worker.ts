@@ -645,13 +645,15 @@ export class ReleaseExecution3Worker {
 
 			if (!step.metadata?.output?.jobCreated) {
 				// Xác định job type dựa vào execution type
-				const jobType = releaseExecution.type === ExecutionType.TAKEDOWN
-					? CiJobType3.ADMIN_TAKEDOWN
-					: CiJobType3.ADMIN_EXPORT;
+				const jobType =
+					releaseExecution.type === ExecutionType.TAKEDOWN
+						? CiJobType3.ADMIN_TAKEDOWN
+						: CiJobType3.ADMIN_EXPORT;
 
-				const stepLabel = jobType === CiJobType3.ADMIN_TAKEDOWN
-					? 'Export CI - Admin Takedown'
-					: 'Export CI - Admin Export';
+				const stepLabel =
+					jobType === CiJobType3.ADMIN_TAKEDOWN
+						? 'Export CI - Admin Takedown'
+						: 'Export CI - Admin Export';
 
 				await this.ciJobService.createJob({
 					type: jobType,
@@ -1281,6 +1283,40 @@ export class ReleaseExecution3Worker {
 			await this.manager.save(ReleaseExecutionStep3, step);
 
 			if (hasIssues) {
+				const tracks =
+					releaseExecution.metadata.input?.releaseSnapshot?.tracks ??
+					[];
+
+				const errorsToCreate = qaFlags.map((flag) => {
+					const typeInfo = flag.qa_flag_type;
+					const msg =
+						typeInfo?.advisor_message ||
+						typeInfo?.public_name ||
+						flag.type ||
+						'QA Flag issue';
+					const suggestion = typeInfo?.suggested_action
+						? ` (Suggested action: ${typeInfo.suggested_action})`
+						: '';
+					const trackPart = flag.track_number
+						? `Track ${flag.track_number}: `
+						: '';
+					const matchedTrack = flag.track_number
+						? tracks.find((t: any) => t.order === flag.track_number)
+						: undefined;
+
+					return {
+						releaseId,
+						releaseExecutionId: releaseExecution.id,
+						stepId: step.id,
+						type: ReleaseErrorType.QA_FLAG_CI,
+						message: `${trackPart}${msg}${suggestion}`.trim(),
+						messageCode: '',
+						trackId: matchedTrack?.id,
+					};
+				});
+
+				await this.releaseErrorService.bulkCreateErrors(errorsToCreate);
+
 				throw new Error(
 					`QA validation failed: ${qaFlags.length} issue(s) found`,
 				);
