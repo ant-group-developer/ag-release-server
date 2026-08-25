@@ -37,8 +37,7 @@ function getDedupedOwnershipSubquery(ownershipPeriod: OwnershipPeriod): string {
 		    effective_to,
 		    argMax(tenant_id, updated_at) AS tenant_id,
 		    argMax(label_id, updated_at) AS label_id,
-		    argMax(release_id, updated_at) AS release_id,
-		    max(updated_at) AS updated_at
+		    argMax(release_id, updated_at) AS release_id
 		  FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
 		  GROUP BY isrc, revenue_effective_from, revenue_effective_to, effective_from, effective_to)`;
 	}
@@ -50,8 +49,7 @@ function getDedupedOwnershipSubquery(ownershipPeriod: OwnershipPeriod): string {
 		    revenue_effective_to,
 		    argMax(tenant_id, updated_at) AS tenant_id,
 		    argMax(label_id, updated_at) AS label_id,
-		    argMax(release_id, updated_at) AS release_id,
-		    max(updated_at) AS updated_at
+		    argMax(release_id, updated_at) AS release_id
 		  FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
 		  GROUP BY isrc, effective_from, effective_to, revenue_effective_from, revenue_effective_to)`;
 }

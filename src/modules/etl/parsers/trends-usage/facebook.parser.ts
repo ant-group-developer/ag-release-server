@@ -221,7 +221,7 @@ export class FacebookParser extends BaseParser {
 							innerNames.push(flatName);
 							innerTotalLines.set(
 								flatName,
-								content.split(/\r?\n/).filter((l) => l.trim()).length,
+								content.split(/\r?\n/).filter((l: string) => l.trim()).length,
 							);
 						}
 					} catch (err) {
@@ -247,7 +247,7 @@ export class FacebookParser extends BaseParser {
 						fileContents.set(entry, content);
 						innerTotalLines.set(
 							entry,
-							content.split(/\r?\n/).filter((l) => l.trim()).length,
+							content.split(/\r?\n/).filter((l: string) => l.trim()).length,
 						);
 						outerFileInfos.push({
 							outerName: entry,
@@ -281,7 +281,7 @@ export class FacebookParser extends BaseParser {
 					fileContents.set(entry, content);
 					innerTotalLines.set(
 						entry,
-						content.split(/\r?\n/).filter((l) => l.trim()).length,
+						content.split(/\r?\n/).filter((l: string) => l.trim()).length,
 					);
 					outerFileInfos.push({
 						outerName: entry,
@@ -607,7 +607,7 @@ export class FacebookParser extends BaseParser {
 		const rows: FactDspRow[] = [];
 		const delimiter = filename.endsWith('.csv') ? ',' : '\t';
 
-		const lines = content.split(/\r?\n/).filter((l) => l.trim());
+		const lines = content.split(/\r?\n/).filter((l: string) => l.trim());
 		if (lines.length < 2) return rows;
 
 		const headers = this.parseLine(lines[0], delimiter);
@@ -674,7 +674,7 @@ export class FacebookParser extends BaseParser {
 		const isProd = filename.includes('production');
 		const delimiter = filename.endsWith('.csv') ? ',' : '\t';
 
-		const lines = content.split(/\r?\n/).filter((l) => l.trim());
+		const lines = content.split(/\r?\n/).filter((l: string) => l.trim());
 		if (lines.length < 2) return rows;
 
 		const headers = this.parseLine(lines[0], delimiter);
@@ -737,7 +737,7 @@ export class FacebookParser extends BaseParser {
 		const delimiter = this.getDelimiter(filePath);
 
 		const fileContent = fs.readFileSync(filePath, 'utf-8');
-		const lines = fileContent.split(/\r?\n/).filter((l) => l.trim());
+		const lines = fileContent.split(/\r?\n/).filter((l: string) => l.trim());
 		if (lines.length < 2) return rows;
 
 		const headers = this.parseLine(lines[0], delimiter);
