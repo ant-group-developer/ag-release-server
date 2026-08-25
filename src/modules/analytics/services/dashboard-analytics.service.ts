@@ -5,6 +5,7 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { DashboardAnalyticsQueryDto } from '../dto/analytics-query.dto';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { buildOwnershipJoin } from '../utils/ownership-join.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	appendAnalyticsVideoScopeFilter,
@@ -43,15 +44,10 @@ export class DashboardAnalyticsService {
 			return { joinSql: '', filterSql: '', params };
 		}
 
-		const ownershipDate =
-			query.type === 'stream'
-				? 's.period >= o.effective_from AND (o.effective_to IS NULL OR s.period < o.effective_to)'
-				: 's.period >= o.revenue_effective_from AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)';
+		const ownershipPeriod = query.type === 'stream' ? 'trend' : 'revenue';
 		const joinSql = `
       INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o
-        ON s.isrc = o.isrc
-        AND ${ownershipDate}`;
+      ${buildOwnershipJoin(ownershipPeriod, 's.period')}`;
 		filterSql += ` AND t.is_deleted = 0
       AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`;
 
@@ -220,7 +216,7 @@ export class DashboardAnalyticsService {
           sum(s.total_quantity) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} s
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-        LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND s.reporting_date >= o.effective_from AND (o.effective_to IS NULL OR s.reporting_date < o.effective_to)
+        ${buildOwnershipJoin('trend')}
         WHERE t.is_deleted = 0 AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
           AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))
           AND s.reporting_date >= toDate({from:String})
@@ -239,7 +235,7 @@ export class DashboardAnalyticsService {
           sum(s.total_revenue_usd) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_ISRC_MONTHLY} s
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-        LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND s.period >= o.revenue_effective_from AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)
+        ${buildOwnershipJoin('revenue')}
         WHERE t.is_deleted = 0 AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
           AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))
           AND s.period >= toDate({from:String})
@@ -340,7 +336,7 @@ export class DashboardAnalyticsService {
           sum(s.total_quantity) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} s
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-        LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND s.reporting_date >= o.effective_from AND (o.effective_to IS NULL OR s.reporting_date < o.effective_to)
+        ${buildOwnershipJoin('trend')}
         WHERE t.is_deleted = 0 AND artistId != ''
           AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))
           AND s.reporting_date >= toDate({from:String})
@@ -359,7 +355,7 @@ export class DashboardAnalyticsService {
           sum(s.total_revenue_usd) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_ISRC_MONTHLY} s
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-        LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND s.period >= o.revenue_effective_from AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)
+        ${buildOwnershipJoin('revenue')}
         WHERE t.is_deleted = 0 AND artistId != ''
           AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))
           AND s.period >= toDate({from:String})

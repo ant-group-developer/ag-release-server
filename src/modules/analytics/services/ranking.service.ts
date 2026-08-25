@@ -21,6 +21,7 @@ import {
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
+import { buildOwnershipJoin } from '../utils/ownership-join.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	appendAnalyticsVideoScopeFilter,
@@ -96,10 +97,7 @@ export class RankingService {
 
 		// All other cases: JOIN pg_tracks_sync for tenant/label filtering
 		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o
-        ON s.isrc = o.isrc
-        AND s.reporting_date >= o.effective_from
-        AND (o.effective_to IS NULL OR s.reporting_date < o.effective_to)`;
+      ${buildOwnershipJoin('trend')}`;
 		filterSql += ` AND t.is_deleted = 0
       AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`;
 

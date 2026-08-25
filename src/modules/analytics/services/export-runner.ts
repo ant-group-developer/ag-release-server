@@ -27,6 +27,7 @@ import {
 	appendAnalyticsVideoScopeFilter,
 	getAnalyticsVideoScope,
 } from './analytics-video-scope.service';
+import { getDedupedOwnershipSubquerySql } from '../utils/ownership-join.util';
 import {
 	GroupState,
 	IStreamDetailWriter,
@@ -845,10 +846,7 @@ export class ExportRunner {
 
 	private getCommonJoins() {
 		return `
-      LEFT JOIN (
-        SELECT isrc, tenant_id, label_id, revenue_effective_from, revenue_effective_to
-        FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
-      ) o
+      LEFT JOIN ${getDedupedOwnershipSubquerySql('revenue')} o
         ON s.isrc = o.isrc
         AND s.period >= o.revenue_effective_from
         AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)
