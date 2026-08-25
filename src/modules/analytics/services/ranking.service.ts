@@ -1521,6 +1521,7 @@ export class RankingService {
       LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
       LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
     `;
+		filterSql += ` ${this.buildDspFilter(query, params)}`;
 
 		if (query.keyword) {
 			filterSql += ` AND ${resolvedDspName} ILIKE {keyword:String}`;
