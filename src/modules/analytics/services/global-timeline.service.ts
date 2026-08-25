@@ -2011,17 +2011,10 @@ export class TimelineAnalyticsService {
 			params.matchedReleaseIds = matchedReleaseIds;
 		}
 
-		// Count query
 		const countSql = queries.getRevenueTopReleaseCountQuery(
 			joinSql,
 			filterSql,
 		);
-		const countResult = await this.clickHouseService.query<{
-			total: string;
-		}>(countSql, params);
-		const totalItems = Number(countResult[0]?.total ?? 0);
-
-		// Data query
 		const sql = queries.getRevenueTopReleaseQuery(
 			joinSql,
 			filterSql,
@@ -2029,44 +2022,68 @@ export class TimelineAnalyticsService {
 			limit,
 			offset,
 		);
-		const rows = await this.clickHouseService.query<{
-			releaseId: string;
-			revenue_usd: string;
-			quantity: string;
-			trackCount: string;
-			releaseTitle: string;
-			releaseUpc: string;
-			labelId: string;
-			labelName: string;
-			tenantId: string;
-			cover75: string;
-			cover100: string;
-			cover160: string;
-			cover300: string;
-			coverOriginal: string;
-			releaseMetadataSpotify: string;
-			releaseMetadataDeezer: string;
-		}>(sql, params);
+		const [countResult, rows] = await Promise.all([
+			this.clickHouseService.query<{ total: string }>(countSql, params),
+			this.clickHouseService.query<{
+				releaseId: string;
+				revenue_usd: string;
+				quantity: string;
+				trackCount: string;
+				releaseTitle: string;
+				releaseUpc: string;
+				labelId: string;
+				labelName: string;
+				tenantId: string;
+				cover75: string;
+				cover100: string;
+				cover160: string;
+				cover300: string;
+				coverOriginal: string;
+				releaseMetadataSpotify: string;
+				releaseMetadataDeezer: string;
+			}>(sql, params),
+		]);
+		const totalItems = Number(countResult[0]?.total ?? 0);
 
 		const items: RevenueReleaseItem[] = [];
 		const releaseJoinSql = joinSql;
 
 		if (rows.length > 0) {
+			const missingReleaseIds = [
+				...new Set(
+					rows
+						.filter((r) => !r.releaseTitle)
+						.map((r) => r.releaseId)
+						.filter(Boolean),
+				),
+			];
+			const releasesMeta =
+				missingReleaseIds.length > 0
+					? await this.isrcResolverService.getReleaseMetadata(
+							missingReleaseIds,
+						)
+					: new Map();
 			const tenantMetadata =
 				await this.isrcResolverService.getTenantMetadata([
-					...new Set(rows.map((row) => row.tenantId).filter(Boolean)),
+					...new Set(
+						rows.map((row) => row.tenantId).filter(Boolean),
+					),
 				]);
 			rows.forEach((r, index) => {
+				const meta = !r.releaseTitle
+					? (releasesMeta.get(r.releaseId) ??
+						releasesMeta.get(r.releaseId?.toLowerCase()))
+					: undefined;
 				const workspace = r.tenantId
 					? tenantMetadata.get(r.tenantId)
 					: undefined;
 				items.push({
 					rank: offset + index + 1,
 					releaseId: r.releaseId,
-					title: r.releaseTitle || 'Unknown Release',
-					upc: r.releaseUpc || null,
-					labelId: r.labelId || null,
-					labelName: r.labelName || null,
+					title: r.releaseTitle || meta?.title || 'Unknown Release',
+					upc: r.releaseUpc || meta?.upc || null,
+					labelId: r.labelId || meta?.labelId || null,
+					labelName: r.labelName || meta?.labelName || null,
 					trackCount: Number(r.trackCount),
 					revenueUsd: this.revenueNumber(r.revenue_usd),
 					revenueUsdExact: this.revenueExact(r.revenue_usd),
@@ -2080,11 +2097,26 @@ export class TimelineAnalyticsService {
 						: [],
 					release: {
 						coverArtThumbnails: {
-							'75x75': r.cover75 || null,
-							'100x100': r.cover100 || null,
-							'160x160': r.cover160 || null,
-							'300x300': r.cover300 || null,
-							original: r.coverOriginal || null,
+							'75x75':
+								r.cover75 ||
+								meta?.coverArtThumbnails?.['75x75'] ||
+								null,
+							'100x100':
+								r.cover100 ||
+								meta?.coverArtThumbnails?.['100x100'] ||
+								null,
+							'160x160':
+								r.cover160 ||
+								meta?.coverArtThumbnails?.['160x160'] ||
+								null,
+							'300x300':
+								r.cover300 ||
+								meta?.coverArtThumbnails?.['300x300'] ||
+								null,
+							original:
+								r.coverOriginal ||
+								meta?.coverArtThumbnails?.original ||
+								null,
 						},
 					},
 				});

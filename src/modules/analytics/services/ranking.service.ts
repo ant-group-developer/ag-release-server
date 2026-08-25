@@ -533,20 +533,20 @@ export class RankingService {
 		const dataSql = `
       SELECT
         t.release_id AS releaseId,
-        uniq(s.isrc) AS trackCount,
+        uniqIf(s.isrc, s.isrc NOT LIKE 'UPC-%') AS trackCount,
         sum(s.total_quantity) AS totalViews,
-        any(t.release_title) AS releaseTitle,
-        any(t.release_upc) AS releaseUpc,
-        any(t.label_id) AS labelId,
-        any(t.label_name) AS labelName,
-        any(t.tenant_id) AS tenantId,
-        any(t.cover_75) AS cover75,
-        any(t.cover_100) AS cover100,
-        any(t.cover_160) AS cover160,
-        any(t.cover_300) AS cover300,
-        any(t.cover_original) AS coverOriginal,
-        any(t.release_metadata_spotify) AS releaseMetadataSpotify,
-        any(t.release_metadata_deezer) AS releaseMetadataDeezer
+        anyIf(t.release_title, t.release_title != '') AS releaseTitle,
+        anyIf(t.release_upc, t.release_upc != '') AS releaseUpc,
+        anyIf(t.label_id, t.label_id != '') AS labelId,
+        anyIf(t.label_name, t.label_name != '') AS labelName,
+        anyIf(t.tenant_id, t.tenant_id != '') AS tenantId,
+        anyIf(t.cover_75, t.cover_75 != '') AS cover75,
+        anyIf(t.cover_100, t.cover_100 != '') AS cover100,
+        anyIf(t.cover_160, t.cover_160 != '') AS cover160,
+        anyIf(t.cover_300, t.cover_300 != '') AS cover300,
+        anyIf(t.cover_original, t.cover_original != '') AS coverOriginal,
+        anyIf(t.release_metadata_spotify, t.release_metadata_spotify != '') AS releaseMetadataSpotify,
+        anyIf(t.release_metadata_deezer, t.release_metadata_deezer != '') AS releaseMetadataDeezer
       FROM ${table} s
 			${joinSql}
       WHERE t.is_deleted = 0
@@ -576,17 +576,41 @@ export class RankingService {
 			releaseMetadataSpotify: string;
 			releaseMetadataDeezer: string;
 		}>(dataSql, params);
+		const missingReleaseIds = [
+			...new Set(
+				paged
+					.filter((r) => !r.releaseTitle)
+					.map((r) => r.releaseId)
+					.filter(Boolean),
+			),
+		];
+		const releasesMeta =
+			missingReleaseIds.length > 0
+				? await this.isrcResolverService.getReleaseMetadata(
+						missingReleaseIds,
+					)
+				: new Map();
 		const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
 			[...new Set(paged.map((row) => row.tenantId).filter(Boolean))],
 		);
 
 		const items: ReleaseRankingItem[] = paged.map((r, index) => {
+			const meta = !r.releaseTitle
+				? (releasesMeta.get(r.releaseId) ??
+					releasesMeta.get(r.releaseId?.toLowerCase()))
+				: undefined;
 			const coverArtThumbnails: ICoverArtThumbnails = {
-				'75x75': r.cover75 || null,
-				'100x100': r.cover100 || null,
-				'160x160': r.cover160 || null,
-				'300x300': r.cover300 || null,
-				original: r.coverOriginal || null,
+				'75x75': r.cover75 || meta?.coverArtThumbnails?.['75x75'] || null,
+				'100x100':
+					r.cover100 || meta?.coverArtThumbnails?.['100x100'] || null,
+				'160x160':
+					r.cover160 || meta?.coverArtThumbnails?.['160x160'] || null,
+				'300x300':
+					r.cover300 || meta?.coverArtThumbnails?.['300x300'] || null,
+				original:
+					r.coverOriginal ||
+					meta?.coverArtThumbnails?.original ||
+					null,
 			};
 			const workspace = r.tenantId
 				? tenantMetadata.get(r.tenantId)
@@ -594,10 +618,10 @@ export class RankingService {
 			return {
 				rank: query.skip + index + 1,
 				releaseId: r.releaseId,
-				title: r.releaseTitle || 'Unknown Release',
-				upc: r.releaseUpc || null,
-				labelId: r.labelId || null,
-				labelName: r.labelName || null,
+				title: r.releaseTitle || meta?.title || 'Unknown Release',
+				upc: r.releaseUpc || meta?.upc || null,
+				labelId: r.labelId || meta?.labelId || null,
+				labelName: r.labelName || meta?.labelName || null,
 				trackCount: Number(r.trackCount),
 				totalViews: Number(r.totalViews),
 				metadataExternal: normalizeSyncedMetadataExternal(
