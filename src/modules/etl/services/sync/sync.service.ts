@@ -20,6 +20,7 @@ import {
 	FtpAuthenticationError,
 	FtpService,
 	FtpSession,
+	isFtpDisconnectError,
 } from '../ftp/ftp.service';
 import { ImportService } from '../import/import.service';
 
@@ -530,12 +531,18 @@ export class SyncService {
 				folders: [],
 			};
 
-			for (const dspFolder of dspFolders) {
+			const dspRetryAttempts = Math.max(1, config.maxRetries ?? 3);
+			folderLoop: for (const dspFolder of dspFolders) {
 				const key = `${period}|${category}|${dspFolder}`;
 				const existing = importedDetails.get(key);
 				let parserConfig: ResolvedFtpParserConfig;
 				let ignoredFilesCleaned = 0;
 				let availableFiles: string[] = [];
+				for (
+					let dspAttempt = 1;
+					dspAttempt <= dspRetryAttempts;
+					dspAttempt++
+				) {
 				try {
 					availableFiles = await this.ftpService.listRemoteFiles(
 						category,
@@ -620,7 +627,7 @@ export class SyncService {
 									? `${ignoredFilesCleaned} ignored file(s) removed by force sync`
 									: 'no import rule matched files',
 						});
-						continue;
+						continue folderLoop;
 					}
 					parserConfig =
 						await this.ftpParserConfigService.resolveForParserCode(
@@ -632,6 +639,16 @@ export class SyncService {
 					parserConfig.selectFile = (path) => selectedNames.has(path);
 				} catch (err) {
 					if (err instanceof FtpAuthenticationError) throw err;
+					if (
+						isFtpDisconnectError(err) &&
+						dspAttempt < dspRetryAttempts
+					) {
+						session.invalidate();
+						this.logger.warn(
+							`FTP disconnected listing ${category}/${dspFolder}; retrying DSP (${dspAttempt}/${dspRetryAttempts}): ${err.message}`,
+						);
+						continue;
+					}
 					this.logger.error(
 						`Invalid parser config for ${category}/${dspFolder}: ${err.message}`,
 					);
@@ -643,7 +660,7 @@ export class SyncService {
 						durationMs: 0,
 						error: err.message,
 					});
-					continue;
+					continue folderLoop;
 				}
 				// The first recursive listing above is authoritative for this DSP.
 				// Filtering it locally avoids walking the same remote tree a second
@@ -663,7 +680,7 @@ export class SyncService {
 						durationMs: 0,
 						reason: 'no files matched parser config',
 					});
-					continue;
+					continue folderLoop;
 				}
 
 				// ── Change detection: compare file lists ──
@@ -701,7 +718,7 @@ export class SyncService {
 								durationMs: 0,
 								reason: 'files unchanged',
 							});
-							continue;
+							continue folderLoop;
 						}
 
 						// Files differ → need re-sync
@@ -763,7 +780,7 @@ export class SyncService {
 							reason: `no parser for ${category}`,
 						});
 						this.ftpService.cleanupTemp(localPath);
-						continue;
+						continue folderLoop;
 					}
 
 					const rows = dspResult.rows || 0;
@@ -844,8 +861,19 @@ export class SyncService {
 						`  ${isUpdate ? '🔄' : '✅'} ${category}/${dspFolder}: ${rows} rows, ${files} files (${durationMs}ms)` +
 							(isUpdate ? ' [UPDATED]' : ''),
 					);
+					continue folderLoop;
 				} catch (err) {
 					if (err instanceof FtpAuthenticationError) throw err;
+					if (
+						isFtpDisconnectError(err) &&
+						dspAttempt < dspRetryAttempts
+					) {
+						session.invalidate();
+						this.logger.warn(
+							`FTP disconnected on ${category}/${dspFolder}; retrying DSP (${dspAttempt}/${dspRetryAttempts}): ${err.message}`,
+						);
+						continue;
+					}
 					const durationMs = Date.now() - folderStart;
 
 					categoryResult.folders.push({
@@ -860,6 +888,8 @@ export class SyncService {
 					this.logger.error(
 						`  ❌ ${category}/${dspFolder}: ${err.message}`,
 					);
+					continue folderLoop;
+				}
 				}
 			}
 

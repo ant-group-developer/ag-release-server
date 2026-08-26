@@ -11,7 +11,7 @@ import { SyncService } from './sync.service';
 
 describe('SyncService', () => {
 	let service: SyncService;
-	let sessions: Array<{ close: jest.Mock }>;
+	let sessions: Array<{ close: jest.Mock; invalidate: jest.Mock }>;
 
 	const ftpService = {
 		createSession: jest.fn(),
@@ -77,7 +77,7 @@ describe('SyncService', () => {
 		sessions = [];
 
 		ftpService.createSession.mockImplementation(() => {
-			const session = { close: jest.fn() };
+			const session = { close: jest.fn(), invalidate: jest.fn() };
 			sessions.push(session);
 			return session;
 		});
@@ -202,6 +202,30 @@ describe('SyncService', () => {
 
 			const statuses = result.categories[0].folders.map((f) => f.status);
 			expect(statuses).toEqual(['error', 'done']);
+		});
+
+		it('retries the same DSP after an FTP disconnect instead of skipping it', async () => {
+			ftpService.listDspFolders.mockResolvedValue([
+				'fbk-facebook',
+				'vvo-vevo',
+			]);
+			givenImportableFolder();
+			const disconnect = new Error(
+				'Client is closed because Server sent FIN packet unexpectedly, closing connection.',
+			);
+			ftpService.downloadDspFolder
+				.mockRejectedValueOnce(disconnect)
+				.mockResolvedValue({ localPath: '/tmp/x', fileCount: 1 });
+
+			const result = await service.syncPeriod('202608', false, [
+				'trends',
+			]);
+
+			const statuses = result.categories[0].folders.map((f) => f.status);
+			expect(statuses).toEqual(['done', 'done']);
+			// facebook: fail then retry success; vevo: success
+			expect(ftpService.downloadDspFolder).toHaveBeenCalledTimes(3);
+			expect(sessions[0].invalidate).toHaveBeenCalled();
 		});
 
 		it('aborts the whole period on a 530 and still closes the session', async () => {

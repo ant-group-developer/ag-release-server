@@ -38,6 +38,15 @@ export class FtpAuthenticationError extends Error {
 	}
 }
 
+/** True when the FTP control socket is dead and the session must reconnect. */
+export function isFtpDisconnectError(error: unknown): boolean {
+	const message =
+		error instanceof Error ? error.message : String(error ?? '');
+	return /ECONNRESET|EPIPE|ENOTCONN|control socket|client is closed|socket is closed|connection closed|FIN packet/i.test(
+		message,
+	);
+}
+
 interface FtpLimiterWaiter {
 	resolve: () => void;
 	reject: (error: Error) => void;
@@ -318,8 +327,10 @@ export class FtpService {
 	/**
 	 * Runs a single FTP operation, either on the caller's session or on a
 	 * throwaway connection when no session is given. A session whose socket died
-	 * between calls is reconnected once; a second failure is left to the caller.
+	 * mid-op is dropped and the same op is retried on a fresh login.
 	 */
+	private static readonly SESSION_RETRY_ATTEMPTS = 3;
+
 	private async withSessionRetry<T>(
 		session: FtpSession | undefined,
 		op: (client: ftp.Client) => Promise<T>,
@@ -336,21 +347,32 @@ export class FtpService {
 			);
 		}
 
-		const client = await session.getClient();
-		try {
-			return await op(client);
-		} catch (error) {
-			const err = error as Error;
-			if (this.isAuthenticationError(err)) throw err;
-			if (this.isDisconnected(err)) {
+		let lastError: Error | undefined;
+		for (
+			let attempt = 1;
+			attempt <= FtpService.SESSION_RETRY_ATTEMPTS;
+			attempt++
+		) {
+			const client = await session.getClient();
+			try {
+				return await op(client);
+			} catch (error) {
+				const err = error as Error;
+				if (this.isAuthenticationError(err)) throw err;
+				lastError = err;
+				if (
+					!this.isDisconnected(err) ||
+					attempt === FtpService.SESSION_RETRY_ATTEMPTS
+				) {
+					throw err;
+				}
 				this.logger.warn(
-					`FTP session lost (${err.message}); reconnecting once`,
+					`FTP session lost (${err.message}); reconnecting (${attempt}/${FtpService.SESSION_RETRY_ATTEMPTS})`,
 				);
 				session.invalidate();
-				return await op(await session.getClient());
 			}
-			throw err;
 		}
+		throw lastError;
 	}
 
 	/**
@@ -447,6 +469,7 @@ export class FtpService {
 			return files.sort();
 		} catch (err) {
 			if (this.isAuthenticationError(err as Error)) throw err;
+			if (this.isDisconnected(err as Error)) throw err;
 			this.logger.warn(
 				`Cannot list files for ${category}/${period}/${dspFolder}: ${err.message}`,
 			);
@@ -700,9 +723,7 @@ export class FtpService {
 	}
 
 	private isDisconnected(error: Error): boolean {
-		return /ECONNRESET|control socket|client is closed|socket is closed|connection closed/i.test(
-			error.message,
-		);
+		return isFtpDisconnectError(error);
 	}
 
 	private isAuthenticationError(error: Error): boolean {
@@ -772,6 +793,10 @@ export class FtpService {
 					fileCount++;
 				} catch (err) {
 					if (this.isAuthenticationError(err as Error)) throw err;
+					// A dead socket cannot finish the rest of the folder. Bubble up
+					// so withSessionRetry reconnects and re-downloads this DSP
+					// instead of skipping remaining files and moving on.
+					if (this.isDisconnected(err as Error)) throw err;
 					this.logger.error(
 						`Failed to download ${remoteItemPath}: ${err.message}`,
 					);
