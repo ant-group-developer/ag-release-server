@@ -1286,6 +1286,42 @@ export class ReleaseExecution3WorkerTest {
 			await this.manager.save(ReleaseExecutionStep3, step);
 
 			if (hasIssues) {
+				const tracks =
+					releaseExecution.metadata.input?.releaseSnapshot?.tracks ??
+					[];
+
+				const errorsToCreate = qaFlags.map((flag) => {
+					const typeInfo = flag.qa_flag_type;
+					const msg =
+						typeInfo?.advisor_message ||
+						typeInfo?.public_name ||
+						flag.type ||
+						'QA Flag issue';
+					const suggestion = typeInfo?.suggested_action
+						? ` (Suggested action: ${typeInfo.suggested_action})`
+						: '';
+					const trackPart = flag.track_number
+						? `Track ${flag.track_number}: `
+						: '';
+					const matchedTrack = flag.track_number
+						? tracks.find((t: any) => t.order === flag.track_number)
+						: undefined;
+
+					return {
+						releaseId,
+						releaseExecutionId: releaseExecution.id,
+						stepId: step.id,
+						type: ReleaseErrorType.QA_FLAG_CI,
+						message: `${trackPart}${msg}${suggestion}`.trim(),
+						messageCode:
+							flag.qa_flag_id ||
+							(flag.id ? String(flag.id) : undefined),
+						trackId: matchedTrack?.id,
+					};
+				});
+
+				await this.releaseErrorService.bulkCreateErrors(errorsToCreate);
+
 				throw new Error(
 					`QA validation failed: ${qaFlags.length} issue(s) found`,
 				);
