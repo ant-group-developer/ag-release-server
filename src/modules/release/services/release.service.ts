@@ -455,15 +455,55 @@ export class ReleaseService {
 		};
 	}
 
-	async genUpcById(releaseId: string) {
-		// return '0850080651804';
-		const release = await this.releaseQueryService.getOneDetail(releaseId);
+	// async genUpcById(releaseId: string) {
+	// 	// return '0850080651804';
+	// 	const release = await this.releaseQueryService.getOneDetail(releaseId);
 
-		// Nếu release đã có UPC
-		if (release.upc) {
-			return release.upc ?? '';
-		}
+	// 	// Nếu release đã có UPC
+	// 	if (release.upc) {
+	// 		return release.upc ?? '';
+	// 	}
 
+	// 	const prefixUpcId =
+	// 		this.appConfigService.cache.config.generator.prefixUpcDefaultId;
+
+	// 	if (!prefixUpcId) {
+	// 		this.releaseLogService.failed({
+	// 			releaseId,
+	// 			step: 'Khởi tạo UPC',
+	// 			content: release,
+	// 			message: 'Bản phát hành chưa được gắn mã Prefix UPC',
+	// 		});
+
+	// 		throw new ResponseError({
+	// 			message: 'Bản phát hành chưa được gắn mã Prefix UPC',
+	// 		});
+	// 	}
+
+	// 	const res = await this.upcService.getUpc({ prefixUpcId });
+
+	// 	const newUpc = res.upc;
+	// 	if (!newUpc) {
+	// 		this.releaseLogService.failed({
+	// 			releaseId,
+	// 			step: 'Khởi tạo UPC',
+	// 			content: release,
+	// 			message: 'Dịch vụ cấp UPC không phản hồi mã GTIN',
+	// 		});
+
+	// 		throw new ResponseError({
+	// 			message: 'Service UPC không trả về GTIN',
+	// 		});
+	// 	}
+
+	// 	// -------- Update release --------
+	// 	await this.releaseRepo.update(releaseId, { upc: newUpc });
+
+	// 	return newUpc;
+	// }
+
+	// Gen upc v2
+	async genUpcById(releaseId: string): Promise<string> {
 		const prefixUpcId =
 			this.appConfigService.cache.config.generator.prefixUpcDefaultId;
 
@@ -471,7 +511,6 @@ export class ReleaseService {
 			this.releaseLogService.failed({
 				releaseId,
 				step: 'Khởi tạo UPC',
-				content: release,
 				message: 'Bản phát hành chưa được gắn mã Prefix UPC',
 			});
 
@@ -480,26 +519,214 @@ export class ReleaseService {
 			});
 		}
 
-		const res = await this.upcService.getUpc({ prefixUpcId });
+		const maxAttempts = 10;
 
-		const newUpc = res.upc;
-		if (!newUpc) {
+		try {
+			return await this.releaseRepo.manager.transaction(
+				async (transactionManager) => {
+					/*
+					 * Chỉ cho phép một worker gen UPC trên cùng prefix
+					 * tại một thời điểm.
+					 *
+					 * Lock này dùng chung giữa tất cả pod/process đang
+					 * kết nối vào cùng PostgreSQL.
+					 *
+					 * Lock tự động được nhả khi transaction commit/rollback.
+					 */
+					await transactionManager.query(
+						`
+                        SELECT pg_advisory_xact_lock(
+                            hashtextextended($1, 0)
+                        )
+                    `,
+						[`release:generate-upc:${prefixUpcId}`],
+					);
+
+					/*
+					 * Đọc release sau khi đã lấy advisory lock.
+					 *
+					 * pessimistic_write tương đương SELECT ... FOR UPDATE,
+					 * bảo vệ release trước những code path khác update cùng row
+					 * nhưng không sử dụng advisory lock.
+					 */
+					const release = await transactionManager
+						.getRepository(Release)
+						.createQueryBuilder('release')
+						.setLock('pessimistic_write')
+						.where('release.id = :releaseId', { releaseId })
+						.getOne();
+
+					if (!release) {
+						throw new ResponseError({
+							message: 'Không tìm thấy bản phát hành',
+						});
+					}
+
+					/*
+					 * Worker khác có thể đã gen UPC trong lúc request hiện tại
+					 * đang chờ advisory lock.
+					 */
+					const currentUpc = release.upc?.trim();
+
+					if (currentUpc) {
+						return currentUpc;
+					}
+
+					for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+						/*
+						 * Gọi dịch vụ UPC.
+						 *
+						 * Do đang giữ advisory lock, worker khác dùng cùng
+						 * prefix chưa thể gọi đoạn này đồng thời.
+						 */
+						const response = await this.upcService.getUpc({
+							prefixUpcId,
+						});
+
+						const generatedUpc = response.upc?.trim();
+
+						if (!generatedUpc) {
+							throw new ResponseError({
+								message: 'Dịch vụ UPC không trả về mã GTIN',
+							});
+						}
+
+						/*
+						 * Kiểm tra UPC đã thuộc release khác chưa.
+						 *
+						 * Bỏ các số 0 ở đầu khi so sánh để coi UPC-12 và
+						 * GTIN-14 tương đương nhau, ví dụ:
+						 *
+						 * 850080651766
+						 * 00850080651766
+						 */
+						const duplicatedRelease = await transactionManager
+							.getRepository(Release)
+							.createQueryBuilder('otherRelease')
+							.select([
+								'otherRelease.id',
+								'otherRelease.title',
+								'otherRelease.upc',
+							])
+							.where(
+								`
+                                    TRIM(
+                                        LEADING '0'
+                                        FROM BTRIM(otherRelease.upc)
+                                    ) =
+                                    TRIM(
+                                        LEADING '0'
+                                        FROM :generatedUpc
+                                    )
+                                `,
+								{ generatedUpc },
+							)
+							.andWhere('otherRelease.id <> :releaseId', {
+								releaseId,
+							})
+							.getOne();
+
+						if (duplicatedRelease) {
+							this.logger.warn(
+								[
+									'[GEN_UPC] UPC service returned a duplicate',
+									`upc=${generatedUpc}`,
+									`releaseId=${releaseId}`,
+									`existingReleaseId=${duplicatedRelease.id}`,
+									`existingReleaseTitle=${duplicatedRelease.title}`,
+									`attempt=${attempt}/${maxAttempts}`,
+								].join(', '),
+							);
+
+							// Gọi UPC service lần nữa để lấy mã tiếp theo.
+							continue;
+						}
+
+						/*
+						 * Chỉ update nếu UPC hiện vẫn null/rỗng.
+						 *
+						 * Điều kiện này là lớp bảo vệ bổ sung, tránh vô tình
+						 * ghi đè UPC nếu có code path khác vừa gắn UPC.
+						 */
+						const updateResult = await transactionManager
+							.getRepository(Release)
+							.createQueryBuilder()
+							.update(Release)
+							.set({
+								upc: generatedUpc,
+							})
+							.where('id = :releaseId', { releaseId })
+							.andWhere(`(upc IS NULL OR BTRIM(upc) = '')`)
+							.execute();
+
+						if (updateResult.affected !== 1) {
+							/*
+							 * Không update được có thể vì UPC của release đã
+							 * được gắn bởi một luồng khác.
+							 */
+							const latestRelease = await transactionManager
+								.getRepository(Release)
+								.findOne({
+									where: { id: releaseId },
+									select: {
+										id: true,
+										upc: true,
+									},
+								});
+
+							const latestUpc = latestRelease?.upc?.trim();
+
+							if (latestUpc) {
+								return latestUpc;
+							}
+
+							throw new ResponseError({
+								message: 'Không thể lưu UPC cho bản phát hành',
+							});
+						}
+
+						this.logger.log(
+							[
+								'[GEN_UPC] UPC assigned successfully',
+								`releaseId=${releaseId}`,
+								`upc=${generatedUpc}`,
+								`attempt=${attempt}/${maxAttempts}`,
+							].join(', '),
+						);
+
+						/*
+						 * Callback trả kết quả:
+						 * TypeORM commit transaction và PostgreSQL tự nhả
+						 * advisory lock cùng row lock.
+						 */
+						return generatedUpc;
+					}
+
+					/*
+					 * UPC service liên tục trả mã đã tồn tại.
+					 * Throw sẽ rollback transaction và tự nhả lock.
+					 */
+					throw new ResponseError({
+						message:
+							`Không thể cấp UPC duy nhất sau ` +
+							`${maxAttempts} lần thử`,
+					});
+				},
+			);
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: 'Không thể khởi tạo UPC';
+
 			this.releaseLogService.failed({
 				releaseId,
 				step: 'Khởi tạo UPC',
-				content: release,
-				message: 'Dịch vụ cấp UPC không phản hồi mã GTIN',
+				message,
 			});
 
-			throw new ResponseError({
-				message: 'Service UPC không trả về GTIN',
-			});
+			throw error;
 		}
-
-		// -------- Update release --------
-		await this.releaseRepo.update(releaseId, { upc: newUpc });
-
-		return newUpc;
 	}
 
 	async genListIsrcByReleaseId(releaseId: string) {
