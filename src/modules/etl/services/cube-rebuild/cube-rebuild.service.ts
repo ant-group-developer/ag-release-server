@@ -168,6 +168,10 @@ export class CubeRebuildService {
 					CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE,
 					partition,
 				);
+				await this.dropPartition(
+					CLICKHOUSE_TABLES.TRENDS_DEMOGRAPHICS_CUBE,
+					partition,
+				);
 
 				// 2. Re-insert aggregated data for trends dsp monthly cube
 				await this.clickHouseService.execute(`
@@ -241,6 +245,96 @@ export class CubeRebuildService {
           FROM music_analytics.${CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT}
           WHERE toYYYYMM(reporting_period) = '${partition}'
           GROUP BY reporting_date, isrc, import_source
+        `);
+
+				// 7. Re-insert Vevo demographics (device / gender / age / social).
+				// Must drop+rebuild like the other cubes: the MV only fires on
+				// INSERT, so a fact re-import would otherwise double-count.
+				await this.clickHouseService.execute(`
+          INSERT INTO music_analytics.${CLICKHOUSE_TABLES.TRENDS_DEMOGRAPHICS_CUBE}
+          SELECT
+              reporting_date,
+              isrc,
+              import_source,
+              dimension,
+              dimension_value,
+              territory_code,
+              sum(views) AS views,
+              sum(likes) AS likes,
+              sum(dislikes) AS dislikes,
+              sum(shares) AS shares
+          FROM (
+              SELECT
+                  reporting_period AS reporting_date,
+                  isrc,
+                  if(import_source = '', 'ftp', import_source) AS import_source,
+                  'device' AS dimension,
+                  metadata['device'] AS dimension_value,
+                  territory_code,
+                  quantity_total AS views,
+                  0 AS likes,
+                  0 AS dislikes,
+                  0 AS shares
+              FROM music_analytics.${CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT}
+              WHERE usage_type = 'view'
+                AND metadata['sub_type'] = 'devices'
+                AND metadata['device'] != ''
+                AND toYYYYMM(reporting_period) = '${partition}'
+
+              UNION ALL
+
+              SELECT
+                  reporting_period AS reporting_date,
+                  isrc,
+                  if(import_source = '', 'ftp', import_source) AS import_source,
+                  'gender' AS dimension,
+                  metadata['gender'] AS dimension_value,
+                  territory_code,
+                  toUInt64OrZero(metadata['views_estimate']) AS views,
+                  0 AS likes,
+                  0 AS dislikes,
+                  0 AS shares
+              FROM music_analytics.${CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT}
+              WHERE usage_type = 'view_demo'
+                AND metadata['gender'] != ''
+                AND toYYYYMM(reporting_period) = '${partition}'
+
+              UNION ALL
+
+              SELECT
+                  reporting_period AS reporting_date,
+                  isrc,
+                  if(import_source = '', 'ftp', import_source) AS import_source,
+                  'age_group' AS dimension,
+                  metadata['age_group'] AS dimension_value,
+                  territory_code,
+                  toUInt64OrZero(metadata['views_estimate']) AS views,
+                  0 AS likes,
+                  0 AS dislikes,
+                  0 AS shares
+              FROM music_analytics.${CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT}
+              WHERE usage_type = 'view_demo'
+                AND metadata['age_group'] != ''
+                AND toYYYYMM(reporting_period) = '${partition}'
+
+              UNION ALL
+
+              SELECT
+                  reporting_period AS reporting_date,
+                  isrc,
+                  if(import_source = '', 'ftp', import_source) AS import_source,
+                  'social' AS dimension,
+                  '' AS dimension_value,
+                  territory_code,
+                  toUInt64OrZero(metadata['views']) AS views,
+                  toUInt64OrZero(metadata['likes']) AS likes,
+                  toUInt64OrZero(metadata['dislikes']) AS dislikes,
+                  toUInt64OrZero(metadata['shares']) AS shares
+              FROM music_analytics.${CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT}
+              WHERE usage_type = 'view_social'
+                AND toYYYYMM(reporting_period) = '${partition}'
+          )
+          GROUP BY reporting_date, isrc, import_source, dimension, dimension_value, territory_code
         `);
 
 				this.logger.log(
@@ -366,6 +460,7 @@ export class CubeRebuildService {
 			CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE,
 			CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE,
 			CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE,
+			CLICKHOUSE_TABLES.TRENDS_DEMOGRAPHICS_CUBE,
 		]) {
 			await this.clickHouseService.execute(
 				`TRUNCATE TABLE IF EXISTS music_analytics.${table}`,

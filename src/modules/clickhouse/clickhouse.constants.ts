@@ -17,6 +17,7 @@ export const CLICKHOUSE_TABLES = {
 	SALES_EXPORT_MONTHLY: 'sales_export_monthly_cube',
 	TRENDS_TER_MONTHLY: 'trends_ter_monthly_cube',
 	TRENDS_TER_DAILY_CUBE: 'trends_ter_daily_cube',
+	TRENDS_DEMOGRAPHICS_CUBE: 'trends_demographics_cube',
 	IMPORT_JOBS: 'import_jobs',
 	REPORT_SOURCE_CONFIGS: 'report_source_configs',
 	EXCHANGE_RATES: 'exchange_rates',

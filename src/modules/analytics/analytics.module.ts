@@ -41,6 +41,7 @@ import { AnalyticsReportExportService } from './services/analytics-report-export
 import { AnalyticsVideoScopeService } from './services/analytics-video-scope.service';
 import { ClickHouseSyncService } from './services/clickhouse-sync.service';
 import { DashboardAnalyticsService } from './services/dashboard-analytics.service';
+import { DemographicsAnalyticsService } from './services/demographics-analytics.service';
 import { DspAnalyticsService } from './services/dsp-analytics.service';
 import { EntityAnalyticsService } from './services/entity-analytics.service';
 import { ExportQueueService } from './services/export-queue.service';
@@ -87,6 +88,7 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 	],
 	providers: [
 		EntityAnalyticsService,
+		DemographicsAnalyticsService,
 		AnalyticsReportExportService,
 		ExportQueueService,
 		ExportWorkerPoolService,

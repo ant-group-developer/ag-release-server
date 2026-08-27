@@ -204,10 +204,55 @@ describe('SyncService', () => {
 			expect(statuses).toEqual(['error', 'done']);
 		});
 
+		it('imports all 3 Vevo .tsv.zip reports without calling the rule engine', async () => {
+			const vevoZips = [
+				'bombshelter-digital-services-llc_vevo_merlin_devices_20260801.tsv.zip',
+				'bombshelter-digital-services-llc_vevo_merlin_user_attributes_20260801.tsv.zip',
+				'bombshelter-digital-services-llc_vevo_merlin_user_interactions_20260801.tsv.zip',
+			];
+			ftpService.listDspFolders.mockResolvedValue(['vvo-vevo']);
+			ftpService.listRemoteFiles.mockResolvedValue([
+				...vevoZips,
+				'readme.txt',
+			]);
+			ftpParserConfigService.resolveForParserCode.mockResolvedValue({
+				configVersion: 1,
+				selectFile: () => false,
+			});
+			ftpService.downloadDspFolder.mockResolvedValue({
+				localPath: '/tmp/vevo',
+				fileCount: 3,
+			});
+			importService.importDspFolder.mockResolvedValue({
+				rows: 30,
+				files: 3,
+				fileStats: [],
+			});
+
+			const result = await service.syncPeriod('202608', false, [
+				'trends',
+			]);
+
+			expect(ftpReportFileRuleService.resolveFiles).not.toHaveBeenCalled();
+			expect(
+				ftpParserConfigService.resolveForParserCode,
+			).toHaveBeenCalledWith('vvo-vevo', 'trends', 'vevo');
+			expect(result.categories[0].folders[0]).toMatchObject({
+				dsp_folder: 'vvo-vevo',
+				status: 'done',
+				files: 3,
+			});
+			const selectFile = ftpService.downloadDspFolder.mock.calls[0][4];
+			expect(vevoZips.every((file) => selectFile(file))).toBe(true);
+			expect(selectFile('readme.txt')).toBe(false);
+		});
+
 		it('retries the same DSP after an FTP disconnect instead of skipping it', async () => {
+			// scd-soundcloud (not vvo-vevo: vevo trends has a dedicated
+			// file-selection policy covered in vevo-sync.policy.spec.ts)
 			ftpService.listDspFolders.mockResolvedValue([
 				'fbk-facebook',
-				'vvo-vevo',
+				'scd-soundcloud',
 			]);
 			givenImportableFolder();
 			const disconnect = new Error(
@@ -223,7 +268,7 @@ describe('SyncService', () => {
 
 			const statuses = result.categories[0].folders.map((f) => f.status);
 			expect(statuses).toEqual(['done', 'done']);
-			// facebook: fail then retry success; vevo: success
+			// facebook: fail then retry success; soundcloud: success
 			expect(ftpService.downloadDspFolder).toHaveBeenCalledTimes(3);
 			expect(sessions[0].invalidate).toHaveBeenCalled();
 		});

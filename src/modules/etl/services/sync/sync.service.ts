@@ -23,6 +23,7 @@ import {
 	isFtpDisconnectError,
 } from '../ftp/ftp.service';
 import { ImportService } from '../import/import.service';
+import { resolveVevoTrendsFiles } from './vevo-sync.policy';
 
 export interface SyncConfig {
 	mode: string;
@@ -552,13 +553,26 @@ export class SyncService {
 						true,
 						session,
 					);
-					const ruleDecision =
-						await this.ftpReportFileRuleService.resolveFiles(
-							'ftp',
-							category as FtpSourceCategory,
-							dspFolder,
-							availableFiles,
+					// Hard-coded Vevo trends case: always select all 3 report
+					// files and bypass the generic rule engine entirely.
+					const vevoDecision = resolveVevoTrendsFiles(
+						category,
+						dspFolder,
+						availableFiles,
+					);
+					if (vevoDecision) {
+						this.logger.log(
+							`Vevo trends policy selected ${vevoDecision.selected.length}/${availableFiles.length} file(s) for ${category}/${dspFolder}`,
 						);
+					}
+					const ruleDecision = vevoDecision
+						? { ...vevoDecision, pending: [], ignored: [] }
+						: await this.ftpReportFileRuleService.resolveFiles(
+								'ftp',
+								category as FtpSourceCategory,
+								dspFolder,
+								availableFiles,
+							);
 					if (ruleDecision.pending.length) {
 						this.logger.warn(
 							`FTP rules pending confirmation for ${category}/${dspFolder}: ${ruleDecision.pending.length} file(s)`,
@@ -567,7 +581,7 @@ export class SyncService {
 					// A rule may have changed from import to ignore after its file was
 					// already imported. During a force sync, reconcile those historical
 					// FTP rows before the normal early-return for "no import rule".
-					if (resolvedForce) {
+					if (resolvedForce && !vevoDecision) {
 						const trackedFiles = await this.getFtpFolderFactFiles(
 							period,
 							category,

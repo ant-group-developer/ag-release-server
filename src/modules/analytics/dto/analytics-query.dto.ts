@@ -543,6 +543,26 @@ export class RevenueChartQueryDto extends ChartQueryDto {
 	sortBy?: 'revenue' | 'usage';
 }
 
+/** DTO cho Vevo demographics endpoints (device / gender / age). */
+export class DemographicsQueryDto extends ChartQueryDto {
+	@ApiPropertyOptional({
+		description: 'Filter by territory code (ISO2)',
+		example: 'US',
+	})
+	@IsOptional()
+	@IsString()
+	territoryCode?: string;
+
+	@ApiPropertyOptional({
+		description: 'Group results by territory',
+		default: false,
+	})
+	@IsOptional()
+	@Type(() => Boolean)
+	@IsBoolean()
+	groupByTerritory?: boolean;
+}
+
 export class EntityTimelineQueryDto {
 	/** Server-only scope injected from the authenticated request. */
 	@Allow()
