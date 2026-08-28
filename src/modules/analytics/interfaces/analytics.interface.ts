@@ -458,7 +458,21 @@ export interface DspBarChartItem {
 	quantity?: number;
 }
 
-/** Một điểm trên line-chart revenue theo tháng */
+/** Bar-chart item for Vevo device / gender / age breakdowns. */
+export interface DemographicsBarChartItem {
+	label: string;
+	dimensionValue: string;
+	totalViews: number;
+	percent: number;
+}
+
+export interface DemographicsBarChartResponse {
+	totalViews: number;
+	/** gender/age only: views_estimate / devices views. null for device. */
+	coverage: number | null;
+	items: DemographicsBarChartItem[];
+}
+
 export interface TerritoryBarChartItem {
 	territory: string;
 	isoCode?: string;

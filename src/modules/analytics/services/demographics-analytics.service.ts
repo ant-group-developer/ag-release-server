@@ -2,7 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
-import { DemographicsQueryDto } from '../dto/analytics-query.dto';
+import {
+	DemographicsQueryDto,
+	VevoDemographicsBarChartQueryDto,
+} from '../dto/analytics-query.dto';
+import {
+	DemographicsBarChartItem,
+	DemographicsBarChartResponse,
+} from '../interfaces/analytics.interface';
 import { buildOwnershipJoin } from '../utils/ownership-join.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import {
@@ -82,9 +89,9 @@ export class DemographicsAnalyticsService {
 		return this.cache.wrap(key, async () => {
 			const { rows, total } = await this.queryDimension(
 				'device',
-				isrc,
 				dto,
 				tenantId,
+				isrc,
 			);
 			this.sortRows(rows, 'device', dto.groupByTerritory === true);
 			return {
@@ -122,9 +129,106 @@ export class DemographicsAnalyticsService {
 		);
 	}
 
+	async getDspDeviceBarChart(
+		dto: VevoDemographicsBarChartQueryDto,
+		tenantId: string,
+	): Promise<DemographicsBarChartResponse> {
+		const key = this.cache.buildKey('demographics:dsp-device', tenantId, dto);
+		return this.cache.wrap(key, async () => {
+			if (!(await this.shouldQueryVevoDemographics(dto))) {
+				return { totalViews: 0, coverage: null, items: [] };
+			}
+			const { rows, total } = await this.queryDimension(
+				'device',
+				dto,
+				tenantId,
+			);
+			this.sortRows(rows, 'device', false);
+			return {
+				totalViews: total,
+				coverage: null,
+				items: this.toBarChartItems(rows),
+			};
+		});
+	}
+
+	async getDspGenderBarChart(
+		dto: VevoDemographicsBarChartQueryDto,
+		tenantId: string,
+	): Promise<DemographicsBarChartResponse> {
+		const key = this.cache.buildKey('demographics:dsp-gender', tenantId, dto);
+		return this.cache.wrap(key, () =>
+			this.computeDspEstimateBarChart('gender', dto, tenantId),
+		);
+	}
+
+	async getDspAgeBarChart(
+		dto: VevoDemographicsBarChartQueryDto,
+		tenantId: string,
+	): Promise<DemographicsBarChartResponse> {
+		const key = this.cache.buildKey('demographics:dsp-age', tenantId, dto);
+		return this.cache.wrap(key, () =>
+			this.computeDspEstimateBarChart('age_group', dto, tenantId),
+		);
+	}
+
 	// ─────────────────────────────────────────────────────
 	// Compute
 	// ─────────────────────────────────────────────────────
+
+	private async computeDspEstimateBarChart(
+		dimension: 'gender' | 'age_group',
+		dto: VevoDemographicsBarChartQueryDto,
+		tenantId: string,
+	): Promise<DemographicsBarChartResponse> {
+		if (!(await this.shouldQueryVevoDemographics(dto))) {
+			return { totalViews: 0, coverage: null, items: [] };
+		}
+		const [dimensionResult, deviceResult] = await Promise.all([
+			this.queryDimension(dimension, dto, tenantId),
+			this.queryDimension('device', dto, tenantId),
+		]);
+		this.sortRows(dimensionResult.rows, dimension, false);
+		return {
+			totalViews: dimensionResult.total,
+			coverage:
+				deviceResult.total > 0
+					? Math.round(
+							(dimensionResult.total / deviceResult.total) * 10000,
+						) / 10000
+					: null,
+			items: this.toBarChartItems(dimensionResult.rows),
+		};
+	}
+
+	/**
+	 * Cube demographics is Vevo-only. Skip the DSP lookup unless the caller
+	 * sent pgDspId/dspReportId — then empty unless that DSP is Vevo.
+	 */
+	private async shouldQueryVevoDemographics(
+		dto: VevoDemographicsBarChartQueryDto,
+	): Promise<boolean> {
+		if (!dto.pgDspId && !dto.dspReportId) return true;
+		const clauses: string[] = [];
+		const params: Record<string, string> = {};
+		if (dto.pgDspId) {
+			clauses.push('pg_uuid = {pgDspId:String}');
+			params.pgDspId = dto.pgDspId;
+		}
+		if (dto.dspReportId) {
+			clauses.push('id_dsps_report = {dspReportId:String}');
+			params.dspReportId = dto.dspReportId;
+		}
+		const rows = await this.clickHouseService.query<{ dsp_name: string }>(
+			`SELECT dsp_name
+       FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL
+       WHERE ${clauses.join(' OR ')}
+       LIMIT 5`,
+			params,
+		);
+		if (rows.length === 0) return false;
+		return rows.some((row) => /vevo|vvo/i.test(row.dsp_name || ''));
+	}
 
 	private async computeEstimateBreakdown(
 		dimension: 'gender' | 'age_group',
@@ -134,8 +238,8 @@ export class DemographicsAnalyticsService {
 	): Promise<DemographicsEstimateResponse> {
 		const groupByTerritory = dto.groupByTerritory === true;
 		const [dimensionResult, deviceResult] = await Promise.all([
-			this.queryDimension(dimension, isrc, dto, tenantId),
-			this.queryDimension('device', isrc, dto, tenantId),
+			this.queryDimension(dimension, dto, tenantId, isrc),
+			this.queryDimension('device', dto, tenantId, isrc),
 		]);
 
 		this.sortRows(dimensionResult.rows, dimension, groupByTerritory);
@@ -155,25 +259,30 @@ export class DemographicsAnalyticsService {
 
 	private async queryDimension(
 		dimension: string,
-		isrc: string,
-		dto: DemographicsQueryDto,
+		dto: DemographicsQueryDto | VevoDemographicsBarChartQueryDto,
 		tenantId: string,
+		isrc?: string,
 	): Promise<{ rows: AggregatedRow[]; total: number }> {
 		const { joinSql, filterSql, params } = this.buildTrackFilters(
 			tenantId,
 			dto,
 		);
-		params.isrc = isrc;
 		params.dimension = dimension;
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
 
-		const groupByTerritory = dto.groupByTerritory === true;
+		const groupByTerritory =
+			(dto as DemographicsQueryDto).groupByTerritory === true;
 		const territorySelect = groupByTerritory ? 's.territory_code, ' : '';
-		let territoryFilter = '';
-		if (dto.territoryCode) {
-			territoryFilter = ' AND s.territory_code = {territoryCode:String}';
-			params.territoryCode = dto.territoryCode;
+		let extraFilters = '';
+		if (isrc) {
+			extraFilters += ' AND s.isrc = {isrc:String}';
+			params.isrc = isrc;
+		}
+		const territoryCode = (dto as DemographicsQueryDto).territoryCode;
+		if (territoryCode) {
+			extraFilters += ' AND s.territory_code = {territoryCode:String}';
+			params.territoryCode = territoryCode;
 		}
 
 		const sql = `
@@ -184,9 +293,8 @@ export class DemographicsAnalyticsService {
       ${joinSql}
       WHERE s.reporting_date >= toDate({from:String})
         AND s.reporting_date <= toDate({to:String})
-        AND s.isrc = {isrc:String}
         AND s.dimension = {dimension:String}
-        ${territoryFilter}
+        ${extraFilters}
         ${filterSql}
       GROUP BY ${territorySelect}s.dimension_value
     `;
@@ -212,20 +320,25 @@ export class DemographicsAnalyticsService {
 
 	private buildTrackFilters(
 		tenantId: string,
-		dto: DemographicsQueryDto,
+		dto: DemographicsQueryDto | VevoDemographicsBarChartQueryDto,
 	): { joinSql: string; filterSql: string; params: Record<string, any> } {
 		const analyticsScope = getAnalyticsVideoScope(dto);
 		const isSystem = checkIsSystemTenant(tenantId);
 		const params: Record<string, any> = {};
+		const chartDto = dto as VevoDemographicsBarChartQueryDto;
+		const needsTrackJoin = !!(
+			dto.releaseType ||
+			chartDto.channelId ||
+			chartDto.releaseId ||
+			chartDto.labelId ||
+			chartDto.artistId ||
+			analyticsScope?.allowedChannelIds !== undefined
+		);
 
-		// System tenant không cần join nếu không filter release_type / video scope
-		if (
-			isSystem &&
-			!dto.releaseType &&
-			analyticsScope?.allowedChannelIds === undefined
-		) {
+		// System tenant không cần join nếu không filter entity / release_type / video scope
+		if (isSystem && !needsTrackJoin) {
 			let filterSql = '';
-			if (dto.importSource) {
+			if ('importSource' in dto && dto.importSource) {
 				filterSql += ' AND s.import_source = {importSource:String}';
 				params.importSource = dto.importSource;
 			}
@@ -249,7 +362,28 @@ export class DemographicsAnalyticsService {
 			params.releaseType = dto.releaseType;
 		}
 
-		if (dto.importSource) {
+		if (chartDto.channelId) {
+			filterSql += ' AND t.channel_id = {channelId:String}';
+			params.channelId = chartDto.channelId;
+		}
+
+		if (chartDto.releaseId) {
+			filterSql += ' AND t.release_id = {releaseId:String}';
+			params.releaseId = chartDto.releaseId;
+		}
+
+		if (chartDto.labelId) {
+			filterSql +=
+				" AND coalesce(nullIf(o.label_id, ''), t.label_id) = {labelId:String}";
+			params.labelId = chartDto.labelId;
+		}
+
+		if (chartDto.artistId) {
+			filterSql += ' AND has(t.artist_ids, {artistId:String})';
+			params.artistId = chartDto.artistId;
+		}
+
+		if ('importSource' in dto && dto.importSource) {
 			filterSql += ' AND s.import_source = {importSource:String}';
 			params.importSource = dto.importSource;
 		}
@@ -293,6 +427,16 @@ export class DemographicsAnalyticsService {
 		const orderB = indexB === -1 ? AGE_ORDER.length : indexB;
 		if (orderA !== orderB) return orderA - orderB;
 		return b.views - a.views;
+	}
+
+	private toBarChartItems(rows: AggregatedRow[]): DemographicsBarChartItem[] {
+		const percents = this.computePercents(rows.map((row) => row.views));
+		return rows.map((row, index) => ({
+			label: row.dimensionValue,
+			dimensionValue: row.dimensionValue,
+			totalViews: row.views,
+			percent: percents[index],
+		}));
 	}
 
 	private toBreakdownItems(

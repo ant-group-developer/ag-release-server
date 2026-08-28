@@ -183,7 +183,7 @@ export class ImportJobsService implements OnModuleInit {
 		)
 			return;
 
-		await this.persist(job);
+		await this.persist(job, force);
 	}
 
 	async markCompleted(
