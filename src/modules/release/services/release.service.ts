@@ -581,6 +581,7 @@ export class ReleaseService {
 						 */
 						const response = await this.upcService.getUpc({
 							prefixUpcId,
+							description: release?.title,
 						});
 
 						const generatedUpc = response.upc?.trim();

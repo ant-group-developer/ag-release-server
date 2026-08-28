@@ -109,6 +109,7 @@ message ListPrefixUpcResponse {
 
 message GetUpcRequest {
   string prefixUpcId = 1;
+  string description = 2; // Tên release
 }
 
 message GetUpcResponse {
