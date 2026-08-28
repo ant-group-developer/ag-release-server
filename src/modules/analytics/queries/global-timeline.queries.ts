@@ -534,24 +534,26 @@ export function getRevenueTopReleaseQuery(
 	limit: number,
 	offset: number,
 ): string {
+	// anyIf skips the UPC-{upc} placeholder row in pg_tracks_sync (empty
+	// title/label/covers). Album-level UPC sales still count in the sums.
 	return `
     SELECT
       t.release_id AS releaseId,
       sum(s.total_revenue_usd) AS revenue_usd,
       sum(s.total_quantity) AS quantity,
-      uniq(s.isrc) AS trackCount,
-      any(t.release_title) AS releaseTitle,
-      any(t.release_upc) AS releaseUpc,
-      any(t.label_id) AS labelId,
-      any(t.label_name) AS labelName,
-      any(t.tenant_id) AS tenantId,
-      any(t.cover_75) AS cover75,
-      any(t.cover_100) AS cover100,
-      any(t.cover_160) AS cover160,
-      any(t.cover_300) AS cover300,
-      any(t.cover_original) AS coverOriginal,
-      any(t.release_metadata_spotify) AS releaseMetadataSpotify,
-      any(t.release_metadata_deezer) AS releaseMetadataDeezer
+      uniqIf(s.isrc, s.isrc NOT LIKE 'UPC-%') AS trackCount,
+      anyIf(t.release_title, t.release_title != '') AS releaseTitle,
+      anyIf(t.release_upc, t.release_upc != '') AS releaseUpc,
+      anyIf(t.label_id, t.label_id != '') AS labelId,
+      anyIf(t.label_name, t.label_name != '') AS labelName,
+      anyIf(t.tenant_id, t.tenant_id != '') AS tenantId,
+      anyIf(t.cover_75, t.cover_75 != '') AS cover75,
+      anyIf(t.cover_100, t.cover_100 != '') AS cover100,
+      anyIf(t.cover_160, t.cover_160 != '') AS cover160,
+      anyIf(t.cover_300, t.cover_300 != '') AS cover300,
+      anyIf(t.cover_original, t.cover_original != '') AS coverOriginal,
+      anyIf(t.release_metadata_spotify, t.release_metadata_spotify != '') AS releaseMetadataSpotify,
+      anyIf(t.release_metadata_deezer, t.release_metadata_deezer != '') AS releaseMetadataDeezer
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0

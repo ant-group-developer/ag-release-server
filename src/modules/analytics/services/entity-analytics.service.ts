@@ -29,6 +29,7 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { buildOwnershipJoin } from '../utils/ownership-join.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	AnalyticsVideoScope,
@@ -150,13 +151,9 @@ export class EntityAnalyticsService {
 			return { joinSql: '', filterSql, params };
 		}
 
-		const ownershipDate =
-			ownershipPeriod === 'revenue'
-				? 's.period >= o.revenue_effective_from AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)'
-				: `${factDateExpression} >= o.effective_from AND (o.effective_to IS NULL OR ${factDateExpression} < o.effective_to)`;
 		const joinSql = `
       INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL) o ON s.isrc = o.isrc AND ${ownershipDate}`;
+      ${buildOwnershipJoin(ownershipPeriod, ownershipPeriod === 'revenue' ? 's.period' : factDateExpression)}`;
 		let filterSql = `AND t.is_deleted = 0
       AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`;
 

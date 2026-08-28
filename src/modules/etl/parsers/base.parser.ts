@@ -115,24 +115,78 @@ export abstract class BaseParser {
 	): Promise<{ rows: FactDspRow[]; stats: ParseFileStats }> {
 		const lowerPath = filePath.toLowerCase();
 		if (lowerPath.endsWith('.zip')) {
-			const rows = await this.parseZipFile(filePath, batchId);
-			let zipSize = 0;
-			try {
-				zipSize = fs.statSync(filePath).size;
-			} catch {}
-			const stats: ParseFileStats = {
-				filePath,
-				fileName: path.basename(filePath),
-				fileDirectory: path.dirname(filePath),
-				fileSizeBytes: zipSize,
-				totalLines: rows.length,
-				processedRows: rows.length,
-				skippedRows: 0,
-				errorRows: 0,
-			};
-			return { rows, stats };
+			return this.parseZipFileWithStats(filePath, batchId);
 		}
 		return this.parseSingleFileWithStats(filePath, batchId);
+	}
+
+	private async parseZipFileWithStats(
+		zipPath: string,
+		batchId: string,
+	): Promise<{ rows: FactDspRow[]; stats: ParseFileStats }> {
+		const zip = new AdmZip(zipPath);
+		const tempDir = path.join(
+			os.tmpdir(),
+			`etl-zip-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+		);
+		let zipSize = 0;
+		try {
+			zipSize = fs.statSync(zipPath).size;
+		} catch {}
+		try {
+			zip.extractAllTo(tempDir, true);
+			const extractedFiles = this.findExtractedDataFiles(tempDir);
+			if (extractedFiles.length === 0) {
+				return {
+					rows: [],
+					stats: {
+						filePath: zipPath,
+						fileName: path.basename(zipPath),
+						fileDirectory: path.dirname(zipPath),
+						fileSizeBytes: zipSize,
+						totalLines: 0,
+						processedRows: 0,
+						skippedRows: 0,
+						errorRows: 0,
+					},
+				};
+			}
+			let totalLines = 0;
+			let skippedRows = 0;
+			let errorRows = 0;
+			const allRows: FactDspRow[] = [];
+			for (const extracted of extractedFiles) {
+				const { rows, stats } = await this.parseSingleFileWithStats(
+					extracted,
+					batchId,
+				);
+				totalLines += stats.totalLines;
+				skippedRows += stats.skippedRows;
+				errorRows += stats.errorRows;
+				allRows.push(...rows);
+			}
+			return {
+				rows: allRows,
+				stats: {
+					filePath: zipPath,
+					fileName: path.basename(zipPath),
+					fileDirectory: path.dirname(zipPath),
+					fileSizeBytes: zipSize,
+					totalLines,
+					processedRows: allRows.length,
+					skippedRows,
+					errorRows,
+				},
+			};
+		} finally {
+			try {
+				if (fs.existsSync(tempDir)) {
+					fs.rmSync(tempDir, { recursive: true, force: true });
+				}
+			} catch {
+				/* ignore cleanup errors */
+			}
+		}
 	}
 
 	/**

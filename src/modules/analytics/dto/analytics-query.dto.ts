@@ -111,11 +111,10 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
 	tenantId?: string;
 
 	@ApiPropertyOptional({
-		description: 'Filter by a specific artist UUID',
-		format: 'uuid',
+		description: 'Filter by a specific artist ID (external IDs are supported).',
 	})
 	@IsOptional()
-	@IsUUID()
+	@IsString()
 	artistId?: string;
 
 	@ApiPropertyOptional({
@@ -492,11 +491,10 @@ export class ChartQueryDto {
 	tenantId?: string;
 
 	@ApiPropertyOptional({
-		description: 'Filter by a specific artist UUID',
-		format: 'uuid',
+		description: 'Filter by a specific artist ID (external IDs are supported).',
 	})
 	@IsOptional()
-	@IsUUID()
+	@IsString()
 	artistId?: string;
 
 	@ApiPropertyOptional({
@@ -525,11 +523,10 @@ export class ChartQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by PostgreSQL DSP UUID. Takes precedence over dspReportId.',
-		format: 'uuid',
+			'Filter by mapped DSP ID. Takes precedence over dspReportId and supports non-UUID values.',
 	})
 	@IsOptional()
-	@IsUUID()
+	@IsString()
 	pgDspId?: string;
 }
 
