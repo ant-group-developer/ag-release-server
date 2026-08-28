@@ -1,9 +1,10 @@
 import { Test } from '@nestjs/testing';
+import { ClickHouseMigrationService } from '../../clickhouse';
 import { FtpService } from '../services/ftp/ftp.service';
 import { ImportJobsService } from '../services/import-jobs/import-jobs.service';
-import { SchedulerService } from '../services/scheduler/scheduler.service';
+import { FtpSyncQueueService } from '../services/sync/ftp-sync-queue.service';
+import { FtpSyncWorkerService } from '../services/sync/ftp-sync-worker.service';
 import { SyncService } from '../services/sync/sync.service';
-import { SyncController } from './sync.controller';
 
 /**
  * A range sync touches many DSP folders and some of them are routinely broken
@@ -11,19 +12,21 @@ import { SyncController } from './sync.controller';
  * so folder-level problems are warnings carried in the result while the job
  * itself completes. Only a fatal error still marks the job failed.
  */
-describe('SyncController range job outcome', () => {
-	let controller: SyncController;
+describe('FtpSyncWorkerService range job outcome', () => {
+	let worker: FtpSyncWorkerService;
 
 	const syncService = { syncPeriod: jest.fn() };
-	const ftpService = { withSession: jest.fn() };
+	const ftpService = {
+		withSession: jest.fn(async (action: (session: object) => Promise<void>) =>
+			action({}),
+		),
+	};
 	const importJobsService = {
-		create: jest.fn(),
 		markProcessing: jest.fn(),
 		markCompleted: jest.fn(),
 		markFailed: jest.fn(),
 		updateProgress: jest.fn(),
 	};
-	const schedulerService = { rescheduleAutoSync: jest.fn() };
 
 	const periodResult = (overrides: Record<string, any> = {}) => ({
 		totalRows: 0,
@@ -48,27 +51,22 @@ describe('SyncController range job outcome', () => {
 
 	beforeEach(async () => {
 		const moduleRef = await Test.createTestingModule({
-			controllers: [SyncController],
 			providers: [
+				FtpSyncWorkerService,
 				{ provide: SyncService, useValue: syncService },
 				{ provide: FtpService, useValue: ftpService },
 				{ provide: ImportJobsService, useValue: importJobsService },
-				{ provide: SchedulerService, useValue: schedulerService },
+				{ provide: FtpSyncQueueService, useValue: {} },
+				{ provide: ClickHouseMigrationService, useValue: {} },
 			],
 		}).compile();
 
-		controller = moduleRef.get(SyncController);
+		worker = moduleRef.get(FtpSyncWorkerService);
 		jest.clearAllMocks();
 	});
 
 	const runRange = (periods: string[]) =>
-		(controller as any).executeSyncRangeJob(
-			'job-1',
-			periods,
-			false,
-			undefined,
-			{},
-		);
+		worker.executeSyncRangeJob('job-1', periods, false, undefined);
 
 	it('completes with warnings when some folders fail', async () => {
 		syncService.syncPeriod
@@ -93,8 +91,6 @@ describe('SyncController range job outcome', () => {
 		expect(summary.hasWarnings).toBe(true);
 		expect(summary.totalFolderErrors).toBe(2);
 		expect(summary.totalRows).toBe(408_057);
-		// The per-folder detail survives in the result so the failures are still
-		// diagnosable even though the job reads as a success.
 		expect(summary.results).toHaveLength(2);
 	});
 

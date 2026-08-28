@@ -32,10 +32,23 @@ export async function connectFtpClient(
 			secure: credentials.secure,
 			secureOptions: { rejectUnauthorized: false },
 		});
+		enableFtpControlKeepAlive(client);
 		return client;
 	} catch (error) {
 		client.close();
 		throw error;
+	}
+}
+
+/**
+ * Merlin (and most FTPS servers) idle-drop the control socket while a large
+ * file is transferring on the data connection. TCP keepalive on the control
+ * socket is the cheapest way to stop that FIN.
+ */
+function enableFtpControlKeepAlive(client: ftp.Client): void {
+	const socket = client.ftp?.socket;
+	if (socket && typeof socket.setKeepAlive === 'function') {
+		socket.setKeepAlive(true, 15_000);
 	}
 }
 

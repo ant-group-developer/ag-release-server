@@ -24,8 +24,11 @@ export class NewsPostQueryService {
 		private readonly newsCategoryRepo: Repository<NewsCategory>,
 	) {}
 
-	async getList(query: QueryGetListNewsPostDto) {
-		const qb = this.createQueryGetList(query);
+	async getList(
+		query: QueryGetListNewsPostDto,
+		isSystemAdmin: boolean = false,
+	) {
+		const qb = this.createQueryGetList(query, isSystemAdmin);
 		const [items, totalItems] = await qb.getManyAndCount();
 		return { items, totalItems };
 	}
@@ -88,7 +91,10 @@ export class NewsPostQueryService {
 		return this.newsPostRepo.createQueryBuilder('newsPost');
 	}
 
-	private createQueryGetList(filter: QueryGetListNewsPostDto) {
+	private createQueryGetList(
+		filter: QueryGetListNewsPostDto,
+		isSystemAdmin: boolean = false,
+	) {
 		const qb = this.createBaseQb();
 
 		this.leftJoinNewsCategory(qb);
@@ -96,7 +102,7 @@ export class NewsPostQueryService {
 		this.leftJoinLanguage(qb);
 		this.leftJoinUserTracked(qb);
 
-		this.applyFilter({ qb, filter });
+		this.applyFilter({ qb, filter, isSystemAdmin });
 
 		this.selectNewsPost(qb);
 		this.addSelectNewsCategory({ qb });
@@ -154,8 +160,7 @@ export class NewsPostQueryService {
 	}
 
 	private createQueryGetListPublic(filter: QueryGetListNewsPostDto) {
-		const qb = this.createQueryGetList(filter);
-		this.andWhereStatusPublic(qb);
+		const qb = this.createQueryGetList(filter, false);
 		return qb;
 	}
 
@@ -223,9 +228,11 @@ export class NewsPostQueryService {
 	private applyFilter({
 		filter,
 		qb,
+		isSystemAdmin = false,
 	}: {
 		filter: QueryGetListNewsPostDto;
 		qb: SelectQueryBuilder<NewsPost>;
+		isSystemAdmin?: boolean;
 	}) {
 		const {
 			keyword,
@@ -246,7 +253,13 @@ export class NewsPostQueryService {
 		this.andWhereKeywords({ qb, keywords });
 		this.andWhereTitle({ qb, title });
 		this.andWhereCreatedAt({ qb, startCreatedAt, endCreatedAt });
-		this.andWhereStatus({ qb, status });
+
+		if (isSystemAdmin) {
+			this.andWhereStatus({ qb, status });
+		} else {
+			this.andWhereStatusPublic(qb);
+		}
+
 		this.andWhereNewsCategoryId({ qb, newsCategoryId });
 
 		qb.orderBy(fieldOrder, orderBy);

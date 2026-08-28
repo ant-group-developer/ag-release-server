@@ -20,8 +20,10 @@ import {
 	FtpAuthenticationError,
 	FtpService,
 	FtpSession,
+	isFtpDisconnectError,
 } from '../ftp/ftp.service';
 import { ImportService } from '../import/import.service';
+import { resolveVevoTrendsFiles } from './vevo-sync.policy';
 
 export interface SyncConfig {
 	mode: string;
@@ -530,12 +532,18 @@ export class SyncService {
 				folders: [],
 			};
 
-			for (const dspFolder of dspFolders) {
+			const dspRetryAttempts = Math.max(1, config.maxRetries ?? 3);
+			folderLoop: for (const dspFolder of dspFolders) {
 				const key = `${period}|${category}|${dspFolder}`;
 				const existing = importedDetails.get(key);
 				let parserConfig: ResolvedFtpParserConfig;
 				let ignoredFilesCleaned = 0;
 				let availableFiles: string[] = [];
+				for (
+					let dspAttempt = 1;
+					dspAttempt <= dspRetryAttempts;
+					dspAttempt++
+				) {
 				try {
 					availableFiles = await this.ftpService.listRemoteFiles(
 						category,
@@ -545,13 +553,26 @@ export class SyncService {
 						true,
 						session,
 					);
-					const ruleDecision =
-						await this.ftpReportFileRuleService.resolveFiles(
-							'ftp',
-							category as FtpSourceCategory,
-							dspFolder,
-							availableFiles,
+					// Hard-coded Vevo trends case: always select all 3 report
+					// files and bypass the generic rule engine entirely.
+					const vevoDecision = resolveVevoTrendsFiles(
+						category,
+						dspFolder,
+						availableFiles,
+					);
+					if (vevoDecision) {
+						this.logger.log(
+							`Vevo trends policy selected ${vevoDecision.selected.length}/${availableFiles.length} file(s) for ${category}/${dspFolder}`,
 						);
+					}
+					const ruleDecision = vevoDecision
+						? { ...vevoDecision, pending: [], ignored: [] }
+						: await this.ftpReportFileRuleService.resolveFiles(
+								'ftp',
+								category as FtpSourceCategory,
+								dspFolder,
+								availableFiles,
+							);
 					if (ruleDecision.pending.length) {
 						this.logger.warn(
 							`FTP rules pending confirmation for ${category}/${dspFolder}: ${ruleDecision.pending.length} file(s)`,
@@ -560,7 +581,7 @@ export class SyncService {
 					// A rule may have changed from import to ignore after its file was
 					// already imported. During a force sync, reconcile those historical
 					// FTP rows before the normal early-return for "no import rule".
-					if (resolvedForce) {
+					if (resolvedForce && !vevoDecision) {
 						const trackedFiles = await this.getFtpFolderFactFiles(
 							period,
 							category,
@@ -620,7 +641,7 @@ export class SyncService {
 									? `${ignoredFilesCleaned} ignored file(s) removed by force sync`
 									: 'no import rule matched files',
 						});
-						continue;
+						continue folderLoop;
 					}
 					parserConfig =
 						await this.ftpParserConfigService.resolveForParserCode(
@@ -632,6 +653,16 @@ export class SyncService {
 					parserConfig.selectFile = (path) => selectedNames.has(path);
 				} catch (err) {
 					if (err instanceof FtpAuthenticationError) throw err;
+					if (
+						isFtpDisconnectError(err) &&
+						dspAttempt < dspRetryAttempts
+					) {
+						session.invalidate();
+						this.logger.warn(
+							`FTP disconnected listing ${category}/${dspFolder}; retrying DSP (${dspAttempt}/${dspRetryAttempts}): ${err.message}`,
+						);
+						continue;
+					}
 					this.logger.error(
 						`Invalid parser config for ${category}/${dspFolder}: ${err.message}`,
 					);
@@ -643,7 +674,7 @@ export class SyncService {
 						durationMs: 0,
 						error: err.message,
 					});
-					continue;
+					continue folderLoop;
 				}
 				// The first recursive listing above is authoritative for this DSP.
 				// Filtering it locally avoids walking the same remote tree a second
@@ -663,7 +694,7 @@ export class SyncService {
 						durationMs: 0,
 						reason: 'no files matched parser config',
 					});
-					continue;
+					continue folderLoop;
 				}
 
 				// ── Change detection: compare file lists ──
@@ -701,7 +732,7 @@ export class SyncService {
 								durationMs: 0,
 								reason: 'files unchanged',
 							});
-							continue;
+							continue folderLoop;
 						}
 
 						// Files differ → need re-sync
@@ -728,6 +759,9 @@ export class SyncService {
 				const folderStart = Date.now();
 				const isUpdate = existing && existing.status === 'done';
 				try {
+					this.logger.log(
+						`  ⬇️ ${category}/${dspFolder}: downloading ${remoteFiles.length} file(s)`,
+					);
 					// Download from FTPS
 					const { localPath, fileCount } =
 						await this.ftpService.downloadDspFolder(
@@ -763,7 +797,7 @@ export class SyncService {
 							reason: `no parser for ${category}`,
 						});
 						this.ftpService.cleanupTemp(localPath);
-						continue;
+						continue folderLoop;
 					}
 
 					const rows = dspResult.rows || 0;
@@ -844,8 +878,19 @@ export class SyncService {
 						`  ${isUpdate ? '🔄' : '✅'} ${category}/${dspFolder}: ${rows} rows, ${files} files (${durationMs}ms)` +
 							(isUpdate ? ' [UPDATED]' : ''),
 					);
+					continue folderLoop;
 				} catch (err) {
 					if (err instanceof FtpAuthenticationError) throw err;
+					if (
+						isFtpDisconnectError(err) &&
+						dspAttempt < dspRetryAttempts
+					) {
+						session.invalidate();
+						this.logger.warn(
+							`FTP disconnected on ${category}/${dspFolder}; retrying DSP (${dspAttempt}/${dspRetryAttempts}): ${err.message}`,
+						);
+						continue;
+					}
 					const durationMs = Date.now() - folderStart;
 
 					categoryResult.folders.push({
@@ -860,6 +905,8 @@ export class SyncService {
 					this.logger.error(
 						`  ❌ ${category}/${dspFolder}: ${err.message}`,
 					);
+					continue folderLoop;
+				}
 				}
 			}
 

@@ -57,7 +57,8 @@ export class ExcludePatternService {
 	private cachedMatchers: CompiledMatcher[] | null = null;
 	private excludeEnabledCache: boolean | null = null;
 	private cacheLoadedAt = 0;
-	private readonly CACHE_TTL_MS = 30_000;
+	private cachePinCount = 0;
+	private readonly CACHE_TTL_MS = 10 * 60 * 1000;
 
 	constructor(private readonly clickHouseService: ClickHouseService) {}
 
@@ -243,25 +244,12 @@ export class ExcludePatternService {
 		name: string,
 		kind: 'folder' | 'file',
 	): Promise<boolean> {
-		const now = Date.now();
-		if (
-			this.excludeEnabledCache === null ||
-			now - this.cacheLoadedAt >= this.CACHE_TTL_MS
-		) {
-			const configRows = await this.clickHouseService.query<{
-				value: string;
-			}>(
-				`SELECT value FROM etl_config FINAL WHERE key = 'sync_exclude_enabled' LIMIT 1`,
-			);
-			this.excludeEnabledCache =
-				configRows.length > 0 ? configRows[0].value !== 'false' : true;
-		}
+		await this.ensureCache();
 		if (!this.excludeEnabledCache) {
 			return false;
 		}
 
-		const matchers = await this.getCompiledMatchers();
-		for (const m of matchers) {
+		for (const m of this.cachedMatchers ?? []) {
 			const scopes = m.scope
 				.split(',')
 				.map((s: string) => s.trim())
@@ -273,16 +261,42 @@ export class ExcludePatternService {
 	}
 
 	/**
-	 * Trả về compiled matchers, dùng cache TTL 30s.
+	 * Hold the in-memory exclude cache for a long FTP walk/download so every
+	 * file does not re-query ClickHouse (the 30s TTL used to fire once per zip).
+	 * Ref-counted so nested list+download calls share one load.
 	 */
-	private async getCompiledMatchers(): Promise<CompiledMatcher[]> {
-		const now = Date.now();
-		if (
-			this.cachedMatchers &&
-			now - this.cacheLoadedAt < this.CACHE_TTL_MS
-		) {
-			return this.cachedMatchers;
+	async pinCache(): Promise<void> {
+		this.cachePinCount++;
+		if (this.cachePinCount === 1) {
+			await this.loadCache();
 		}
+	}
+
+	unpinCache(): void {
+		this.cachePinCount = Math.max(0, this.cachePinCount - 1);
+	}
+
+	private async ensureCache(): Promise<void> {
+		if (
+			this.excludeEnabledCache !== null &&
+			this.cachedMatchers &&
+			(this.cachePinCount > 0 ||
+				Date.now() - this.cacheLoadedAt < this.CACHE_TTL_MS)
+		) {
+			return;
+		}
+		await this.loadCache();
+	}
+
+	private async loadCache(): Promise<void> {
+		const now = Date.now();
+		const configRows = await this.clickHouseService.query<{
+			value: string;
+		}>(
+			`SELECT value FROM etl_config FINAL WHERE key = 'sync_exclude_enabled' LIMIT 1`,
+		);
+		this.excludeEnabledCache =
+			configRows.length > 0 ? configRows[0].value !== 'false' : true;
 
 		const rows = await this.clickHouseService.query<any>(
 			`SELECT pattern, pattern_type, scope
@@ -306,7 +320,6 @@ export class ExcludePatternService {
 					);
 				}
 			} else {
-				// contains (case-insensitive)
 				const lower = rawPattern.toLowerCase();
 				matchers.push({
 					scope,
@@ -317,13 +330,13 @@ export class ExcludePatternService {
 
 		this.cachedMatchers = matchers;
 		this.cacheLoadedAt = now;
-		return matchers;
 	}
 
 	clearCache(): void {
 		this.cachedMatchers = null;
 		this.excludeEnabledCache = null;
 		this.cacheLoadedAt = 0;
+		this.cachePinCount = 0;
 	}
 
 	// ── Helpers ────────────────────────────────────────────
