@@ -922,9 +922,26 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				: null,
 			updated_at: new Date().toISOString().slice(0, 23).replace('T', ' '),
 		}));
+		// Dedupe theo (isrc, window): mot ISRC co the xuat hien trong nhieu release
+		// (compilation/re-release) voi cung ownership window. Chi giu row co
+		// updated_at moi nhat de tranh fan-out khi analytics LEFT JOIN theo window.
+		const deduped = new Map<string, AssetOwnershipSyncRow>();
+		for (const row of data) {
+			const key = [
+				row.isrc,
+				row.effective_from,
+				row.effective_to ?? '',
+				row.revenue_effective_from,
+				row.revenue_effective_to ?? '',
+			].join('|');
+			const existing = deduped.get(key);
+			if (!existing || row.updated_at > existing.updated_at) {
+				deduped.set(key, row);
+			}
+		}
 		await this.clickHouseService.insert(
 			CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC,
-			data,
+			Array.from(deduped.values()),
 		);
 	}
 

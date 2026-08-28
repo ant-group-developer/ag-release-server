@@ -86,26 +86,80 @@ export abstract class BaseSalesParser {
 		filePath: string,
 		batchId: string,
 	): Promise<{ rows: FactSalesRow[]; stats: ParseFileStats }> {
-		const rows = await this.parseFile(filePath, batchId);
-		return {
-			rows,
-			stats: {
-				filePath,
-				fileName: path.basename(filePath),
-				fileDirectory: path.dirname(filePath),
-				fileSizeBytes: (() => {
-					try {
-						return fs.statSync(filePath).size;
-					} catch {
-						return 0;
-					}
-				})(),
-				totalLines: rows.length,
-				processedRows: rows.length,
-				skippedRows: 0,
-				errorRows: 0,
-			},
-		};
+		const lowerPath = filePath.toLowerCase();
+		if (lowerPath.endsWith('.zip')) {
+			return this.parseZipFileWithStats(filePath, batchId);
+		}
+		return this.parseSingleFileWithStats(filePath, batchId);
+	}
+
+	private async parseZipFileWithStats(
+		zipPath: string,
+		batchId: string,
+	): Promise<{ rows: FactSalesRow[]; stats: ParseFileStats }> {
+		const zip = new AdmZip(zipPath);
+		const tempDir = path.join(
+			os.tmpdir(),
+			`etl-sales-zip-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+		);
+		let zipSize = 0;
+		try {
+			zipSize = fs.statSync(zipPath).size;
+		} catch {}
+		try {
+			zip.extractAllTo(tempDir, true);
+			const extractedFiles = this.findExtractedDataFiles(tempDir);
+			if (extractedFiles.length === 0) {
+				return {
+					rows: [],
+					stats: {
+						filePath: zipPath,
+						fileName: path.basename(zipPath),
+						fileDirectory: path.dirname(zipPath),
+						fileSizeBytes: zipSize,
+						totalLines: 0,
+						processedRows: 0,
+						skippedRows: 0,
+						errorRows: 0,
+					},
+				};
+			}
+			let totalLines = 0;
+			let skippedRows = 0;
+			let errorRows = 0;
+			const allRows: FactSalesRow[] = [];
+			for (const extracted of extractedFiles) {
+				const { rows, stats } = await this.parseSingleFileWithStats(
+					extracted,
+					batchId,
+				);
+				totalLines += stats.totalLines;
+				skippedRows += stats.skippedRows;
+				errorRows += stats.errorRows;
+				allRows.push(...rows);
+			}
+			return {
+				rows: allRows,
+				stats: {
+					filePath: zipPath,
+					fileName: path.basename(zipPath),
+					fileDirectory: path.dirname(zipPath),
+					fileSizeBytes: zipSize,
+					totalLines,
+					processedRows: allRows.length,
+					skippedRows,
+					errorRows,
+				},
+			};
+		} finally {
+			try {
+				if (fs.existsSync(tempDir)) {
+					fs.rmSync(tempDir, { recursive: true, force: true });
+				}
+			} catch {
+				/* ignore cleanup errors */
+			}
+		}
 	}
 
 	/**
@@ -174,6 +228,14 @@ export abstract class BaseSalesParser {
 		filePath: string,
 		batchId: string,
 	): Promise<FactSalesRow[]> {
+		const { rows } = await this.parseSingleFileWithStats(filePath, batchId);
+		return rows;
+	}
+
+	private async parseSingleFileWithStats(
+		filePath: string,
+		batchId: string,
+	): Promise<{ rows: FactSalesRow[]; stats: ParseFileStats }> {
 		const rows: FactSalesRow[] = [];
 		let delimiter = this.getDelimiter(filePath);
 		const isGzipped = filePath.toLowerCase().endsWith('.gz');
@@ -195,26 +257,25 @@ export abstract class BaseSalesParser {
 
 		let headers: string[] = [];
 		let lineNum = 0;
-		const headerLine = this.skipHeaderRows + 1; // The actual column header line number
+		let skippedRows = 0;
+		let errorRows = 0;
+		const headerLine = this.skipHeaderRows + 1;
 
 		for await (const rawLine of rl) {
 			lineNum++;
 			const line = rawLine.trim();
 			if (!line) continue;
 
-			// Skip pre-header rows (e.g. Spotify format version, Pandora summary)
 			if (lineNum < headerLine) {
 				this.onSkippedHeaderRow(lineNum, line, filePath);
 				continue;
 			}
 
 			if (lineNum === headerLine) {
-				// Auto-detect delimiter based on header line
 				const tabCount = (line.match(/\t/g) || []).length;
 				const commaCount = (line.match(/,/g) || []).length;
 				if (tabCount > commaCount && tabCount > 3) delimiter = '\t';
-				else if (commaCount > tabCount && commaCount > 3)
-					delimiter = ',';
+				else if (commaCount > tabCount && commaCount > 3) delimiter = ',';
 
 				headers = this.parseLine(line, delimiter);
 				continue;
@@ -222,7 +283,10 @@ export abstract class BaseSalesParser {
 
 			try {
 				const values = this.parseLine(line, delimiter);
-				if (values.length < headers.length * 0.3) continue;
+				if (values.length < headers.length * 0.3) {
+					skippedRows++;
+					continue;
+				}
 
 				const record: Record<string, string> = {};
 				headers.forEach((h, i) => {
@@ -236,10 +300,7 @@ export abstract class BaseSalesParser {
 						rows.push(
 							...this.normalizeParsedRows(
 								parsed.map((row) =>
-									this.applyFieldMappingOverrides(
-										row,
-										record,
-									),
+									this.applyFieldMappingOverrides(row, record),
 								),
 							),
 						);
@@ -250,8 +311,11 @@ export abstract class BaseSalesParser {
 							]),
 						);
 					}
+				} else {
+					skippedRows++;
 				}
 			} catch (err) {
+				errorRows++;
 				if (lineNum <= headerLine + 3) {
 					this.logger.warn(
 						`Line ${lineNum} error in ${path.basename(filePath)}: ${err.message}`,
@@ -260,7 +324,24 @@ export abstract class BaseSalesParser {
 			}
 		}
 
-		return rows;
+		const stats: ParseFileStats = {
+			filePath,
+			fileName: path.basename(filePath),
+			fileDirectory: path.dirname(filePath),
+			fileSizeBytes: (() => {
+				try {
+					return fs.statSync(filePath).size;
+				} catch {
+					return 0;
+				}
+			})(),
+			totalLines: lineNum,
+			processedRows: rows.length,
+			skippedRows,
+			errorRows,
+		};
+
+		return { rows, stats };
 	}
 
 	/**

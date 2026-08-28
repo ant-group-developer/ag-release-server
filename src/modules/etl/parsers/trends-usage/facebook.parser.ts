@@ -1,7 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FactDspRow } from '../../interfaces';
-import { BaseParser, ParserCatalogFieldMapping } from '../base.parser';
+import {
+	BaseParser,
+	ParseFileStats,
+	ParserCatalogFieldMapping,
+} from '../base.parser';
 
 const AdmZip = require('adm-zip');
 
@@ -94,6 +98,274 @@ export class FacebookParser extends BaseParser {
 	}
 
 	private processedFolders = new Set<string>();
+	private folderStatsCache = new Map<string, ParseFileStats[]>();
+	private folderMergedRowsCache = new Map<string, FactDspRow[]>();
+
+	/**
+	 * Folder-aware override for ImportService/SyncService.
+	 * - Usage-Report files delegate to BaseParser (now fixed for zip).
+	 * - Trends files (MERLIN + Daily) are merged once per folder+batchId;
+	 *   per-file stats are computed from raw content (totalLines) and
+	 *   pre-dedup parsed rows, then cached so each of the N calls for the
+	 *   same folder returns correct stats and only the first call returns
+	 *   the merged rows.
+	 */
+	async parseFileWithStats(
+		filePath: string,
+		batchId: string,
+	): Promise<{ rows: FactDspRow[]; stats: ParseFileStats }> {
+		const basename = path.basename(filePath);
+
+		// Usage-Report → base class (flat/zip counted correctly after BaseParser fix)
+		if (basename.includes('Usage-Report')) {
+			return super.parseFileWithStats(filePath, batchId);
+		}
+
+		const folder = path.dirname(filePath);
+		const folderKey = folder + '|' + batchId;
+
+		// Build cache on first call for this folder+batch
+		if (
+			!this.folderStatsCache.has(folderKey) ||
+			!this.folderMergedRowsCache.has(folderKey)
+		) {
+			const { mergedRows, perFileStats } =
+				await this.buildFolderCacheWithStats(folder, batchId);
+			this.folderStatsCache.set(folderKey, perFileStats);
+			this.folderMergedRowsCache.set(folderKey, mergedRows);
+			// Bound cache growth (singleton) — evict oldest when >50 folders
+			if (this.folderStatsCache.size > 50) {
+				const firstKey = this.folderStatsCache.keys().next().value as string;
+				this.folderStatsCache.delete(firstKey);
+				this.folderMergedRowsCache.delete(firstKey);
+				this.processedFolders.delete(firstKey);
+			}
+		}
+
+		const perFileStats = this.folderStatsCache.get(folderKey)!;
+		const mergedRows = this.folderMergedRowsCache.get(folderKey)!;
+
+		// Find stats for this exact outer file; fallback to zero-stat if missing
+		let stat = perFileStats.find((s) => s.fileName === basename);
+		if (!stat) {
+			let size = 0;
+			try {
+				size = fs.statSync(filePath).size;
+			} catch {}
+			stat = {
+				filePath,
+				fileName: basename,
+				fileDirectory: folder,
+				fileSizeBytes: size,
+				totalLines: 0,
+				processedRows: 0,
+				skippedRows: 0,
+				errorRows: 0,
+			};
+		}
+
+		// Only first caller returns merged rows — rest return [] to avoid double-count in fact table
+		const isFirst = !this.processedFolders.has(folderKey);
+		if (isFirst) this.processedFolders.add(folderKey);
+
+		return { rows: isFirst ? mergedRows : [], stats: stat };
+	}
+
+	/**
+	 * Build merged rows + per-outer-file stats by reading folder in-memory
+	 * (same strategy as extractAndParseFolder but instrumented for stats).
+	 */
+	private async buildFolderCacheWithStats(
+		folder: string,
+		batchId: string,
+	): Promise<{ mergedRows: FactDspRow[]; perFileStats: ParseFileStats[] }> {
+		const fileContents = new Map<string, string>();
+		// per-outer-file raw info for stats (outer file name → {contentLines, innerNames})
+		const outerFileInfos: {
+			outerName: string;
+			outerPath: string;
+			outerSize: number;
+			innerNames: string[];
+		}[] = [];
+		// per inner file parsed row count (inner flatName → processed count)
+		const innerProcessedCounts = new Map<string, number>();
+		const innerTotalLines = new Map<string, number>();
+
+		let entries: string[] = [];
+		try {
+			entries = fs.readdirSync(folder);
+		} catch {
+			return { mergedRows: [], perFileStats: [] };
+		}
+
+		const hasZips = entries.some((f) => f.toLowerCase().endsWith('.zip'));
+
+		if (hasZips) {
+			for (const entry of entries) {
+				const fullPath = path.join(folder, entry);
+				const lower = entry.toLowerCase();
+				if (lower.endsWith('.zip')) {
+					let outerSize = 0;
+					try {
+						outerSize = fs.statSync(fullPath).size;
+					} catch {}
+					const innerNames: string[] = [];
+					try {
+						const zip = new AdmZip(fullPath);
+						for (const ze of zip.getEntries()) {
+							if (ze.isDirectory) continue;
+							const flatName = path.basename(ze.entryName);
+							if (!flatName) continue;
+							const content = ze.getData().toString('utf-8');
+							fileContents.set(flatName, content);
+							innerNames.push(flatName);
+							innerTotalLines.set(
+								flatName,
+								content.split(/\r?\n/).filter((l: string) => l.trim()).length,
+							);
+						}
+					} catch (err) {
+						this.logger.warn(`Failed to extract ${entry}: ${err.message}`);
+					}
+					outerFileInfos.push({
+						outerName: entry,
+						outerPath: fullPath,
+						outerSize,
+						innerNames,
+					});
+				} else if (
+					lower.endsWith('.csv') ||
+					lower.endsWith('.tsv') ||
+					lower.endsWith('.txt')
+				) {
+					let outerSize = 0;
+					try {
+						outerSize = fs.statSync(fullPath).size;
+					} catch {}
+					try {
+						const content = fs.readFileSync(fullPath, 'utf-8');
+						fileContents.set(entry, content);
+						innerTotalLines.set(
+							entry,
+							content.split(/\r?\n/).filter((l: string) => l.trim()).length,
+						);
+						outerFileInfos.push({
+							outerName: entry,
+							outerPath: fullPath,
+							outerSize,
+							innerNames: [entry],
+						});
+					} catch (err) {
+						this.logger.warn(`Failed to read ${entry}: ${err.message}`);
+						outerFileInfos.push({
+							outerName: entry,
+							outerPath: fullPath,
+							outerSize,
+							innerNames: [],
+						});
+					}
+				}
+			}
+		} else {
+			// Flat-only folder (no zips) — same as parseFolder path
+			for (const entry of entries) {
+				const ext = path.extname(entry).toLowerCase();
+				if (!['.csv', '.tsv', '.txt'].includes(ext)) continue;
+				const fullPath = path.join(folder, entry);
+				let outerSize = 0;
+				try {
+					outerSize = fs.statSync(fullPath).size;
+				} catch {}
+				try {
+					const content = fs.readFileSync(fullPath, 'utf-8');
+					fileContents.set(entry, content);
+					innerTotalLines.set(
+						entry,
+						content.split(/\r?\n/).filter((l: string) => l.trim()).length,
+					);
+					outerFileInfos.push({
+						outerName: entry,
+						outerPath: fullPath,
+						outerSize,
+						innerNames: [entry],
+					});
+				} catch (err) {
+					this.logger.warn(`Failed to read ${entry}: ${err.message}`);
+					outerFileInfos.push({
+						outerName: entry,
+						outerPath: fullPath,
+						outerSize,
+						innerNames: [],
+					});
+				}
+			}
+		}
+
+		// Pre-compute per-inner processed counts by running the appropriate content parser
+		// (mirrors parseFolderFromMemory classification)
+		for (const [innerName, content] of fileContents) {
+			if (innerName.includes('MERLIN_DAILY_TOP_1K')) {
+				try {
+					innerProcessedCounts.set(
+						innerName,
+						this.parseMerlinContent(content, innerName, batchId).length,
+					);
+				} catch {
+					innerProcessedCounts.set(innerName, 0);
+				}
+			} else if (
+				innerName.includes('Daily_consumption') ||
+				innerName.includes('Daily_production')
+			) {
+				try {
+					innerProcessedCounts.set(
+						innerName,
+						this.parseDailyContent(content, innerName, batchId).length,
+					);
+				} catch {
+					innerProcessedCounts.set(innerName, 0);
+				}
+			} else {
+				// File not part of merge (e.g. stray) — 0 processed, but still count totalLines
+				innerProcessedCounts.set(innerName, 0);
+			}
+		}
+
+		// Build per-outer-file stats by summing its inners
+		const perFileStats: ParseFileStats[] = outerFileInfos.map((info) => {
+			let totalLines = 0;
+			let processedRows = 0;
+			for (const inner of info.innerNames) {
+				totalLines += innerTotalLines.get(inner) ?? 0;
+				processedRows += innerProcessedCounts.get(inner) ?? 0;
+			}
+			// If zip was empty/failed, totalLines stays 0 — keep it honest
+			const skippedRows =
+				totalLines > 0 ? Math.max(0, totalLines - 1 - processedRows) : 0;
+			return {
+				filePath: info.outerPath,
+				fileName: info.outerName,
+				fileDirectory: folder,
+				fileSizeBytes: info.outerSize,
+				totalLines,
+				processedRows,
+				skippedRows,
+				errorRows: 0,
+			};
+		});
+
+		this.logger.log(
+			`Facebook stats cache: ${perFileStats.length} files, ` +
+				perFileStats
+					.map((s) => `${s.fileName}:${s.totalLines}/${s.processedRows}`)
+					.join(', '),
+		);
+
+		// Reuse existing merge logic for final deduped rows (reads from fileContents)
+		const mergedRows = await this.parseFolderFromMemory(fileContents, batchId);
+
+		return { mergedRows, perFileStats };
+	}
 
 	async parseFile(filePath: string, batchId: string): Promise<FactDspRow[]> {
 		const basename = path.basename(filePath);
@@ -335,7 +607,7 @@ export class FacebookParser extends BaseParser {
 		const rows: FactDspRow[] = [];
 		const delimiter = filename.endsWith('.csv') ? ',' : '\t';
 
-		const lines = content.split(/\r?\n/).filter((l) => l.trim());
+		const lines = content.split(/\r?\n/).filter((l: string) => l.trim());
 		if (lines.length < 2) return rows;
 
 		const headers = this.parseLine(lines[0], delimiter);
@@ -402,7 +674,7 @@ export class FacebookParser extends BaseParser {
 		const isProd = filename.includes('production');
 		const delimiter = filename.endsWith('.csv') ? ',' : '\t';
 
-		const lines = content.split(/\r?\n/).filter((l) => l.trim());
+		const lines = content.split(/\r?\n/).filter((l: string) => l.trim());
 		if (lines.length < 2) return rows;
 
 		const headers = this.parseLine(lines[0], delimiter);
@@ -465,7 +737,7 @@ export class FacebookParser extends BaseParser {
 		const delimiter = this.getDelimiter(filePath);
 
 		const fileContent = fs.readFileSync(filePath, 'utf-8');
-		const lines = fileContent.split(/\r?\n/).filter((l) => l.trim());
+		const lines = fileContent.split(/\r?\n/).filter((l: string) => l.trim());
 		if (lines.length < 2) return rows;
 
 		const headers = this.parseLine(lines[0], delimiter);
