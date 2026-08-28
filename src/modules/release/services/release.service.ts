@@ -748,7 +748,7 @@ export class ReleaseService {
 		}
 	}
 
-	async bulkSubmit(dto: BulkSubmitReleaseDto) {
+	async bulkSubmit(dto: BulkSubmitReleaseDto, creatorId: string) {
 		const idsExclude = new Set(dto.idsExclude ?? []);
 
 		for (const id of dto.ids) {
@@ -759,7 +759,7 @@ export class ReleaseService {
 				ids: [id],
 			});
 
-			await this.submit3(id, submitData);
+			await this.submit3(id, submitData, creatorId);
 		}
 	}
 
@@ -1022,7 +1022,11 @@ export class ReleaseService {
 		} as typeof release.ciData;
 	}
 
-	async submit3(id: string, dto: SubmitReleaseDto) {
+	async submit3(
+		id: string,
+		dto: SubmitReleaseDto,
+		creatorId?: string | null,
+	) {
 		try {
 			// await this.releaseCiDataService.syncCiDataByReleaseId(id);
 			await this.releaseCiDataService.bulkSyncDataCi({ ids: [id] });
@@ -1046,6 +1050,7 @@ export class ReleaseService {
 			release,
 			dspCodes: dto.code,
 			type: ExecutionType.INITIAL_RELEASE,
+			creatorId,
 		});
 	}
 
@@ -1090,6 +1095,7 @@ export class ReleaseService {
 			release,
 			dspCodes,
 			type: ExecutionType.TAKEDOWN,
+			creatorId: userId,
 		});
 	}
 

@@ -164,7 +164,7 @@ export class ReleaseController {
 	)
 	@Post('bulk-submit')
 	async bulkSubmit(@Req() req: Request, @Body() dto: BulkSubmitReleaseDto) {
-		await this.releaseService.bulkSubmit(dto);
+		await this.releaseService.bulkSubmit(dto, req.user!.sub);
 
 		return new ResponseSuccess({
 			messageCode: 'common.processing',
@@ -486,7 +486,11 @@ export class ReleaseController {
 		@Req() req: Request,
 		@Body() dto: SubmitReleaseDto,
 	) {
-		const result = await this.releaseService.submit3(id, dto);
+		const result = await this.releaseService.submit3(
+			id,
+			dto,
+			req.user!.sub,
+		);
 
 		return new ResponseSuccess({
 			data: result,

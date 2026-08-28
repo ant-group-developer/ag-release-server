@@ -3,6 +3,7 @@ import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Logs } from 'src/modules/log/entites/logs.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseError } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
+import { User } from 'src/modules/user/entities/user.entity';
 import {
 	AfterLoad,
 	Column,
@@ -62,6 +63,13 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 		comment: 'Summary or error message',
 	})
 	summary: string | null;
+
+	@Column({ type: 'uuid', name: 'creator_id', nullable: true })
+	creatorId: string | null;
+
+	@ManyToOne(() => User, { nullable: true })
+	@JoinColumn({ name: 'creator_id' })
+	creator: User | null;
 
 	@OneToMany(() => ReleaseExecutionStep3, (step) => step.releaseExecution)
 	steps: ReleaseExecutionStep3[];

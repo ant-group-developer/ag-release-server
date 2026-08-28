@@ -29,6 +29,7 @@ export class ReleaseExecution3Queue {
 		release: Release;
 		dspCodes: string[];
 		type: ExecutionType;
+		creatorId?: string | null;
 	}) {
 		// const execution =
 		await this.executionRepo.save(
@@ -44,6 +45,7 @@ export class ReleaseExecution3Queue {
 						dspCodes: body.dspCodes,
 					},
 				},
+				creatorId: body.creatorId ?? null,
 			}),
 		);
 

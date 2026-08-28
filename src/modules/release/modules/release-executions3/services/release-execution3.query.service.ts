@@ -114,7 +114,9 @@ export class ReleaseExecution3QueryService {
 	}
 
 	createQbGetList(query: QueryGetListReleaseExecution3Dto) {
-		const qb = this.executionRepo.createQueryBuilder('execution');
+		const qb = this.executionRepo
+			.createQueryBuilder('execution')
+			.leftJoinAndSelect('execution.creator', 'creator');
 
 		const keywords = [...(query.keyword ?? [])].filter(
 			(keyword) => !!keyword?.trim(),
@@ -260,6 +262,7 @@ export class ReleaseExecution3QueryService {
 			where: { id },
 			relations: {
 				logs: true,
+				creator: true,
 			},
 		});
 
