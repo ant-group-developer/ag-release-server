@@ -1,5 +1,5 @@
 import { Metadata } from '@grpc/grpc-js';
-import { IsNotEmpty } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { Observable } from 'rxjs';
 
 /* ===== REQUEST TYPES ===== */
@@ -349,6 +349,10 @@ export interface ListPrefixUpcResponse {
 export class GetUpcRequest {
 	@IsNotEmpty()
 	prefixUpcId: string;
+
+	@IsOptional()
+	@IsString()
+	description?: string;
 }
 
 export interface GetUpcResponse {
