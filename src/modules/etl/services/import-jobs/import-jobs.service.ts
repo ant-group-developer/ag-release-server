@@ -602,6 +602,26 @@ export class ImportJobsService implements OnModuleInit {
 		);
 	}
 
+	async findRecoverableFtpSyncJobs(): Promise<ImportJob[]> {
+		const sql = `
+      SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+      WHERE source_type IN ({sourceTypes:Array(String)})
+        AND status IN ({queued:String}, {processing:String})
+      ORDER BY created_at ASC
+    `;
+		const rows = await this.clickHouseService.query<ImportJobRow>(sql, {
+			sourceTypes: [
+				ImportJobSourceType.FTP_SYNC_PERIOD,
+				ImportJobSourceType.FTP_SYNC_ALL,
+				ImportJobSourceType.FTP_RETRY,
+				ImportJobSourceType.FTP_AUTO_CRON,
+			],
+			queued: ImportJobStatus.QUEUED,
+			processing: ImportJobStatus.PROCESSING,
+		});
+		return rows.map(rowToDomain);
+	}
+
 	async findRecoverableReportUploadJobs(): Promise<ImportJob[]> {
 		const sql = `
       SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL

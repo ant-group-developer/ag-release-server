@@ -14,9 +14,10 @@ import { User } from '../../../common/decorators/req.decorators';
 import { ResponseSuccess } from '../../../common/dtos/common.response.dto';
 import { UpdateSyncConfigDto } from '../dto/sync-config.dto';
 import { ImportJobSourceType } from '../interfaces';
-import { FtpService, FtpSession } from '../services/ftp/ftp.service';
+import { FtpService } from '../services/ftp/ftp.service';
 import { ImportJobsService } from '../services/import-jobs/import-jobs.service';
 import { SchedulerService } from '../services/scheduler/scheduler.service';
+import { FtpSyncQueueService } from '../services/sync/ftp-sync-queue.service';
 import { SyncService } from '../services/sync/sync.service';
 
 @ApiTags('ETL')
@@ -29,6 +30,7 @@ export class SyncController {
 		private readonly ftpService: FtpService,
 		private readonly importJobsService: ImportJobsService,
 		private readonly schedulerService: SchedulerService,
+		private readonly ftpSyncQueueService: FtpSyncQueueService,
 	) {}
 
 	// ── FTP: Connection ───────────────────────────────────
@@ -148,14 +150,7 @@ export class SyncController {
 			progressTotal: periods.length,
 		});
 
-		setImmediate(() =>
-			this.runSyncRangeJob(
-				job.id,
-				periods,
-				body.force ?? false,
-				body.categories,
-			),
-		);
+		await this.enqueueFtpSyncJob(job.id);
 
 		return new ResponseSuccess({
 			data: {
@@ -217,9 +212,7 @@ export class SyncController {
 			progressTotal: 1,
 		});
 
-		setImmediate(() =>
-			this.runSyncPeriodJob(job.id, body.period, true, body.categories),
-		);
+		await this.enqueueFtpSyncJob(job.id);
 
 		return new ResponseSuccess({
 			data: {
@@ -287,191 +280,15 @@ export class SyncController {
 		return new ResponseSuccess({ data: updatedConfig });
 	}
 
-	// ─────────────────────────────────────────────────────
-	// Job runners — chạy nền, không throw ra ngoài
-	// ─────────────────────────────────────────────────────
-
-	private async runFtpJob(run: () => Promise<void>): Promise<void> {
-		await run();
-	}
-
-	private async runSyncPeriodJob(
-		jobId: string,
-		period: string,
-		force: boolean,
-		categories?: Array<
-			'trends' | 'usage' | 'sales' | 'illegitimate_activity'
-		>,
-	): Promise<void> {
-		await this.runFtpJob(async () => {
-			try {
-				await this.importJobsService.markProcessing(jobId);
-				await this.importJobsService.updateProgress(
-					jobId,
-					{
-						progressTotal: 1,
-						progressCurrent: 0,
-						progressLabel: `Syncing ${period}`,
-					},
-					true,
-				);
-				const result = await this.syncService.syncPeriod(
-					period,
-					force,
-					categories,
-					jobId,
-				);
-				await this.importJobsService.updateProgress(
-					jobId,
-					{
-						progressTotal: 1,
-						progressCurrent: 1,
-						progressLabel: 'Done',
-					},
-					true,
-				);
-				await this.importJobsService.markCompleted(jobId, {
-					...(result as any),
-					releases: result.releases,
-				});
-			} catch (err) {
-				await this.importJobsService.markFailed(jobId, err);
-			}
-		});
-	}
-
-	private async runSyncRangeJob(
-		jobId: string,
-		periods: string[],
-		force: boolean,
-		categories?: Array<
-			'trends' | 'usage' | 'sales' | 'illegitimate_activity'
-		>,
-	): Promise<void> {
-		// One session covers every period in the range, so the range job leases a
-		// single FTP connection slot instead of one per period.
-		await this.runFtpJob(() =>
-			this.ftpService.withSession(
-				(session) =>
-					this.executeSyncRangeJob(
-						jobId,
-						periods,
-						force,
-						categories,
-						session,
-					),
-				'manual-sync-range',
-			),
-		);
-	}
-
-	private async executeSyncRangeJob(
-		jobId: string,
-		periods: string[],
-		force: boolean,
-		categories?: Array<
-			'trends' | 'usage' | 'sales' | 'illegitimate_activity'
-		>,
-		session?: FtpSession,
-	): Promise<void> {
+	private async enqueueFtpSyncJob(jobId: string): Promise<void> {
 		try {
-			await this.importJobsService.markProcessing(jobId);
-			await this.importJobsService.updateProgress(
-				jobId,
-				{
-					progressTotal: periods.length,
-					progressCurrent: 0,
-					progressLabel: `Starting sync for ${periods.length} period(s)...`,
-				},
-				true,
-			);
-
-			const results: unknown[] = [];
-			let totalRows = 0;
-			let totalFolderErrors = 0;
-			const releases = {
-				total: 0,
-				imported: 0,
-				skipped: 0,
-				errors: 0,
-				inDb: 0,
-				pending: 0,
-			};
-			for (let i = 0; i < periods.length; i++) {
-				const period = periods[i];
-				await this.importJobsService.updateProgress(
-					jobId,
-					{
-						progressCurrent: i,
-						progressLabel: `Syncing ${period}...`,
-					},
-					true,
-				);
-				try {
-					const result = await this.syncService.syncPeriod(
-						period,
-						force,
-						categories,
-						jobId,
-						session,
-					);
-					results.push(result);
-					if (
-						result &&
-						typeof (result as any).totalRows === 'number'
-					) {
-						totalRows += (result as any).totalRows;
-					}
-					if (result && result.releases) {
-						releases.total += result.releases.total;
-						releases.imported += result.releases.imported;
-						releases.skipped += result.releases.skipped;
-						releases.errors += result.releases.errors;
-						releases.inDb += result.releases.inDb;
-						releases.pending += result.releases.pending;
-					}
-					// Count folder-level errors within the period result
-					if (result?.categories) {
-						for (const cat of result.categories) {
-							totalFolderErrors += cat.folders.filter(
-								(f) => f.status === 'error',
-							).length;
-						}
-					}
-				} catch (err) {
-					totalFolderErrors++;
-					results.push({ period, error: (err as Error).message });
-				}
-			}
-
-			const summary = {
-				totalPeriods: periods.length,
-				totalRows,
-				totalFolderErrors,
-				hasWarnings: totalFolderErrors > 0,
-				results,
-				releases,
-			};
-
-			await this.importJobsService.updateProgress(
-				jobId,
-				{
-					progressCurrent: periods.length,
-					progressLabel:
-						totalFolderErrors > 0
-							? `Done with ${totalFolderErrors} warning(s)`
-							: 'Done',
-				},
-				true,
-			);
-			if (totalFolderErrors > 0) {
-				this.logger.warn(
-					`Sync completed with ${totalFolderErrors} folder warning(s). Rows imported: ${totalRows}. See result for details.`,
-				);
-			}
-			await this.importJobsService.markCompleted(jobId, summary);
+			await this.ftpSyncQueueService.pushJob(jobId);
+			await this.importJobsService.markQueued(jobId);
 		} catch (err) {
-			await this.importJobsService.markFailed(jobId, err);
+			await this.importJobsService
+				.markFailed(jobId, err as Error)
+				.catch(() => undefined);
+			throw err;
 		}
 	}
 

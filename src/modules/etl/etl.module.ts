@@ -23,6 +23,8 @@ import { JobService } from './services/job/job.service';
 import { SchedulerService } from './services/scheduler/scheduler.service';
 import { StatementsImportService } from './services/statements/statements-import.service';
 import { StatementsResolverService } from './services/statements/statements-resolver.service';
+import { FtpSyncQueueService } from './services/sync/ftp-sync-queue.service';
+import { FtpSyncWorkerService } from './services/sync/ftp-sync-worker.service';
 import { SyncService } from './services/sync/sync.service';
 
 @Module({
@@ -48,6 +50,8 @@ import { SyncService } from './services/sync/sync.service';
 		FtpService,
 		FtpReportFileDiscoveryService,
 		SyncService,
+		FtpSyncQueueService,
+		FtpSyncWorkerService,
 		SchedulerService,
 		JobService,
 		ExchangeRateService,
