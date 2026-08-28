@@ -33,6 +33,7 @@ VALUES
   -- Release Audio
   ('Release Audio Admin','Full control over audio releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_audio.admin', false),
   ('Release Audio Creator','Create audio releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_audio.creator', false),
+  ('Release Audio Delete','Delete audio releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_audio.delete', false),
   ('Release Audio Editor','Edit audio releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_audio.editor', false),
   ('Release Audio Take Down','Take down audio releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_audio.take_down', false),
   ('Release Audio Viewer','Read-only access to audio releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_audio.viewer', true),

@@ -65,6 +65,7 @@ WITH map(role_code, permission_code) AS (
     ('release_audio.viewer', 'release_audio.read'),
     ('release_audio.creator', 'release_audio.read'),
     ('release_audio.creator', 'release_audio.create'),
+    ('release_audio.delete', 'release_audio.delete'),
     ('release_audio.creator', 'release_review.create'),
     ('release_audio.creator', 'release_review.can_fix'),
     ('release_audio.editor', 'release_audio.read'),
