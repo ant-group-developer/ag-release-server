@@ -759,6 +759,9 @@ export class SyncService {
 				const folderStart = Date.now();
 				const isUpdate = existing && existing.status === 'done';
 				try {
+					this.logger.log(
+						`  ⬇️ ${category}/${dspFolder}: downloading ${remoteFiles.length} file(s)`,
+					);
 					// Download from FTPS
 					const { localPath, fileCount } =
 						await this.ftpService.downloadDspFolder(

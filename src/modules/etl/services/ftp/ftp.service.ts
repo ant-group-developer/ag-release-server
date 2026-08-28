@@ -457,16 +457,25 @@ export class FtpService {
 		const remotePath = `${config.basePath}/${category}/${period}/${dspFolder}`;
 
 		try {
-			const files = await this.withSessionRetry(session, (client) =>
-				this.listFilesRecursive(
-					client,
-					remotePath,
-					'',
-					fileSelector,
-					applyGlobalExcludes,
-				),
-			);
-			return files.sort();
+			if (applyGlobalExcludes) {
+				await this.excludePatternService.pinCache();
+			}
+			try {
+				const files = await this.withSessionRetry(session, (client) =>
+					this.listFilesRecursive(
+						client,
+						remotePath,
+						'',
+						fileSelector,
+						applyGlobalExcludes,
+					),
+				);
+				return files.sort();
+			} finally {
+				if (applyGlobalExcludes) {
+					this.excludePatternService.unpinCache();
+				}
+			}
 		} catch (err) {
 			if (this.isAuthenticationError(err as Error)) throw err;
 			if (this.isDisconnected(err as Error)) throw err;
@@ -777,8 +786,19 @@ export class FtpService {
 					);
 					continue;
 				}
+				if (this.isCompleteLocalCopy(localItemPath, item.size)) {
+					this.logger.log(
+						`  ⏭️ ${relativeName} already downloaded (${item.size} bytes), skipping`,
+					);
+					fileCount++;
+					continue;
+				}
 				try {
+					this.logger.log(
+						`  ⬇️ ${relativeName}${item.size ? ` (${item.size} bytes)` : ''}`,
+					);
 					await client.downloadTo(localItemPath, remoteItemPath);
+					await this.keepControlConnectionAlive(client);
 					// Verify download: check file exists and has content
 					const stat = fs.statSync(localItemPath);
 					if (stat.size === 0) {
@@ -807,6 +827,28 @@ export class FtpService {
 		return fileCount;
 	}
 
+	/** Skip a re-download when a previous attempt already wrote the full file. */
+	private isCompleteLocalCopy(localPath: string, remoteSize: number): boolean {
+		if (!remoteSize || remoteSize <= 0) return false;
+		try {
+			if (!fs.existsSync(localPath)) return false;
+			return fs.statSync(localPath).size === remoteSize;
+		} catch {
+			return false;
+		}
+	}
+
+	/** Cheap control-channel traffic so Merlin does not FIN mid-folder. */
+	private async keepControlConnectionAlive(client: ftp.Client): Promise<void> {
+		try {
+			if (typeof client.sendIgnoringError === 'function') {
+				await client.sendIgnoringError('NOOP');
+			}
+		} catch {
+			// A failed NOOP is not fatal; the next transfer will surface a dead socket.
+		}
+	}
+
 	/**
 	 * Download a single DSP folder for a specific period+category.
 	 */
@@ -822,16 +864,22 @@ export class FtpService {
 		const remotePath = `${config.basePath}/${category}/${period}/${dspFolder}`;
 		const localPath = path.join(tempDir, period, category, dspFolder);
 
-		const fileCount = await this.withSessionRetry(session, (client) =>
-			this.downloadFolder(
-				client,
-				remotePath,
-				localPath,
-				'',
-				fileSelector,
-			),
-		);
-		return { localPath, fileCount };
+		this.logger.log(`Downloading ${category}/${period}/${dspFolder} from FTP`);
+		await this.excludePatternService.pinCache();
+		try {
+			const fileCount = await this.withSessionRetry(session, (client) =>
+				this.downloadFolder(
+					client,
+					remotePath,
+					localPath,
+					'',
+					fileSelector,
+				),
+			);
+			return { localPath, fileCount };
+		} finally {
+			this.excludePatternService.unpinCache();
+		}
 	}
 
 	/**

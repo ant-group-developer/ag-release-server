@@ -12,7 +12,8 @@ import * as path from 'path';
  * (only devices contributes to quantity_total).
  */
 const VEVO_TRENDS_FOLDER = 'vvo-vevo';
-const VEVO_PARSER_CODE = 'vevo'; // = PARSER_REGISTRY['vvo'].parserCode
+// Catalog key from FtpParserConfigService.buildCatalog (PARSER_REGISTRY['vvo']).
+const VEVO_PARSER_CODE = 'ftp.trends.vvo';
 
 // FTP delivers these as `.tsv.zip`; unzipped local samples are `.tsv`.
 const VEVO_TRENDS_FILE_PATTERNS = [

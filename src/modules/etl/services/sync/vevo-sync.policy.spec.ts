@@ -28,7 +28,7 @@ describe('resolveVevoTrendsFiles', () => {
 		]);
 		expect(result).toEqual({
 			selected: [devicesFile, attrsFile, interactionsFile],
-			parserCode: 'vevo',
+			parserCode: 'ftp.trends.vvo',
 		});
 	});
 
@@ -44,7 +44,7 @@ describe('resolveVevoTrendsFiles', () => {
 		]);
 		expect(result).toEqual({
 			selected: [devicesZip, attrsZip, interactionsZip],
-			parserCode: 'vevo',
+			parserCode: 'ftp.trends.vvo',
 		});
 	});
 
@@ -76,6 +76,6 @@ describe('resolveVevoTrendsFiles', () => {
 		const result = resolveVevoTrendsFiles('trends', 'vvo-vevo', [
 			'readme.txt',
 		]);
-		expect(result).toEqual({ selected: [], parserCode: 'vevo' });
+		expect(result).toEqual({ selected: [], parserCode: 'ftp.trends.vvo' });
 	});
 });

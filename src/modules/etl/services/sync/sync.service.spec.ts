@@ -236,7 +236,7 @@ describe('SyncService', () => {
 			expect(ftpReportFileRuleService.resolveFiles).not.toHaveBeenCalled();
 			expect(
 				ftpParserConfigService.resolveForParserCode,
-			).toHaveBeenCalledWith('vvo-vevo', 'trends', 'vevo');
+			).toHaveBeenCalledWith('vvo-vevo', 'trends', 'ftp.trends.vvo');
 			expect(result.categories[0].folders[0]).toMatchObject({
 				dsp_folder: 'vvo-vevo',
 				status: 'done',

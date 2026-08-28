@@ -24,6 +24,7 @@ class FakeClient {
 	access = jest.fn().mockResolvedValue(undefined);
 	list = jest.fn().mockResolvedValue([]);
 	downloadTo = jest.fn().mockResolvedValue(undefined);
+	sendIgnoringError = jest.fn().mockResolvedValue(undefined);
 	close = jest.fn(() => {
 		this.isClosed = true;
 	});
@@ -63,6 +64,8 @@ describe('FtpService', () => {
 					provide: ExcludePatternService,
 					useValue: {
 						shouldExclude: jest.fn().mockResolvedValue(false),
+						pinCache: jest.fn().mockResolvedValue(undefined),
+						unpinCache: jest.fn(),
 					},
 				},
 				{
@@ -335,6 +338,79 @@ describe('FtpService', () => {
 				expect(clients).toHaveLength(2);
 				expect(clients[1].downloadTo).toHaveBeenCalled();
 				expect(result.fileCount).toBe(1);
+			} finally {
+				session.close();
+				fs.rmSync(tempDir, { recursive: true, force: true });
+			}
+		});
+
+		it('skips files already fully downloaded after a reconnect', async () => {
+			const files = [
+				{
+					name: 'one.zip',
+					isFile: true,
+					isDirectory: false,
+					size: 1,
+				},
+				{
+					name: 'two.zip',
+					isFile: true,
+					isDirectory: false,
+					size: 1,
+				},
+			];
+			const fin = new Error(
+				'Client is closed because Server sent FIN packet unexpectedly, closing connection.',
+			);
+			clients = [];
+			(ftp.Client as unknown as jest.Mock).mockImplementation(() => {
+				const client = new FakeClient();
+				client.list.mockResolvedValue(files);
+				if (clients.length === 0) {
+					client.downloadTo.mockImplementation(
+						async (localPath: string) => {
+							if (String(localPath).endsWith('two.zip')) {
+								throw fin;
+							}
+							fs.mkdirSync(path.dirname(localPath), {
+								recursive: true,
+							});
+							fs.writeFileSync(localPath, 'x');
+						},
+					);
+				} else {
+					client.downloadTo.mockImplementation(
+						async (localPath: string) => {
+							fs.mkdirSync(path.dirname(localPath), {
+								recursive: true,
+							});
+							fs.writeFileSync(localPath, 'x');
+						},
+					);
+				}
+				clients.push(client);
+				return client;
+			});
+
+			const tempDir = fs.mkdtempSync(
+				path.join(os.tmpdir(), 'etl-ftp-resume-'),
+			);
+			const session = service.createSession();
+			try {
+				const result = await service.downloadDspFolder(
+					'202608',
+					'trends',
+					'fbk-facebook',
+					tempDir,
+					undefined,
+					session,
+				);
+
+				expect(result.fileCount).toBe(2);
+				expect(clients[1].downloadTo).toHaveBeenCalledTimes(1);
+				expect(String(clients[1].downloadTo.mock.calls[0][0])).toMatch(
+					/two\.zip$/,
+				);
 			} finally {
 				session.close();
 				fs.rmSync(tempDir, { recursive: true, force: true });
