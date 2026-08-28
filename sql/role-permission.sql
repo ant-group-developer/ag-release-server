@@ -75,6 +75,7 @@ WITH map(role_code, permission_code) AS (
     ('release_audio.editor', 'release_review.can_fix'),
     ('release_audio.editor', 'release_review.approve'),
     ('release_audio.editor', 'release_review.reject'),
+    ('release_audio.take_down', 'release_audio.take_down'),
     ('release_audio.admin', 'release_audio.read'),
     ('release_audio.admin', 'release_audio.create'),
     ('release_audio.admin', 'release_audio.update'),
