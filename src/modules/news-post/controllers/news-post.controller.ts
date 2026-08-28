@@ -47,8 +47,13 @@ export class NewsPostController {
 	async getList(
 		@Query() query: QueryGetListNewsPostDto,
 		@Headers('locale') locale?: string,
+		@Req() req?: Request,
 	) {
-		const result = await this.newsPostService.getList(query, locale);
+		const result = await this.newsPostService.getList(
+			query,
+			locale,
+			req?.user,
+		);
 		return new ResponseSuccess({ data: result });
 	}
 

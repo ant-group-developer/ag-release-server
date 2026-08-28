@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import slugify from 'slugify';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
+import { UserFromRequest } from 'src/modules/token/token.interface';
+import {
+	checkIsSystemAdmin,
+	checkIsTenantOwnerOrAdmin,
+} from 'src/modules/user/utils/user-type.util';
 import { getTimeStamp } from 'src/utils/util.date';
 import { Repository } from 'typeorm';
 import { NewsPostResponseError } from '../constants/news-post.constant';
@@ -108,10 +113,17 @@ export class NewsPostService {
 	async getList(
 		query: QueryGetListNewsPostDto,
 		locale?: string,
+		user?: UserFromRequest,
 	): Promise<PageDto<NewsPost>> {
 		const { page, pageSize } = query;
-		const { items, totalItems } =
-			await this.newsPostQueryService.getList(query);
+		const isSystemAdmin = user
+			? checkIsSystemAdmin(user.type) ||
+				checkIsTenantOwnerOrAdmin(user.tenantUserType)
+			: false;
+		const { items, totalItems } = await this.newsPostQueryService.getList(
+			query,
+			isSystemAdmin,
+		);
 
 		const listAssigneed = this.assigneTranslationList({
 			listNewsPost: items,
