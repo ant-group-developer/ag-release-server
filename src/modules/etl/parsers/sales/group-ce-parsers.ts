@@ -113,9 +113,26 @@ export class FacebookSalesParser extends BaseSalesParser {
 		filePath: string,
 	): FactSalesRow | null {
 		const basename = path.basename(filePath);
-		// SFV + WhatsApp aggregate files (no ISRC)
+		// SFV + WhatsApp aggregate files — DSP-only revenue (no ISRC)
 		if (basename.includes('SFV') || basename.includes('WhatsApp')) {
-			return null;
+			// Schema: page_name, dte (YYYY-MM-DD), territory (ISO2), payout (USD), market_index, event_count
+			const rawPayout = r['payout'] || '0';
+			// Skip completely empty rows (no payout and no events)
+			if (this.safeDecimal(rawPayout) === '0' && this.safeInt(r['event_count'] || '0') === 0) return null;
+			const row = this.createBaseRow(batchId);
+			row.reporting_period_start = this.normalizeDate(r['dte']);
+			row.reporting_period_end = this.normalizeDate(r['dte']);
+			row.service_name = 'Meta';
+			row.member_name = r['page_name'] || 'Meta';
+			// isrc/upc/release_id/track_title/artist_name keep 'N/A' from createBaseRow
+			row.territory_code = this.normalizeCountryCode(r['territory'] || '');
+			row.quantity = this.safeInt(r['event_count'] || '0');
+			row.revenue_currency = 'USD';
+			row.revenue_local = this.safeDecimal(rawPayout);
+			row.revenue_usd = this.safeDecimal(rawPayout);
+			row.usage_type = basename.includes('SFV') ? 'SFV' : 'WhatsApp-Incentive-Pool';
+			if (r['market_index']) row.metadata = { market_index: r['market_index'] };
+			return row;
 		}
 		// AL/UGC files with ISRC
 		const isrc = r['elected_isrc'] || '';

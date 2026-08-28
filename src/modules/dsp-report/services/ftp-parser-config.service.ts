@@ -118,6 +118,26 @@ function normalizeFieldTransform(value?: string): string {
 	return value && isSupportedFieldTransform(value) ? value : 'trim';
 }
 
+/**
+ * Catalog keys are `ftp.{category}.{registryKey}` (e.g. ftp.trends.vvo).
+ * Callers sometimes pass the parser dspId (`vevo`) or the folder prefix (`vvo`).
+ */
+export function expandParserCatalogCodes(
+	code: string,
+	category: string,
+): string[] {
+	const raw = code.trim();
+	if (!raw) return [];
+	const lastSegment = raw.includes('.')
+		? raw.slice(raw.lastIndexOf('.') + 1)
+		: raw;
+	const candidates = [raw, `ftp.${category}.${lastSegment}`];
+	if (lastSegment.toLowerCase() === 'vevo') {
+		candidates.push(`ftp.${category}.vvo`);
+	}
+	return [...new Set(candidates)];
+}
+
 function toRecord(row: any): FtpParserConfigRecord {
 	return {
 		dspReportId: row.dsp_report_id,
@@ -764,7 +784,15 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 			'ftp_folder',
 		);
 		const entry = this.assertCatalogCode(parserCode, category);
-		const fieldMappings = await this.findParserOverrideFieldMappings(parserCode, category);
+		parserCode = entry.code;
+		// VevoParser dispatches 3 files itself (devices = views, attrs/social
+		// quantity_total = 0). A DB overlay mapping `views → quantity_total`
+		// rewrites social rows after parseRow and double-counts Vevo views.
+		const skipFieldMappingOverlay =
+			parserCode === 'ftp.trends.vvo' || parserCode === 'ftp.usage.vvo';
+		const fieldMappings = skipFieldMappingOverlay
+			? []
+			: await this.findParserOverrideFieldMappings(parserCode, category);
 		const usesDatabaseFieldMappings = fieldMappings.length > 0;
 		const resolvedMappings = usesDatabaseFieldMappings
 			? await this.resolveParserColumns(parserCode, category, fieldMappings)
@@ -1293,12 +1321,13 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 		code: string,
 		category: FtpSourceCategory,
 	): CatalogEntry {
-		const entry = this.catalog.get(code);
-		if (!entry || entry.category !== category)
-			throw new BadRequestException(
-				`Unsupported parser code "${code}" for ${category}`,
-			);
-		return entry;
+		for (const candidate of expandParserCatalogCodes(code, category)) {
+			const entry = this.catalog.get(candidate);
+			if (entry && entry.category === category) return entry;
+		}
+		throw new BadRequestException(
+			`Unsupported parser code "${code}" for ${category}`,
+		);
 	}
 
 	private getLegacyEntry(

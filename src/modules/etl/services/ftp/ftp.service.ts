@@ -38,6 +38,15 @@ export class FtpAuthenticationError extends Error {
 	}
 }
 
+/** True when the FTP control socket is dead and the session must reconnect. */
+export function isFtpDisconnectError(error: unknown): boolean {
+	const message =
+		error instanceof Error ? error.message : String(error ?? '');
+	return /ECONNRESET|EPIPE|ENOTCONN|control socket|client is closed|socket is closed|connection closed|FIN packet/i.test(
+		message,
+	);
+}
+
 interface FtpLimiterWaiter {
 	resolve: () => void;
 	reject: (error: Error) => void;
@@ -318,8 +327,10 @@ export class FtpService {
 	/**
 	 * Runs a single FTP operation, either on the caller's session or on a
 	 * throwaway connection when no session is given. A session whose socket died
-	 * between calls is reconnected once; a second failure is left to the caller.
+	 * mid-op is dropped and the same op is retried on a fresh login.
 	 */
+	private static readonly SESSION_RETRY_ATTEMPTS = 3;
+
 	private async withSessionRetry<T>(
 		session: FtpSession | undefined,
 		op: (client: ftp.Client) => Promise<T>,
@@ -336,21 +347,32 @@ export class FtpService {
 			);
 		}
 
-		const client = await session.getClient();
-		try {
-			return await op(client);
-		} catch (error) {
-			const err = error as Error;
-			if (this.isAuthenticationError(err)) throw err;
-			if (this.isDisconnected(err)) {
+		let lastError: Error | undefined;
+		for (
+			let attempt = 1;
+			attempt <= FtpService.SESSION_RETRY_ATTEMPTS;
+			attempt++
+		) {
+			const client = await session.getClient();
+			try {
+				return await op(client);
+			} catch (error) {
+				const err = error as Error;
+				if (this.isAuthenticationError(err)) throw err;
+				lastError = err;
+				if (
+					!this.isDisconnected(err) ||
+					attempt === FtpService.SESSION_RETRY_ATTEMPTS
+				) {
+					throw err;
+				}
 				this.logger.warn(
-					`FTP session lost (${err.message}); reconnecting once`,
+					`FTP session lost (${err.message}); reconnecting (${attempt}/${FtpService.SESSION_RETRY_ATTEMPTS})`,
 				);
 				session.invalidate();
-				return await op(await session.getClient());
 			}
-			throw err;
 		}
+		throw lastError;
 	}
 
 	/**
@@ -435,18 +457,28 @@ export class FtpService {
 		const remotePath = `${config.basePath}/${category}/${period}/${dspFolder}`;
 
 		try {
-			const files = await this.withSessionRetry(session, (client) =>
-				this.listFilesRecursive(
-					client,
-					remotePath,
-					'',
-					fileSelector,
-					applyGlobalExcludes,
-				),
-			);
-			return files.sort();
+			if (applyGlobalExcludes) {
+				await this.excludePatternService.pinCache();
+			}
+			try {
+				const files = await this.withSessionRetry(session, (client) =>
+					this.listFilesRecursive(
+						client,
+						remotePath,
+						'',
+						fileSelector,
+						applyGlobalExcludes,
+					),
+				);
+				return files.sort();
+			} finally {
+				if (applyGlobalExcludes) {
+					this.excludePatternService.unpinCache();
+				}
+			}
 		} catch (err) {
 			if (this.isAuthenticationError(err as Error)) throw err;
+			if (this.isDisconnected(err as Error)) throw err;
 			this.logger.warn(
 				`Cannot list files for ${category}/${period}/${dspFolder}: ${err.message}`,
 			);
@@ -700,9 +732,7 @@ export class FtpService {
 	}
 
 	private isDisconnected(error: Error): boolean {
-		return /ECONNRESET|control socket|client is closed|socket is closed|connection closed/i.test(
-			error.message,
-		);
+		return isFtpDisconnectError(error);
 	}
 
 	private isAuthenticationError(error: Error): boolean {
@@ -756,8 +786,19 @@ export class FtpService {
 					);
 					continue;
 				}
+				if (this.isCompleteLocalCopy(localItemPath, item.size)) {
+					this.logger.log(
+						`  ⏭️ ${relativeName} already downloaded (${item.size} bytes), skipping`,
+					);
+					fileCount++;
+					continue;
+				}
 				try {
+					this.logger.log(
+						`  ⬇️ ${relativeName}${item.size ? ` (${item.size} bytes)` : ''}`,
+					);
 					await client.downloadTo(localItemPath, remoteItemPath);
+					await this.keepControlConnectionAlive(client);
 					// Verify download: check file exists and has content
 					const stat = fs.statSync(localItemPath);
 					if (stat.size === 0) {
@@ -772,6 +813,10 @@ export class FtpService {
 					fileCount++;
 				} catch (err) {
 					if (this.isAuthenticationError(err as Error)) throw err;
+					// A dead socket cannot finish the rest of the folder. Bubble up
+					// so withSessionRetry reconnects and re-downloads this DSP
+					// instead of skipping remaining files and moving on.
+					if (this.isDisconnected(err as Error)) throw err;
 					this.logger.error(
 						`Failed to download ${remoteItemPath}: ${err.message}`,
 					);
@@ -780,6 +825,28 @@ export class FtpService {
 		}
 
 		return fileCount;
+	}
+
+	/** Skip a re-download when a previous attempt already wrote the full file. */
+	private isCompleteLocalCopy(localPath: string, remoteSize: number): boolean {
+		if (!remoteSize || remoteSize <= 0) return false;
+		try {
+			if (!fs.existsSync(localPath)) return false;
+			return fs.statSync(localPath).size === remoteSize;
+		} catch {
+			return false;
+		}
+	}
+
+	/** Cheap control-channel traffic so Merlin does not FIN mid-folder. */
+	private async keepControlConnectionAlive(client: ftp.Client): Promise<void> {
+		try {
+			if (typeof client.sendIgnoringError === 'function') {
+				await client.sendIgnoringError('NOOP');
+			}
+		} catch {
+			// A failed NOOP is not fatal; the next transfer will surface a dead socket.
+		}
 	}
 
 	/**
@@ -797,16 +864,22 @@ export class FtpService {
 		const remotePath = `${config.basePath}/${category}/${period}/${dspFolder}`;
 		const localPath = path.join(tempDir, period, category, dspFolder);
 
-		const fileCount = await this.withSessionRetry(session, (client) =>
-			this.downloadFolder(
-				client,
-				remotePath,
-				localPath,
-				'',
-				fileSelector,
-			),
-		);
-		return { localPath, fileCount };
+		this.logger.log(`Downloading ${category}/${period}/${dspFolder} from FTP`);
+		await this.excludePatternService.pinCache();
+		try {
+			const fileCount = await this.withSessionRetry(session, (client) =>
+				this.downloadFolder(
+					client,
+					remotePath,
+					localPath,
+					'',
+					fileSelector,
+				),
+			);
+			return { localPath, fileCount };
+		} finally {
+			this.excludePatternService.unpinCache();
+		}
 	}
 
 	/**

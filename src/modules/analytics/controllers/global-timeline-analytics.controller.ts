@@ -7,6 +7,7 @@ import {
 	ChartQueryDto,
 	RevenueChartQueryDto,
 	TimelineQueryDto,
+	VevoDemographicsBarChartQueryDto,
 } from '../dto/analytics-query.dto';
 import {
 	AnalyticsSummaryResponse,
@@ -25,7 +26,9 @@ import {
 	RevenueTrackItem,
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
+	DemographicsBarChartResponse,
 } from '../interfaces/analytics.interface';
+import { DemographicsAnalyticsService } from '../services/demographics-analytics.service';
 import { TimelineAnalyticsService } from '../services/global-timeline.service';
 
 /**
@@ -35,7 +38,10 @@ import { TimelineAnalyticsService } from '../services/global-timeline.service';
 @ApiTags('Analytics')
 @Controller('analytics')
 export class TimelineAnalyticsController {
-	constructor(private readonly timelineService: TimelineAnalyticsService) {}
+	constructor(
+		private readonly timelineService: TimelineAnalyticsService,
+		private readonly demographicsSvc: DemographicsAnalyticsService,
+	) {}
 
 	@Post('summary')
 	@ApiOperation({
@@ -376,6 +382,64 @@ export class TimelineAnalyticsController {
 			query,
 		);
 		return new ResponseSuccess({ data });
+	}
+
+	@Post('trend-view/device/bar-chart')
+	@ApiOperation({
+		summary: 'Vevo device breakdown bar chart',
+		description:
+			'Views + % by device from the Vevo demographics cube. ' +
+			'Optional filters: channelId, releaseId, pgDspId/dspReportId, territoryCode, labelId, artistId. ' +
+			'Missing/non-Vevo DSP or no matching rows → empty items. Percent sums to 100%.',
+	})
+	async getTrendViewDeviceBarChart(
+		@Req() req: Request,
+		@Body() query: VevoDemographicsBarChartQueryDto,
+	): Promise<ResponseSuccess<DemographicsBarChartResponse>> {
+		return new ResponseSuccess({
+			data: await this.demographicsSvc.getDspDeviceBarChart(
+				query,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/gender/bar-chart')
+	@ApiOperation({
+		summary: 'Vevo gender breakdown bar chart',
+		description:
+			'views_estimate + % by gender. Same optional filters as device. ' +
+			'coverage = gender estimate / device views. Empty items when no matching rows.',
+	})
+	async getTrendViewGenderBarChart(
+		@Req() req: Request,
+		@Body() query: VevoDemographicsBarChartQueryDto,
+	): Promise<ResponseSuccess<DemographicsBarChartResponse>> {
+		return new ResponseSuccess({
+			data: await this.demographicsSvc.getDspGenderBarChart(
+				query,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/age-range/bar-chart')
+	@ApiOperation({
+		summary: 'Vevo age-range breakdown bar chart',
+		description:
+			'views_estimate + % by age bucket (AGE_13_17 → AGE_65_). Same optional filters as device. ' +
+			'coverage = age estimate / device views. Empty items when no matching rows.',
+	})
+	async getTrendViewAgeBarChart(
+		@Req() req: Request,
+		@Body() query: VevoDemographicsBarChartQueryDto,
+	): Promise<ResponseSuccess<DemographicsBarChartResponse>> {
+		return new ResponseSuccess({
+			data: await this.demographicsSvc.getDspAgeBarChart(
+				query,
+				req.user!.tenantId,
+			),
+		});
 	}
 
 	@Post('revenue/line-chart')

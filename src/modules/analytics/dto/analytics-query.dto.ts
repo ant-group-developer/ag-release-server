@@ -316,6 +316,59 @@ export class DspOverviewQueryDto extends DspAnalyticsBaseDto {
  */
 export class DspChartQueryDto extends DspOverviewQueryDto {}
 
+/**
+ * DTO cho Vevo trend-view device/gender/age bar charts.
+ * pgDspId/dspReportId are optional; omit them to scope only by channel/release/dates.
+ */
+export class VevoDemographicsBarChartQueryDto extends DspChartQueryDto {
+	@ApiPropertyOptional({
+		description: 'Sort bar items by views (default). Age chart still uses age-bucket order.',
+		enum: ['views'],
+		default: 'views',
+	})
+	@IsOptional()
+	@IsIn(['views'])
+	sortBy?: 'views';
+
+	@ApiPropertyOptional({
+		description: 'Scope to one channel UUID (video channel page)',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	channelId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Scope to one release UUID (video release page)',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	releaseId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by territory code (ISO2)',
+		example: 'US',
+	})
+	@IsOptional()
+	@IsString()
+	territoryCode?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by label ID',
+	})
+	@IsOptional()
+	@IsString()
+	labelId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by artist ID (external IDs supported)',
+	})
+	@IsOptional()
+	@IsString()
+	artistId?: string;
+}
+
 /** DTO dành riêng cho revenue chart của một DSP. */
 export class DspRevenueChartQueryDto extends DspChartQueryDto {
 	@ApiPropertyOptional({
@@ -541,6 +594,26 @@ export class RevenueChartQueryDto extends ChartQueryDto {
 	@IsOptional()
 	@IsIn(['revenue', 'usage'])
 	sortBy?: 'revenue' | 'usage';
+}
+
+/** DTO cho Vevo demographics endpoints (device / gender / age). */
+export class DemographicsQueryDto extends ChartQueryDto {
+	@ApiPropertyOptional({
+		description: 'Filter by territory code (ISO2)',
+		example: 'US',
+	})
+	@IsOptional()
+	@IsString()
+	territoryCode?: string;
+
+	@ApiPropertyOptional({
+		description: 'Group results by territory',
+		default: false,
+	})
+	@IsOptional()
+	@Type(() => Boolean)
+	@IsBoolean()
+	groupByTerritory?: boolean;
 }
 
 export class EntityTimelineQueryDto {

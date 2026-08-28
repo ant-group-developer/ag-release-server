@@ -504,16 +504,26 @@ export class ImportService {
 			`Parsing DSP folder: ${folderName} (${sourceCategory || 'trends'})`,
 		);
 		const files = await this.findDataFiles(folderPath, fileExcluder);
-		const allRows: FactDspRow[] = [];
 		const allFileStats: ParseFileStats[] = [];
+		let totalRows = 0;
+		let entityResult:
+			| Awaited<ReturnType<ImportService['extractAndImportPerFile']>>
+			| undefined;
+		let insertedAny = false;
 
-		for (const filePath of files) {
+		for (let i = 0; i < files.length; i++) {
+			const filePath = files[i];
+			let rows: FactDspRow[] = [];
 			try {
-				const { rows, stats } = await parser.parseFileWithStats(
+				this.logger.log(
+					`  Parsing ${i + 1}/${files.length} ${path.basename(filePath)}`,
+				);
+				const parsed = await parser.parseFileWithStats(
 					filePath,
 					batchId,
 				);
-				allFileStats.push(stats);
+				rows = parsed.rows;
+				allFileStats.push(parsed.stats);
 				const sourceFileName = path.basename(filePath);
 				for (const row of rows) {
 					if (sourceCategory) {
@@ -524,46 +534,49 @@ export class ImportService {
 					row.source_file_name = sourceFileName;
 					normalizeFactRows([row]);
 				}
-				allRows.push(...rows);
 			} catch (err) {
 				this.logger.error(
 					`Error parsing ${path.basename(filePath)}: ${err.message}`,
 				);
+				continue;
 			}
-		}
 
-		let entityResult:
-			| Awaited<ReturnType<ImportService['extractAndImportPerFile']>>
-			| undefined;
-		if (allRows.length > 0) {
+			if (rows.length === 0) continue;
+
 			try {
 				await this.clickHouseService.insertBatched(
 					CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT,
-					allRows as unknown as Record<string, unknown>[],
+					rows as unknown as Record<string, unknown>[],
 					50_000,
 				);
 			} catch (err) {
 				this.logger.error(
-					`Bulk insert failed for ${folderName}: ${err.message}`,
+					`Bulk insert failed for ${folderName}/${path.basename(filePath)}: ${err.message}`,
 				);
 				throw err;
 			}
 
-			// Import metadata (Release/Track/Video) sang Postgres giống report-import.
-			entityResult = await this.extractAndImportPerFile(allRows, {
+			const fileEntity = await this.extractAndImportPerFile(rows, {
 				folderName,
 				batchId,
 				dspsReport,
 			});
+			entityResult = this.mergeEntityResults(entityResult, fileEntity);
+			totalRows += rows.length;
+			insertedAny = true;
+		}
 
-			// Refresh materialized stats cho các dsp_id vừa nạp thêm data.
-			this.refreshStatsAfterImport(allRows, folderName);
+		if (insertedAny) {
+			this.refreshStatsAfterImport(
+				[{ dsp_id: dspsReport.id_dsps_report }],
+				folderName,
+			);
 		}
 
 		return this.buildResult(
 			folderName,
 			files,
-			allRows.length,
+			totalRows,
 			startTime,
 			entityResult,
 			allFileStats,
@@ -788,6 +801,23 @@ export class ImportService {
 			entityResult,
 			allFileStats,
 		);
+	}
+
+	private mergeEntityResults(
+		current:
+			| Awaited<ReturnType<ImportService['extractAndImportPerFile']>>
+			| undefined,
+		next: Awaited<ReturnType<ImportService['extractAndImportPerFile']>>,
+	): Awaited<ReturnType<ImportService['extractAndImportPerFile']>> {
+		if (!current) return next;
+		return {
+			totalReleases: current.totalReleases + next.totalReleases,
+			created: current.created + next.created,
+			skipped: current.skipped + next.skipped,
+			errors: current.errors + next.errors,
+			inDb: current.inDb + next.inDb,
+			pending: current.pending + next.pending,
+		};
 	}
 
 	private buildResult(

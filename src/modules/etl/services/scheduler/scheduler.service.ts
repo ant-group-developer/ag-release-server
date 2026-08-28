@@ -4,6 +4,7 @@ import { CronJob } from 'cron';
 import { ClickHouseMigrationService } from '../../../clickhouse';
 import { ImportJobSourceType } from '../../interfaces';
 import { ImportJobsService } from '../import-jobs/import-jobs.service';
+import { FtpSyncQueueService } from '../sync/ftp-sync-queue.service';
 import { SyncService } from '../sync/sync.service';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class SchedulerService implements OnModuleInit {
 	constructor(
 		private readonly syncService: SyncService,
 		private readonly importJobsService: ImportJobsService,
+		private readonly ftpSyncQueueService: FtpSyncQueueService,
 		private readonly schedulerRegistry: SchedulerRegistry,
 		private readonly clickHouseMigrationService: ClickHouseMigrationService,
 	) {}
@@ -108,49 +110,9 @@ export class SchedulerService implements OnModuleInit {
 					cronExpr: config.cron || '0 2 * * *',
 				},
 			});
-			await this.importJobsService.markProcessing(job.id);
-			const results = await this.syncService.syncAll(
-				false,
-				undefined,
-				undefined,
-				job.id,
-				ImportJobSourceType.FTP_AUTO_CRON,
-			);
-			const totalRows = results.reduce(
-				(sum, r) => sum + (r.totalRows ?? 0),
-				0,
-			);
-			const totalPeriods = results.length;
-			const totalFolderWarnings = results.reduce(
-				(sum, result) =>
-					sum +
-					(result.categories || []).reduce(
-						(categorySum, category) =>
-							categorySum +
-							category.folders.filter(
-								(folder) => folder.status === 'error',
-							).length,
-						0,
-					),
-				0,
-			);
-
-			this.logger.log(
-				`Auto-sync complete: ${totalPeriods} periods, ${totalRows} total rows`,
-			);
-			if (totalFolderWarnings > 0) {
-				this.logger.warn(
-					`Auto-sync completed with ${totalFolderWarnings} folder warning(s)`,
-				);
-			}
-
-			await this.importJobsService.markCompleted(job.id, {
-				totalPeriods,
-				totalRows,
-				totalFolderErrors: totalFolderWarnings,
-				hasWarnings: totalFolderWarnings > 0,
-				results,
-			});
+			await this.ftpSyncQueueService.pushJob(job.id);
+			await this.importJobsService.markQueued(job.id);
+			this.logger.log(`Auto-sync job ${job.id} queued for the worker`);
 		} catch (err) {
 			this.logger.error(`Auto-sync failed: ${err.message}`, err.stack);
 			if (job) await this.importJobsService.markFailed(job.id, err);

@@ -11,6 +11,7 @@ services:
         environment:
             - TZ=${TZ:-Asia/Ho_Chi_Minh}
             - APP_ROLE=api
+            - NODE_OPTIONS=--max-old-space-size=2048
         command: yarn start:prod
         restart: unless-stopped
         volumes:
@@ -32,6 +33,7 @@ services:
             - TZ=${TZ:-Asia/Ho_Chi_Minh}
             - APP_ROLE=worker
             - EXPORT_WORKER_THREADS=2
+            - NODE_OPTIONS=--max-old-space-size=1536
         command: yarn start:prod
         restart: unless-stopped
         volumes:
