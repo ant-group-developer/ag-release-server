@@ -70,7 +70,6 @@ export class StatementsImportService {
 
 		const startTime = Date.now();
 		const batchId = uuidv4();
-		const affectedSalesPeriods = new Set<string>();
 
 		const summary: StatementsSummary = {
 			totalFilesInFolder,
@@ -101,6 +100,28 @@ export class StatementsImportService {
 			summary.totalDurationMs = Date.now() - startTime;
 			return summary;
 		}
+
+		return this.analyticsProjectionRefreshService.whileCubeViewsPaused(() =>
+			this.importOpenedStatements(
+				toImport,
+				summary,
+				batchId,
+				jobId,
+				onProgress,
+				startTime,
+			),
+		);
+	}
+
+	private async importOpenedStatements(
+		toImport: CanonicalFile[],
+		summary: StatementsSummary,
+		batchId: string,
+		jobId: string | undefined,
+		onProgress: StatementsImportOptions['onProgress'],
+		startTime: number,
+	): Promise<StatementsSummary> {
+		const affectedSalesPeriods = new Set<string>();
 
 		// Step 1: delete old data for -auto revisions
 		const autoRevisions = toImport.filter((f) => f.isAutoRevision);

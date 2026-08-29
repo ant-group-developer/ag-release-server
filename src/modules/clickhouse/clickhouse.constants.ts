@@ -36,3 +36,20 @@ export const CLICKHOUSE_TABLES = {
 	METADATA_ENRICHMENT_LOG: 'metadata_enrichment_log',
 	ANALYTICS_SOURCE_TYPE_CONFIGS: 'analytics_source_type_configs',
 } as const;
+
+/**
+ * Insert-triggered cube MVs. Cubes are rebuilt from fact after each import
+ * batch; these views must stay paused (or dropped) while a period is still
+ * being written, or replacement inserts double-count until the rebuild.
+ */
+export const CUBE_MATERIALIZED_VIEWS = [
+	'sales_dsp_monthly_cube_v2_mv',
+	'sales_ter_monthly_cube_v2_mv',
+	'sales_export_monthly_cube_mv',
+	'trends_dsp_monthly_cube_mv',
+	'trends_ter_monthly_cube_mv',
+	'trends_dsp_daily_cube_mv',
+	'trends_ter_daily_cube_mv',
+	'trends_isrc_daily_cube_mv',
+	'trends_demographics_cube_mv',
+] as const;

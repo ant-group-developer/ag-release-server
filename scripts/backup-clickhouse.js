@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const { PassThrough } = require('stream');
 
 // Read configurations from environment variables or command-line arguments
 const CLICKHOUSE_URL = process.env.CLICKHOUSE_URL || getArg('--url') || 'http://localhost:8124';
@@ -365,61 +366,88 @@ async function runRestore() {
   console.log(`Creating database '${CLICKHOUSE_DATABASE}'...`);
   await queryClickHouse(`CREATE DATABASE \`${CLICKHOUSE_DATABASE}\``, '', null, false);
 
-  const fileStream = fs.createReadStream(TARGET_FILE);
-  const rl = readline.createInterface({
-    input: fileStream,
-    crlfDelay: Infinity
-  });
-
-  let currentStatement = [];
+  const separator = Buffer.from('-- STATEMENT_SEPARATOR\n');
   let statementCount = 0;
+  let current = { chunks: [], length: 0, stream: null, request: null };
 
-  for await (const line of rl) {
-    if (line.trim() === '-- STATEMENT_SEPARATOR') {
-      if (currentStatement.length > 0) {
-        let sql = currentStatement.join('\n').trim();
-        if (sql) {
-          statementCount++;
-          
-          // Dynamically map database name if different
-          if (CLICKHOUSE_DATABASE !== oldDbName) {
-            sql = sql.replace(new RegExp(`\\\`?${oldDbName}\\\`?\\.`, 'g'), `\`${CLICKHOUSE_DATABASE}\`.`);
-            sql = sql.replace(new RegExp(`DATABASE IF NOT EXISTS \\\`?${oldDbName}\\\`?`, 'g'), `DATABASE IF NOT EXISTS \`${CLICKHOUSE_DATABASE}\``);
-            sql = sql.replace(new RegExp(`USE \\\`?${oldDbName}\\\`?`, 'g'), `USE \`${CLICKHOUSE_DATABASE}\``);
-          }
+  const remapDatabase = (sql) => {
+    if (CLICKHOUSE_DATABASE === oldDbName) return sql;
+    return sql
+      .replace(new RegExp(`\\\`?${oldDbName}\\\`?\\.`, 'g'), `\`${CLICKHOUSE_DATABASE}\`.`)
+      .replace(new RegExp(`DATABASE IF NOT EXISTS \\\`?${oldDbName}\\\`?`, 'g'), `DATABASE IF NOT EXISTS \`${CLICKHOUSE_DATABASE}\``)
+      .replace(new RegExp(`USE \\\`?${oldDbName}\\\`?`, 'g'), `USE \`${CLICKHOUSE_DATABASE}\``);
+  };
 
-          const preview = sql.slice(0, 100).replace(/\n/g, ' ');
-          console.log(`Executing statement #${statementCount}: ${preview}...`);
-          const isDbCommand = sql.toUpperCase().startsWith('CREATE DATABASE') || sql.toUpperCase().startsWith('USE ') || sql.toUpperCase().startsWith('DROP DATABASE');
-          try {
-            await queryClickHouse(sql, '', null, !isDbCommand);
-          } catch (err) {
-            console.error(`Error running statement #${statementCount}:`, err.message);
-            process.exit(1);
-          }
-        }
-        currentStatement = [];
-      }
-    } else {
-      currentStatement.push(line);
+  const startInsertStream = () => {
+    const stream = new PassThrough();
+    const url = new URL(CLICKHOUSE_URL);
+    url.searchParams.append('user', CLICKHOUSE_USER);
+    url.searchParams.append('password', CLICKHOUSE_PASSWORD);
+    url.searchParams.append('database', CLICKHOUSE_DATABASE);
+    current.stream = stream;
+    current.request = fetch(url.toString(), {
+      method: 'POST',
+      body: stream,
+      duplex: 'half',
+      headers: { 'Content-Type': 'text/plain' },
+    }).then(async (response) => {
+      if (!response.ok) throw new Error(`ClickHouse error: ${await response.text()}`);
+    });
+    for (const chunk of current.chunks) stream.write(chunk);
+    current.chunks = [];
+  };
+
+  const append = async (chunk) => {
+    if (!chunk.length) return;
+    if (current.stream) {
+      if (!current.stream.write(chunk)) await new Promise(resolve => current.stream.once('drain', resolve));
+      return;
     }
-  }
-
-  // Execute remaining statements if any
-  if (currentStatement.length > 0) {
-    let sql = currentStatement.join('\n').trim();
-    if (sql) {
+    current.chunks.push(chunk);
+    current.length += chunk.length;
+    const preview = Buffer.concat(current.chunks, current.length).toString('utf8').trimStart();
+    if (preview.startsWith('INSERT INTO')) {
       statementCount++;
-      if (CLICKHOUSE_DATABASE !== oldDbName) {
-        sql = sql.replace(new RegExp(`\\\`?${oldDbName}\\\`?\\.`, 'g'), `\`${CLICKHOUSE_DATABASE}\`.`);
-        sql = sql.replace(new RegExp(`DATABASE IF NOT EXISTS \\\`?${oldDbName}\\\`?`, 'g'), `DATABASE IF NOT EXISTS \`${CLICKHOUSE_DATABASE}\``);
-        sql = sql.replace(new RegExp(`USE \\\`?${oldDbName}\\\`?`, 'g'), `USE \`${CLICKHOUSE_DATABASE}\``);
-      }
-      console.log(`Executing statement #${statementCount}: ${sql.slice(0, 100)}...`);
-      const isDbCommand = sql.toUpperCase().startsWith('CREATE DATABASE') || sql.toUpperCase().startsWith('USE ') || sql.toUpperCase().startsWith('DROP DATABASE');
-      await queryClickHouse(sql, '', null, !isDbCommand);
+      console.log(`Executing streamed INSERT #${statementCount}: ${preview.slice(0, 100).replace(/\n/g, ' ')}...`);
+      startInsertStream();
+    } else if (current.length > 1024 * 1024) {
+      throw new Error('A non-INSERT restore statement exceeded 1 MiB.');
     }
+  };
+
+  const finishStatement = async () => {
+    if (current.stream) {
+      current.stream.end();
+      await current.request;
+    } else if (current.length) {
+      let sql = Buffer.concat(current.chunks, current.length).toString('utf8').trim();
+      if (sql) {
+        statementCount++;
+        sql = remapDatabase(sql);
+        const preview = sql.slice(0, 100).replace(/\n/g, ' ');
+        console.log(`Executing statement #${statementCount}: ${preview}...`);
+        const isDbCommand = sql.toUpperCase().startsWith('CREATE DATABASE') || sql.toUpperCase().startsWith('USE ') || sql.toUpperCase().startsWith('DROP DATABASE');
+        await queryClickHouse(sql, '', null, !isDbCommand);
+      }
+    }
+    current = { chunks: [], length: 0, stream: null, request: null };
+  };
+
+  let pending = Buffer.alloc(0);
+  for await (const chunk of fs.createReadStream(TARGET_FILE)) {
+    let data = pending.length ? Buffer.concat([pending, chunk]) : chunk;
+    let markerIndex;
+    while ((markerIndex = data.indexOf(separator)) !== -1) {
+      await append(data.subarray(0, markerIndex));
+      await finishStatement();
+      data = data.subarray(markerIndex + separator.length);
+    }
+    const safeLength = Math.max(0, data.length - separator.length + 1);
+    if (safeLength) await append(data.subarray(0, safeLength));
+    pending = data.subarray(safeLength);
   }
+  await append(pending);
+  await finishStatement();
 
   console.log(`\nRestore completed successfully! Executed ${statementCount} statements.`);
 }

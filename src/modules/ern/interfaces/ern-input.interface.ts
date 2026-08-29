@@ -236,6 +236,7 @@ export interface ErnDealInput {
 	useTypes: string[];
 	/** Whether this is a takedown deal (ERN 3.8.2) */
 	takeDown?: boolean;
+	price?: ErnPriceInput;
 }
 
 // price
@@ -243,6 +244,7 @@ export interface ErnPriceInput {
 	priceType: 'StandardRetailPrice';
 	value: number;
 	currencyCode: string;
+	priceRangeType?: string;
 }
 
 // ============================================================================

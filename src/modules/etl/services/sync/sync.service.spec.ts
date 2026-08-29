@@ -32,6 +32,7 @@ describe('SyncService', () => {
 	const excludePatternService = { shouldExclude: jest.fn() };
 	const analyticsProjectionRefreshService = {
 		refreshAfterFactImport: jest.fn(),
+		whileCubeViewsPaused: jest.fn((work: () => Promise<unknown>) => work()),
 	};
 	const ftpParserConfigService = { resolveForParserCode: jest.fn() };
 	const ftpReportFileRuleService = { resolveFiles: jest.fn() };
@@ -121,6 +122,18 @@ describe('SyncService', () => {
 	};
 
 	describe('syncPeriod connection reuse', () => {
+		it('pauses cube views for the whole period so DSP inserts cannot double-count', async () => {
+			ftpService.listDspFolders.mockResolvedValue(['dsp-a']);
+			givenImportableFolder();
+
+			await service.syncPeriod('202401', false, ['trends']);
+
+			expect(
+				analyticsProjectionRefreshService.whileCubeViewsPaused,
+			).toHaveBeenCalledTimes(1);
+			expect(importService.importDspFolder).toHaveBeenCalled();
+		});
+
 		it('leases one connection for every DSP folder in the period', async () => {
 			ftpService.listDspFolders.mockResolvedValue(['dsp-a', 'dsp-b']);
 			givenImportableFolder();
