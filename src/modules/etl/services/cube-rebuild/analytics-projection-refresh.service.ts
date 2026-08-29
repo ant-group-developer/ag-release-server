@@ -12,11 +12,13 @@ export interface AnalyticsProjectionRefreshRequest {
 /**
  * Keeps analytics projections consistent after any fact-table import.
  *
- * ClickHouse materialized views handle pure inserts, but do not account for
- * DELETE mutations or exchange-rate changes. All import entry points therefore
- * call this service once after their fact writes complete. It refreshes only
- * the affected month partitions and serializes concurrent refreshes for the
- * same partition across application processes.
+ * Cubes are rebuild-only. Insert-triggered materialized views are dropped
+ * (migration 050) because they cannot see DELETE mutations or exchange-rate
+ * changes and they double-count while a period is still being synced. All
+ * import entry points pause any leftover cube MVs around their fact writes,
+ * then call this service once those writes complete. It refreshes only the
+ * affected month partitions and serializes concurrent refreshes for the same
+ * partition across application processes.
  */
 @Injectable()
 export class AnalyticsProjectionRefreshService {
@@ -25,12 +27,40 @@ export class AnalyticsProjectionRefreshService {
 	);
 	private readonly lockTtlMs = 60 * 60 * 1000;
 	private readonly lockTimeoutMs = 10 * 60 * 1000;
+	private readonly cubeViewPauseKey = 'analytics-cube-mv-pause-count';
 
 	constructor(
 		private readonly exchangeRateService: ExchangeRateService,
 		private readonly cubeRebuildService: CubeRebuildService,
 		@InjectRedis() private readonly redis: Redis,
 	) {}
+
+	/**
+	 * Pause leftover cube MVs around a multi-DSP fact write so cubes stay
+	 * at the last rebuild until `refreshAfterFactImport` runs.
+	 */
+	async whileCubeViewsPaused<T>(work: () => Promise<T>): Promise<T> {
+		const count = await this.redis.incr(this.cubeViewPauseKey);
+		await this.redis.pexpire(this.cubeViewPauseKey, this.lockTtlMs);
+		try {
+			if (count === 1) {
+				this.logger.log(
+					'Pausing cube materialized views for fact import',
+				);
+				await this.cubeRebuildService.pauseCubeMaterializedViews();
+			}
+			return await work();
+		} finally {
+			const remaining = await this.redis.decr(this.cubeViewPauseKey);
+			if (remaining <= 0) {
+				await this.redis.del(this.cubeViewPauseKey);
+				this.logger.log('Resuming cube materialized views');
+				await this.cubeRebuildService.resumeCubeMaterializedViews();
+			} else {
+				await this.redis.pexpire(this.cubeViewPauseKey, this.lockTtlMs);
+			}
+		}
+	}
 
 	async refreshAfterFactImport(
 		request: AnalyticsProjectionRefreshRequest,

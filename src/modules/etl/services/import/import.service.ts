@@ -289,6 +289,14 @@ export class ImportService {
 	 *   - dataPath/dsp-folder/ (legacy)
 	 */
 	async importFolder(dataPath: string): Promise<ImportResult> {
+		return this.analyticsProjectionRefreshService.whileCubeViewsPaused(() =>
+			this.importOpenedFolder(dataPath),
+		);
+	}
+
+	private async importOpenedFolder(
+		dataPath: string,
+	): Promise<ImportResult> {
 		const startTime = Date.now();
 		const batchId = uuidv4();
 		const result: ImportResult = {
