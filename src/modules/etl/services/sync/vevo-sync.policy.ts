@@ -5,11 +5,12 @@ import * as path from 'path';
  *
  * Vevo delivers 3 TSV files per day that all measure the SAME video views
  * sliced by different dimensions (devices / user_attributes / user_interactions).
- * The generic rule engine only picks the devices file, so gender/age/social
+ * The generic rule engine only picks one file, so gender/age/device
  * data never lands in the fact table. This policy bypasses the rule engine
  * entirely for the Vevo trends folder and always selects all 3 files.
  * The VevoParser dispatches per file name and prevents double-counting
- * (only devices contributes to quantity_total).
+ * (only user_interactions contributes to quantity_total; devices/attributes
+ * stay in metadata for device / gender / age stats).
  */
 const VEVO_TRENDS_FOLDER = 'vvo-vevo';
 // Catalog key from FtpParserConfigService.buildCatalog (PARSER_REGISTRY['vvo']).
