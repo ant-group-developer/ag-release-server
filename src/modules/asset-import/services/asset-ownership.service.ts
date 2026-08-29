@@ -6,6 +6,8 @@ import { AssetOwnershipTransferEvent } from '../entities/asset-ownership-transfe
 
 const BASELINE_DATE = '1900-01-01';
 
+export type AssetOwnershipSource = 'asset_import' | 'channel_transfer';
+
 export interface TransferAssetOwnershipInput {
 	releaseId: string;
 	tenantId: string;
@@ -15,6 +17,32 @@ export interface TransferAssetOwnershipInput {
 	assetImportItemId?: string | null;
 	actorId: string;
 	note?: string | null;
+	source?: AssetOwnershipSource;
+	notify?: boolean;
+}
+
+export interface TransferManyItem {
+	releaseId: string;
+	labelId: string | null;
+	assetImportItemId?: string | null;
+}
+
+export interface TransferManyInput {
+	items: TransferManyItem[];
+	tenantId: string;
+	effectiveDate: string;
+	revenueEffectiveFrom: string;
+	source: AssetOwnershipSource;
+	actorId: string;
+	note?: string | null;
+	notify: boolean;
+}
+
+export interface TransferManyResult {
+	transferred: number;
+	skippedAlreadyDest: number;
+	labelCleared: number;
+	baselineCreated: number;
 }
 
 /**
@@ -27,51 +55,153 @@ export class AssetOwnershipService {
 		manager: EntityManager,
 		input: TransferAssetOwnershipInput,
 	): Promise<void> {
+		await this.transferMany(manager, {
+			items: [
+				{
+					releaseId: input.releaseId,
+					labelId: input.labelId,
+					assetImportItemId: input.assetImportItemId,
+				},
+			],
+			tenantId: input.tenantId,
+			effectiveDate: input.effectiveDate,
+			revenueEffectiveFrom: input.revenueEffectiveFrom,
+			source: input.source ?? 'asset_import',
+			actorId: input.actorId,
+			note: input.note,
+			notify: input.notify ?? true,
+		});
+	}
+
+	async transferMany(
+		manager: EntityManager,
+		input: TransferManyInput,
+	): Promise<TransferManyResult> {
 		this.assertDate(input.effectiveDate, 'effectiveDate');
-		this.assertDate(input.revenueEffectiveFrom, 'revenueEffectiveFrom');
+		const revenueEffectiveFrom = this.normalizeRevenueMonth(
+			input.revenueEffectiveFrom,
+		);
+
+		const result: TransferManyResult = {
+			transferred: 0,
+			skippedAlreadyDest: 0,
+			labelCleared: 0,
+			baselineCreated: 0,
+		};
+		if (!input.items.length) return result;
+
+		for (const item of input.items) {
+			await this.assertLabelBelongsToTenant(
+				manager,
+				item.labelId,
+				input.tenantId,
+			);
+			const outcome = await this.transferOne(manager, {
+				item,
+				tenantId: input.tenantId,
+				effectiveDate: input.effectiveDate,
+				revenueEffectiveFrom,
+				source: input.source,
+				actorId: input.actorId,
+				note: input.note ?? null,
+				notify: false,
+			});
+			if (outcome === 'skipped') result.skippedAlreadyDest += 1;
+			else {
+				result.transferred += 1;
+				if (outcome.baselineCreated) result.baselineCreated += 1;
+				if (outcome.labelCleared) result.labelCleared += 1;
+			}
+		}
+
+		if (input.notify) {
+			await this.notifyOwnershipSync(manager);
+		}
+		return result;
+	}
+
+	async notifyOwnershipSync(manager: EntityManager): Promise<void> {
+		await manager.query(
+			"SELECT pg_notify('clickhouse_sync_channel', 'asset_ownership_periods')",
+		);
+	}
+
+	async recordInitialOwnership(
+		manager: EntityManager,
+		input: Omit<TransferAssetOwnershipInput, 'assetImportItemId'> & {
+			assetImportItemId?: string | null;
+		},
+	): Promise<void> {
+		this.assertDate(input.effectiveDate, 'effectiveDate');
+		const revenueEffectiveFrom = this.normalizeRevenueMonth(
+			input.revenueEffectiveFrom,
+		);
 		await this.assertLabelBelongsToTenant(
 			manager,
 			input.labelId,
 			input.tenantId,
 		);
+		const exists = await manager.exists(AssetOwnershipPeriod, {
+			where: { releaseId: input.releaseId },
+		});
+		if (exists) return;
+		await manager.save(
+			manager.create(AssetOwnershipPeriod, {
+				releaseId: input.releaseId,
+				tenantId: input.tenantId,
+				labelId: input.labelId,
+				effectiveFrom: input.effectiveDate,
+				effectiveTo: null,
+				revenueEffectiveFrom,
+				revenueEffectiveTo: null,
+				assetImportItemId: input.assetImportItemId ?? null,
+				createdBy: input.actorId,
+			}),
+		);
+		await this.enqueueSync(manager, input.releaseId, input.notify ?? true);
+	}
 
-		if (input.assetImportItemId) {
+	private async transferOne(
+		manager: EntityManager,
+		args: {
+			item: TransferManyItem;
+			tenantId: string;
+			effectiveDate: string;
+			revenueEffectiveFrom: string;
+			source: AssetOwnershipSource;
+			actorId: string;
+			note: string | null;
+			notify: boolean;
+		},
+	): Promise<
+		| 'skipped'
+		| { baselineCreated: boolean; labelCleared: boolean }
+	> {
+		const { item } = args;
+		if (item.assetImportItemId) {
 			const existing = await manager.findOne(
 				AssetOwnershipTransferEvent,
 				{
-					where: { assetImportItemId: input.assetImportItemId },
+					where: { assetImportItemId: item.assetImportItemId },
 				},
 			);
-			if (existing) return;
+			if (existing) return 'skipped';
 		}
 
-		// Serialize all ownership edits for this release, including backdated ones.
-		await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-			input.releaseId,
-		]);
 		const release = await manager.findOne(Release, {
-			where: { id: input.releaseId },
+			where: { id: item.releaseId },
 			lock: { mode: 'pessimistic_write' },
 		});
 		if (!release) throw new BadRequestException('Release không tồn tại');
 
-		if (
-			release.tenantId === input.tenantId &&
-			(release.labelId ?? null) === input.labelId
-		) {
-			return;
-		}
-
 		const periods = await manager
 			.createQueryBuilder(AssetOwnershipPeriod, 'p')
 			.setLock('pessimistic_write')
-			.where('p.release_id = :releaseId', { releaseId: input.releaseId })
+			.where('p.release_id = :releaseId', { releaseId: item.releaseId })
 			.orderBy('p.effective_from', 'ASC')
 			.getMany();
 
-		// Releases created before this feature receive one explicit baseline window.
-		// It is marked as a baseline in the event ledger only on the first transfer;
-		// historical corrections can then be inserted as normal dated transfers.
+		let baselineCreated = false;
 		if (!periods.length) {
 			await manager.save(
 				manager.create(AssetOwnershipPeriod, {
@@ -94,6 +224,7 @@ export class AssetOwnershipService {
 					},
 				}),
 			);
+			baselineCreated = true;
 		}
 
 		const current = periods.find((p) => !p.effectiveTo);
@@ -102,90 +233,75 @@ export class AssetOwnershipService {
 				'Ownership ledger không có period đang mở',
 			);
 		}
-		if (input.effectiveDate <= current.effectiveFrom) {
+
+		const currentTenant = current.tenantId;
+		const currentLabel = current.labelId ?? null;
+		if (
+			currentTenant === args.tenantId &&
+			currentLabel === item.labelId
+		) {
+			return 'skipped';
+		}
+
+		if (args.effectiveDate <= current.effectiveFrom) {
 			throw new BadRequestException(
 				'Ngày chuyển asset phải sau ngày bắt đầu ownership hiện tại',
 			);
 		}
-		if (input.revenueEffectiveFrom <= current.revenueEffectiveFrom) {
+		if (args.revenueEffectiveFrom <= current.revenueEffectiveFrom) {
 			throw new BadRequestException(
 				'Tháng hiệu lực doanh thu phải sau period hiện tại',
 			);
 		}
 
+		const labelCleared =
+			(release.labelId ?? null) != null && item.labelId === null;
+
 		await manager.save(AssetOwnershipTransferEvent, {
 			releaseId: release.id,
 			fromTenantId: release.tenantId,
 			fromLabelId: release.labelId ?? null,
-			toTenantId: input.tenantId,
-			toLabelId: input.labelId,
-			effectiveDate: input.effectiveDate,
-			revenueEffectiveFrom: input.revenueEffectiveFrom,
-			source: 'asset_import',
-			assetImportItemId: input.assetImportItemId ?? null,
-			createdBy: input.actorId,
-			note: input.note ?? null,
+			toTenantId: args.tenantId,
+			toLabelId: item.labelId,
+			effectiveDate: args.effectiveDate,
+			revenueEffectiveFrom: args.revenueEffectiveFrom,
+			source: args.source,
+			assetImportItemId: item.assetImportItemId ?? null,
+			createdBy: args.actorId,
+			note: args.note,
 		});
 
-		current.effectiveTo = input.effectiveDate;
-		current.revenueEffectiveTo = input.revenueEffectiveFrom;
+		current.effectiveTo = args.effectiveDate;
+		current.revenueEffectiveTo = args.revenueEffectiveFrom;
 		await manager.save(current);
 		await manager.save(
 			manager.create(AssetOwnershipPeriod, {
 				releaseId: release.id,
-				tenantId: input.tenantId,
-				labelId: input.labelId,
-				effectiveFrom: input.effectiveDate,
+				tenantId: args.tenantId,
+				labelId: item.labelId,
+				effectiveFrom: args.effectiveDate,
 				effectiveTo: null,
-				revenueEffectiveFrom: input.revenueEffectiveFrom,
+				revenueEffectiveFrom: args.revenueEffectiveFrom,
 				revenueEffectiveTo: null,
-				assetImportItemId: input.assetImportItemId ?? null,
-				createdBy: input.actorId,
+				assetImportItemId: item.assetImportItemId ?? null,
+				createdBy: args.actorId,
 			}),
 		);
 
 		await manager.update(Release, release.id, {
-			tenantId: input.tenantId,
-			labelId: input.labelId,
-			modifierId: input.actorId,
+			tenantId: args.tenantId,
+			labelId: item.labelId,
+			modifierId: args.actorId,
 		});
-		await this.enqueueSync(manager, release.id);
+		await this.enqueueSync(manager, release.id, args.notify);
+		return { baselineCreated, labelCleared };
 	}
 
-	async recordInitialOwnership(
+	private async enqueueSync(
 		manager: EntityManager,
-		input: Omit<TransferAssetOwnershipInput, 'assetImportItemId'> & {
-			assetImportItemId?: string | null;
-		},
-	): Promise<void> {
-		this.assertDate(input.effectiveDate, 'effectiveDate');
-		this.assertDate(input.revenueEffectiveFrom, 'revenueEffectiveFrom');
-		await this.assertLabelBelongsToTenant(
-			manager,
-			input.labelId,
-			input.tenantId,
-		);
-		const exists = await manager.exists(AssetOwnershipPeriod, {
-			where: { releaseId: input.releaseId },
-		});
-		if (exists) return;
-		await manager.save(
-			manager.create(AssetOwnershipPeriod, {
-				releaseId: input.releaseId,
-				tenantId: input.tenantId,
-				labelId: input.labelId,
-				effectiveFrom: input.effectiveDate,
-				effectiveTo: null,
-				revenueEffectiveFrom: input.revenueEffectiveFrom,
-				revenueEffectiveTo: null,
-				assetImportItemId: input.assetImportItemId ?? null,
-				createdBy: input.actorId,
-			}),
-		);
-		await this.enqueueSync(manager, input.releaseId);
-	}
-
-	private async enqueueSync(manager: EntityManager, releaseId: string) {
+		releaseId: string,
+		notify: boolean,
+	) {
 		await manager.query(
 			`INSERT INTO clickhouse_sync_outbox (entity_name, entity_id, action, processed)
 			 VALUES ('asset_ownership_periods', $1, 'UPDATE', FALSE)
@@ -193,18 +309,23 @@ export class AssetOwnershipService {
 			 DO UPDATE SET created_at = CURRENT_TIMESTAMP, action = EXCLUDED.action, error_message = NULL`,
 			[releaseId],
 		);
-		await manager.query(
-			"SELECT pg_notify('clickhouse_sync_channel', 'asset_ownership_periods')",
-		);
+		if (notify) {
+			await this.notifyOwnershipSync(manager);
+		}
 	}
 
-	private assertDate(value: string, field: string) {
+	assertDate(value: string, field: string) {
 		if (
 			!/^\d{4}-\d{2}-\d{2}$/.test(value) ||
 			Number.isNaN(Date.parse(value))
 		) {
 			throw new BadRequestException(`${field} phải có dạng YYYY-MM-DD`);
 		}
+	}
+
+	normalizeRevenueMonth(value: string): string {
+		this.assertDate(value, 'revenueEffectiveFrom');
+		return `${value.slice(0, 7)}-01`;
 	}
 
 	private async assertLabelBelongsToTenant(

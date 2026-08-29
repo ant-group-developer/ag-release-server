@@ -10,10 +10,15 @@ import { TenantUser } from 'src/modules/user/entities/tenant-user.entity';
 import { TenantUserType } from 'src/modules/user/enum/user.enum';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { DataSource, In, Not, Repository } from 'typeorm';
-import { ChannelException } from '../constants/channel.constant';
+import { AssetOwnershipService } from 'src/modules/asset-import/services/asset-ownership.service';
+import {
+	CHANNEL_TRANSFER_MAX_RELEASES,
+	ChannelException,
+} from '../constants/channel.constant';
 import {
 	CreateChannelDto,
 	QueryGetListChannelDto,
+	TransferChannelTenantDto,
 	UpdateChannelDto,
 } from '../dto/channel.dto';
 import { VevoChannelCallbackDto } from '../dto/vevo.dto';
@@ -44,6 +49,7 @@ export class ChannelService {
 
 		private readonly logsService: LogsService,
 		private readonly telegramService: TelegramService,
+		private readonly assetOwnershipService: AssetOwnershipService,
 	) {}
 
 	async create(dto: CreateChannelDto) {
@@ -256,10 +262,8 @@ export class ChannelService {
 
 		// Kiem tra channel hien tai nam trong cay tenant ma nguoi dung quan ly.
 		const channel = await this.findOne(id, actorTenantId);
-		const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
-		if (dto.tenantId !== undefined) {
-			// Khong cho chuyen channel ra ngoai nhanh tenant hien tai.
-			this.ensureTenantAccessible(dto.tenantId, tenantIds);
+		if (dto.tenantId !== undefined && dto.tenantId !== channel.tenantId) {
+			throw ChannelException.USE_TRANSFER_ENDPOINT();
 		}
 
 		if (dto.name && dto.name !== channel.name) {
@@ -267,11 +271,7 @@ export class ChannelService {
 		}
 
 		const hasImportantChange =
-			(dto.name !== undefined && dto.name !== channel.name) ||
-			(dto.tenantId !== undefined && dto.tenantId !== channel.tenantId);
-
-		const isTenantChanged =
-			dto.tenantId !== undefined && dto.tenantId !== channel.tenantId;
+			dto.name !== undefined && dto.name !== channel.name;
 
 		// Snapshot channel cu va update phai thanh cong/that bai cung nhau.
 		await this.dataSource.transaction(async (manager) => {
@@ -284,11 +284,6 @@ export class ChannelService {
 						channel,
 					}),
 				);
-			}
-
-			// Khi chuyển channel sang workspace khác -> xóa toàn bộ quyền/gán truy cập cũ
-			if (isTenantChanged) {
-				await manager.delete(UserChannel, { channelId: id });
 			}
 
 			await manager.update(Channel, id, {
@@ -309,6 +304,317 @@ export class ChannelService {
 		});
 
 		return this.findOne(id, actorTenantId);
+	}
+
+	async previewTransfer(
+		id: string,
+		dto: TransferChannelTenantDto,
+		actorTenantId: string,
+	) {
+		return this.prepareTransfer(id, dto, actorTenantId);
+	}
+
+	async transferTenant(
+		id: string,
+		dto: TransferChannelTenantDto,
+		actorTenantId: string,
+		userId: string,
+	) {
+		const prepared = await this.prepareTransfer(id, dto, actorTenantId);
+		if (prepared.blockingSharedIsrcs.length) {
+			throw ChannelException.SHARED_ISRC({
+				blockingSharedIsrcs: prepared.blockingSharedIsrcs,
+			});
+		}
+		if (prepared.blockingReleases.length) {
+			throw ChannelException.DATE_NOT_AFTER_CURRENT_PERIOD({
+				blockingReleases: prepared.blockingReleases,
+			});
+		}
+
+		const revenueEffectiveFrom =
+			this.assetOwnershipService.normalizeRevenueMonth(
+				dto.revenueEffectiveFrom,
+			);
+
+		await this.dataSource.transaction(async (manager) => {
+			await manager.query(
+				"SELECT pg_advisory_xact_lock(hashtext($1))",
+				[`channel_transfer:${id}`],
+			);
+			await manager.query("SET LOCAL statement_timeout = '60s'");
+
+			const items = prepared.releasesToTransfer.map((release) => ({
+				releaseId: release.releaseId,
+				labelId: release.destLabelId,
+			}));
+			if (items.length) {
+				await this.assetOwnershipService.transferMany(manager, {
+					items,
+					tenantId: dto.tenantId,
+					effectiveDate: dto.effectiveDate,
+					revenueEffectiveFrom,
+					source: 'channel_transfer',
+					actorId: userId,
+					notify: false,
+				});
+			}
+
+			if (prepared.mode !== 'assets_only') {
+				await manager.save(
+					ChannelHistory,
+					this.channelHistoryRepo.create({
+						userId,
+						channelId: id,
+						channel: prepared.channel,
+						effectiveDate: dto.effectiveDate,
+						revenueEffectiveFrom,
+						fromTenantId: prepared.fromTenantId,
+						toTenantId: dto.tenantId,
+					}),
+				);
+				await manager.delete(UserChannel, { channelId: id });
+				await manager.update(Channel, id, { tenantId: dto.tenantId });
+			}
+		});
+
+		await this.dataSource.query(
+			"SELECT pg_notify('clickhouse_sync_channel', 'asset_ownership_periods')",
+		);
+
+		this.logsService.log({
+			module: LogModule.COMMON,
+			message: `[CHANNEL_TRANSFER] ${prepared.channel.name} ${prepared.fromTenantId} -> ${dto.tenantId}`,
+			data: {
+				channelId: id,
+				mode: prepared.mode,
+				fromTenantId: prepared.fromTenantId,
+				toTenantId: dto.tenantId,
+				effectiveDate: dto.effectiveDate,
+				revenueEffectiveFrom,
+				transferredReleaseCount: prepared.releasesToTransfer.length,
+			},
+		});
+
+		const channel = await this.findOne(id, actorTenantId);
+		return {
+			channel,
+			mode: prepared.mode,
+			fromTenantId: prepared.fromTenantId,
+			toTenantId: dto.tenantId,
+			effectiveDate: dto.effectiveDate,
+			revenueEffectiveFrom,
+			totalReleaseCount: prepared.totalReleaseCount,
+			transferredReleaseCount: prepared.releasesToTransfer.length,
+			skippedAlreadyDestCount: prepared.skippedAlreadyDestCount,
+			labelClearedCount: prepared.labelsToClear.length,
+			baselineCreatedCount: prepared.baselineCreatedCount,
+		};
+	}
+
+	private async prepareTransfer(
+		id: string,
+		dto: TransferChannelTenantDto,
+		actorTenantId: string,
+	) {
+		this.assetOwnershipService.assertDate(dto.effectiveDate, 'effectiveDate');
+		const revenueEffectiveFrom =
+			this.assetOwnershipService.normalizeRevenueMonth(
+				dto.revenueEffectiveFrom,
+			);
+
+		const channel = await this.createDetailQuery()
+			.where('channel.id = :id', { id })
+			.getOne();
+		if (!channel) throw ChannelException.CHANNEL_NOT_FOUND();
+
+		const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
+		if (channel.tenantId) {
+			this.ensureTenantAccessible(channel.tenantId, tenantIds);
+		}
+		this.ensureTenantAccessible(dto.tenantId, tenantIds);
+
+		const videoReleases: Array<{
+			release_id: string;
+			tenant_id: string;
+			label_id: string | null;
+			video_id: string;
+			isrc: string | null;
+		}> = await this.dataSource.query(
+			`SELECT r.id AS release_id,
+			        r.tenant_id,
+			        r.label_id,
+			        v.id AS video_id,
+			        v.isrc
+			 FROM videos v
+			 INNER JOIN releases r ON r.id = v.release_id
+			 WHERE v.channel_id = $1`,
+			[id],
+		);
+
+		if (videoReleases.length > CHANNEL_TRANSFER_MAX_RELEASES) {
+			throw ChannelException.TOO_LARGE(CHANNEL_TRANSFER_MAX_RELEASES);
+		}
+
+		const sharedIsrcs: Array<{
+			isrc: string;
+			channel_release_id: string;
+			other_release_id: string;
+			src: string;
+		}> = videoReleases.length
+			? await this.dataSource.query(
+					`SELECT v.isrc,
+					        v.release_id AS channel_release_id,
+					        other.release_id AS other_release_id,
+					        other.src
+					 FROM videos v
+					 JOIN (
+					   SELECT isrc, release_id, 'track' AS src
+					   FROM tracks
+					   WHERE isrc IS NOT NULL AND isrc <> ''
+					   UNION ALL
+					   SELECT isrc, release_id, 'video' AS src
+					   FROM videos
+					   WHERE isrc IS NOT NULL AND isrc <> ''
+					 ) other ON other.isrc = v.isrc AND other.release_id <> v.release_id
+					 WHERE v.channel_id = $1
+					   AND v.isrc IS NOT NULL AND v.isrc <> ''`,
+					[id],
+				)
+			: [];
+
+		const uniqueReleaseIds = [...new Set(videoReleases.map((r) => r.release_id))];
+		const openPeriods: Array<{
+			release_id: string;
+			tenant_id: string;
+			label_id: string | null;
+			effective_from: string;
+			revenue_effective_from: string;
+		}> = uniqueReleaseIds.length
+			? await this.dataSource.query(
+					`SELECT p.release_id, p.tenant_id, p.label_id,
+					        to_char(p.effective_from, 'YYYY-MM-DD') AS effective_from,
+					        to_char(p.revenue_effective_from, 'YYYY-MM-DD') AS revenue_effective_from
+					 FROM asset_ownership_periods p
+					 WHERE p.release_id = ANY($1::uuid[])
+					   AND p.effective_to IS NULL`,
+					[uniqueReleaseIds],
+				)
+			: [];
+		const openByRelease = new Map(
+			openPeriods.map((p) => [p.release_id, p]),
+		);
+
+		const destLabels = uniqueReleaseIds.length
+			? await this.dataSource.query(
+					`SELECT id FROM labels WHERE tenant_id = $1 AND id = ANY($2::varchar[])`,
+					[
+						dto.tenantId,
+						[
+							...new Set(
+								videoReleases
+									.map((r) => r.label_id)
+									.filter((labelId): labelId is string => Boolean(labelId)),
+							),
+						],
+					],
+				)
+			: [];
+		const destLabelSet = new Set(
+			destLabels.map((row: { id: string }) => row.id),
+		);
+
+		const blockingReleases: Array<{
+			releaseId: string;
+			currentEffectiveFrom: string;
+			currentRevenueEffectiveFrom: string;
+		}> = [];
+		const releasesToTransfer: Array<{
+			releaseId: string;
+			destLabelId: string | null;
+		}> = [];
+		const labelsToClear: string[] = [];
+		let skippedAlreadyDestCount = 0;
+		let baselineCreatedCount = 0;
+		let maxCurrentEffectiveFrom = '1900-01-01';
+		let maxCurrentRevenueEffectiveFrom = '1900-01-01';
+
+		for (const releaseId of uniqueReleaseIds) {
+			const row = videoReleases.find((r) => r.release_id === releaseId)!;
+			const open = openByRelease.get(releaseId);
+			const currentEffectiveFrom = open?.effective_from ?? '1900-01-01';
+			const currentRevenueEffectiveFrom =
+				open?.revenue_effective_from ?? '1900-01-01';
+			if (currentEffectiveFrom > maxCurrentEffectiveFrom) {
+				maxCurrentEffectiveFrom = currentEffectiveFrom;
+			}
+			if (currentRevenueEffectiveFrom > maxCurrentRevenueEffectiveFrom) {
+				maxCurrentRevenueEffectiveFrom = currentRevenueEffectiveFrom;
+			}
+			if (!open) baselineCreatedCount += 1;
+
+			const currentTenant = open?.tenant_id ?? row.tenant_id;
+			const currentLabel = open?.label_id ?? row.label_id ?? null;
+			const destLabelId =
+				currentLabel && destLabelSet.has(currentLabel)
+					? currentLabel
+					: null;
+			if (currentLabel && destLabelId === null) {
+				labelsToClear.push(releaseId);
+			}
+
+			if (
+				currentTenant === dto.tenantId &&
+				currentLabel === destLabelId
+			) {
+				skippedAlreadyDestCount += 1;
+				continue;
+			}
+
+			if (
+				dto.effectiveDate <= currentEffectiveFrom ||
+				revenueEffectiveFrom <= currentRevenueEffectiveFrom
+			) {
+				blockingReleases.push({
+					releaseId,
+					currentEffectiveFrom,
+					currentRevenueEffectiveFrom,
+				});
+				continue;
+			}
+
+			releasesToTransfer.push({ releaseId, destLabelId });
+		}
+
+		const identityMatches = channel.tenantId === dto.tenantId;
+		let mode: 'identity' | 'assets_only' | 'first_assign';
+		if (!channel.tenantId) mode = 'first_assign';
+		else if (identityMatches) mode = 'assets_only';
+		else mode = 'identity';
+
+		if (
+			identityMatches &&
+			releasesToTransfer.length === 0 &&
+			!blockingReleases.length &&
+			!sharedIsrcs.length
+		) {
+			throw ChannelException.ALREADY_IN_TENANT();
+		}
+
+		return {
+			channel,
+			mode,
+			fromTenantId: channel.tenantId,
+			totalReleaseCount: uniqueReleaseIds.length,
+			releasesToTransfer,
+			skippedAlreadyDestCount,
+			labelsToClear,
+			baselineCreatedCount,
+			blockingReleases,
+			blockingSharedIsrcs: sharedIsrcs,
+			maxCurrentEffectiveFrom,
+			maxCurrentRevenueEffectiveFrom,
+		};
 	}
 
 	async assignUsersToChannel(

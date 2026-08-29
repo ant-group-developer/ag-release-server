@@ -94,4 +94,60 @@ export class ChannelException {
 			messageCode: 'channel.message.error.userNotAssigned',
 		});
 	}
+
+	static USE_TRANSFER_ENDPOINT() {
+		return new ResponseError({
+			statusCode: 400,
+			message:
+				'Đổi workspace kênh phải dùng POST /channels/:id/transfer kèm effectiveDate và revenueEffectiveFrom.',
+			messageCode: 'channel.transfer.useTransferEndpoint',
+		});
+	}
+
+	static DATES_REQUIRED() {
+		return new ResponseError({
+			statusCode: 400,
+			message: 'effectiveDate và revenueEffectiveFrom là bắt buộc',
+			messageCode: 'channel.transfer.datesRequired',
+		});
+	}
+
+	static ALREADY_IN_TENANT() {
+		return new ResponseError({
+			statusCode: 400,
+			message: 'Kênh và tài sản đã thuộc workspace đích',
+			messageCode: 'channel.transfer.alreadyInTenant',
+		});
+	}
+
+	static DATE_NOT_AFTER_CURRENT_PERIOD(data?: unknown) {
+		return new ResponseError({
+			statusCode: 400,
+			message:
+				'Ngày chuyển phải sau period ownership đang mở của mọi video trên kênh',
+			messageCode: 'channel.transfer.dateNotAfterCurrentPeriod',
+			data,
+		});
+	}
+
+	static SHARED_ISRC(data?: unknown) {
+		return new ResponseError({
+			statusCode: 400,
+			message:
+				'Không thể chuyển kênh vì ISRC của video còn thuộc release khác. Gỡ conflict trước khi transfer.',
+			messageCode: 'channel.transfer.sharedIsrc',
+			data,
+		});
+	}
+
+	static TOO_LARGE(max: number) {
+		return new ResponseError({
+			statusCode: 400,
+			message: `Kênh có quá nhiều video để chuyển đồng bộ (tối đa ${max}).`,
+			messageCode: 'channel.transfer.tooLarge',
+			data: { max },
+		});
+	}
 }
+
+export const CHANNEL_TRANSFER_MAX_RELEASES = 500;
