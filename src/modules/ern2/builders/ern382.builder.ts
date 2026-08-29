@@ -710,6 +710,12 @@ export class Ern382Builder2 {
 					pi.ele('PriceRangeType', {
 						Namespace: `DPID:${this.input.message.sender.partyId}`,
 					}).txt(deal.price.priceRangeType || 'mid');
+
+					if (deal.useTypes?.includes('PermanentDownload')) {
+						pi.ele('PriceType', {
+							Namespace: this.input.message.sender.partyId,
+						}).txt(deal.price.priceRangeType || 'mid');
+					}
 				}
 
 				const validity = terms.ele('ValidityPeriod');
@@ -754,6 +760,12 @@ export class Ern382Builder2 {
 						pi.ele('PriceRangeType', {
 							Namespace: `DPID:${this.input.message.sender.partyId}`,
 						}).txt(deal.price.priceRangeType || 'mid');
+
+						if (deal.useTypes?.includes('PermanentDownload')) {
+							pi.ele('PriceType', {
+								Namespace: this.input.message.sender.partyId,
+							}).txt(deal.price.priceRangeType || 'mid');
+						}
 					}
 
 					const validity = terms.ele('ValidityPeriod');
@@ -787,6 +799,9 @@ export class Ern382Builder2 {
 		const pi0 = t0.ele('PriceInformation');
 		pi0.ele('PriceRangeType', {
 			Namespace: `DPID:${this.input.message.sender.partyId}`,
+		}).txt('mid');
+		pi0.ele('PriceType', {
+			Namespace: this.input.message.sender.partyId,
 		}).txt('mid');
 		t0.ele('ValidityPeriod').ele('StartDate').txt(startDate);
 		rd0.ele('EffectiveDate').txt(startDate);

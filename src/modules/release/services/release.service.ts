@@ -579,6 +579,15 @@ export class ReleaseService {
 						 * Do đang giữ advisory lock, worker khác dùng cùng
 						 * prefix chưa thể gọi đoạn này đồng thời.
 						 */
+						this.logger.log(
+							[
+								'[GEN_UPC] Requesting UPC from service',
+								`releaseId=${releaseId}`,
+								`prefixUpcId=${prefixUpcId}`,
+								`attempt=${attempt}/${maxAttempts}`,
+							].join(', '),
+						);
+
 						const response = await this.upcService.getUpc({
 							prefixUpcId,
 							description: release?.title,
