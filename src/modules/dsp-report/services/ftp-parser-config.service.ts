@@ -842,9 +842,10 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 		);
 		const entry = this.assertCatalogCode(parserCode, category);
 		parserCode = entry.code;
-		// VevoParser dispatches 3 files itself (devices = views, attrs/social
-		// quantity_total = 0). A DB overlay mapping `views → quantity_total`
-		// rewrites social rows after parseRow and double-counts Vevo views.
+		// VevoParser dispatches 3 files itself (user_interactions = views,
+		// devices/attrs quantity_total = 0). A DB overlay mapping
+		// `views → quantity_total` rewrites device rows after parseRow and
+		// double-counts Vevo views.
 		const skipFieldMappingOverlay =
 			parserCode === 'ftp.trends.vvo' || parserCode === 'ftp.usage.vvo';
 		const fieldMappings = skipFieldMappingOverlay

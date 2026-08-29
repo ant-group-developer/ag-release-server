@@ -310,7 +310,7 @@ export class CubeRebuildService {
                   'device' AS dimension,
                   metadata['device'] AS dimension_value,
                   territory_code,
-                  quantity_total AS views,
+                  if(quantity_total > 0, quantity_total, toUInt64OrZero(metadata['views'])) AS views,
                   0 AS likes,
                   0 AS dislikes,
                   0 AS shares
