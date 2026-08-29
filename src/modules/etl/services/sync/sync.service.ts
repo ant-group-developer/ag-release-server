@@ -449,6 +449,28 @@ export class SyncService {
 			);
 		}
 
+		return this.analyticsProjectionRefreshService.whileCubeViewsPaused(() =>
+			this.syncOpenedPeriod(
+				period,
+				force,
+				categories,
+				jobId,
+				session,
+				sourceType,
+			),
+		);
+	}
+
+	private async syncOpenedPeriod(
+		period: string,
+		force: boolean | undefined,
+		categories:
+			| Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>
+			| undefined,
+		jobId: string | undefined,
+		session: FtpSession,
+		sourceType: ImportJobSourceType,
+	): Promise<SyncPeriodResult> {
 		const config = await this.getSyncConfig();
 		const resolvedForce = force ?? config.force;
 		const resolvedCategories =
@@ -918,8 +940,9 @@ export class SyncService {
 			`Period ${period} sync done: ${result.totalRows} rows, ${result.totalFiles} files (${result.durationMs}ms)`,
 		);
 
-		// Rebuild each affected partition only after every fact write for this period.
-		// This keeps cubes correct for both fresh imports and replacement imports.
+		// Rebuild each affected partition only after every fact write for this
+		// period. Cube MVs stay paused for this window so replacement inserts
+		// cannot double-count on top of the previous rebuild.
 		if (affectedSalesPeriods.size || affectedTrendsPeriods.size) {
 			await this.analyticsProjectionRefreshService.refreshAfterFactImport(
 				{

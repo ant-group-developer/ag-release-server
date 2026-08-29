@@ -48,4 +48,38 @@ describe('CubeRebuildService', () => {
 			'TRUNCATE TABLE IF EXISTS music_analytics.trends_demographics_cube',
 		);
 	});
+
+	it('detaches leftover cube materialized views before a period fact write', async () => {
+		await service.pauseCubeMaterializedViews();
+
+		const sql = clickHouseService.execute.mock.calls
+			.map((call) => call[0] as string)
+			.join('\n');
+		expect(sql).toContain(
+			'DETACH TABLE IF EXISTS music_analytics.sales_dsp_monthly_cube_v2_mv',
+		);
+		expect(sql).toContain(
+			'DETACH TABLE IF EXISTS music_analytics.trends_demographics_cube_mv',
+		);
+	});
+
+	it('reattaches leftover cube materialized views after the rebuild', async () => {
+		await service.resumeCubeMaterializedViews();
+
+		expect(clickHouseService.execute).toHaveBeenCalledWith(
+			'ATTACH TABLE IF NOT EXISTS music_analytics.sales_dsp_monthly_cube_v2_mv',
+		);
+	});
+
+	it('keeps going when a dropped cube view cannot be attached', async () => {
+		clickHouseService.execute.mockRejectedValueOnce(
+			new Error(
+				"Table music_analytics.sales_dsp_monthly_cube_v2_mv doesn't exist",
+			),
+		);
+
+		await expect(
+			service.resumeCubeMaterializedViews(),
+		).resolves.toBeUndefined();
+	});
 });

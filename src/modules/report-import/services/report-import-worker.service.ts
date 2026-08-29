@@ -409,6 +409,12 @@ export class ReportImportWorkerService
 	}
 
 	private async processJob(jobId: string) {
+		return this.analyticsProjectionRefreshService.whileCubeViewsPaused(() =>
+			this.processOpenedJob(jobId),
+		);
+	}
+
+	private async processOpenedJob(jobId: string) {
 		const tempDir = path.join(os.tmpdir(), 'report-imports', jobId);
 		let totalProcessedRows = 0;
 		const affectedSalesPeriods = new Set<string>();

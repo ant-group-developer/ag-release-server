@@ -82,6 +82,7 @@ export interface ParserCatalogRecord {
 	parserName: string;
 	sourceFile: string;
 	targetTable: string;
+	/** Catalog mappings with the latest parser_override snapshot applied. */
 	fieldMappings: FtpParserFieldMapping[];
 	parserSource: string;
 	sourceHash: string;
@@ -136,6 +137,62 @@ export function expandParserCatalogCodes(
 		candidates.push(`ftp.${category}.vvo`);
 	}
 	return [...new Set(candidates)];
+}
+
+/**
+ * Build the GET fieldMappings list.
+ *
+ * Catalog stores every parser alias (`Album Title` and `album_title`). Overrides
+ * are a delta. An override always wins for its reportColumn: that source is
+ * removed from the catalog view, and every other catalog alias that pointed at
+ * the same target is removed too so the UI does not keep showing the old
+ * target after a redirect (e.g. album_title → metadata).
+ *
+ * Remaining catalog mappings are collapsed to one row per target so a later
+ * PATCH of this list can satisfy "each targetColumn once".
+ */
+export function mergeEffectiveFieldMappings(
+	catalog: FtpParserFieldMapping[],
+	overrides: FtpParserFieldMapping[],
+): FtpParserFieldMapping[] {
+	if (overrides.length === 0) return catalog;
+
+	const overrideByReport = new Set(
+		overrides.map((mapping) => mapping.reportColumn),
+	);
+	const overrideByTarget = new Set(
+		overrides
+			.filter((mapping) => mapping.targetColumn !== 'skip')
+			.map((mapping) => mapping.targetColumn),
+	);
+	const replacedCatalogTargets = new Set(
+		catalog
+			.filter(
+				(mapping) =>
+					mapping.targetColumn !== 'skip' &&
+					overrideByReport.has(mapping.reportColumn),
+			)
+			.map((mapping) => mapping.targetColumn),
+	);
+
+	const byTarget = new Map<string, FtpParserFieldMapping>();
+	for (const mapping of catalog) {
+		if (mapping.targetColumn === 'skip') continue;
+		if (overrideByReport.has(mapping.reportColumn)) continue;
+		if (overrideByTarget.has(mapping.targetColumn)) continue;
+		if (replacedCatalogTargets.has(mapping.targetColumn)) continue;
+		byTarget.set(mapping.targetColumn, mapping);
+	}
+
+	const skips: FtpParserFieldMapping[] = [];
+	for (const mapping of overrides) {
+		if (mapping.targetColumn === 'skip') {
+			skips.push(mapping);
+			continue;
+		}
+		byTarget.set(mapping.targetColumn, mapping);
+	}
+	return [...byTarget.values(), ...skips];
 }
 
 function toRecord(row: any): FtpParserConfigRecord {
@@ -990,16 +1047,10 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 					targetColumn: row.target_column,
 					transform: row.transform || undefined,
 				}));
-			const byTarget = new Map(
-				(effective.get(key) || []).map((mapping) => [
-					mapping.targetColumn,
-					mapping,
-				]),
+			effective.set(
+				key,
+				mergeEffectiveFieldMappings(effective.get(key) || [], overrides),
 			);
-			for (const mapping of overrides) {
-				byTarget.set(mapping.targetColumn, mapping);
-			}
-			effective.set(key, Array.from(byTarget.values()));
 		}
 		return effective;
 	}

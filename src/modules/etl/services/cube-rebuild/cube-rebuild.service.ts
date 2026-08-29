@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CLICKHOUSE_TABLES } from '../../../clickhouse/clickhouse.constants';
+import {
+	CLICKHOUSE_TABLES,
+	CUBE_MATERIALIZED_VIEWS,
+} from '../../../clickhouse/clickhouse.constants';
 import { ClickHouseService } from '../../../clickhouse/clickhouse.service';
 import { REVENUE_USD_EXPRESSION } from './revenue-sql.util';
 
@@ -8,6 +11,42 @@ export class CubeRebuildService {
 	private readonly logger = new Logger(CubeRebuildService.name);
 
 	constructor(private readonly clickHouseService: ClickHouseService) {}
+
+	/**
+	 * Stop leftover cube MVs from firing on fact INSERT. No-op when the
+	 * views have already been dropped (migration 050).
+	 */
+	async pauseCubeMaterializedViews(): Promise<void> {
+		for (const view of CUBE_MATERIALIZED_VIEWS) {
+			try {
+				await this.clickHouseService.execute(
+					`DETACH TABLE IF EXISTS music_analytics.${view}`,
+				);
+			} catch (error) {
+				this.logger.debug(
+					`Skip detach of cube MV ${view}: ${error.message}`,
+				);
+			}
+		}
+	}
+
+	/**
+	 * Re-attach cube MVs that were only detached (not dropped).
+	 * Dropped views are skipped so cubes stay rebuild-only.
+	 */
+	async resumeCubeMaterializedViews(): Promise<void> {
+		for (const view of CUBE_MATERIALIZED_VIEWS) {
+			try {
+				await this.clickHouseService.execute(
+					`ATTACH TABLE IF NOT EXISTS music_analytics.${view}`,
+				);
+			} catch (error) {
+				this.logger.debug(
+					`Skip attach of cube MV ${view}: ${error.message}`,
+				);
+			}
+		}
+	}
 
 	private async dropPartition(
 		table: string,
@@ -248,8 +287,8 @@ export class CubeRebuildService {
         `);
 
 				// 7. Re-insert Vevo demographics (device / gender / age / social).
-				// Must drop+rebuild like the other cubes: the MV only fires on
-				// INSERT, so a fact re-import would otherwise double-count.
+				// Cubes are rebuild-only: a fact re-import must drop+rebuild the
+				// partition or leftover MV rows would double-count.
 				await this.clickHouseService.execute(`
           INSERT INTO music_analytics.${CLICKHOUSE_TABLES.TRENDS_DEMOGRAPHICS_CUBE}
           SELECT
