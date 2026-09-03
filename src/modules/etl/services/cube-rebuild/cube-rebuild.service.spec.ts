@@ -36,6 +36,8 @@ describe('CubeRebuildService', () => {
 		);
 		expect(sql).toContain("usage_type = 'view_demo'");
 		expect(sql).toContain("usage_type = 'view_social'");
+		expect(sql).toContain("metadata['sub_type'] = 'devices'");
+		expect(sql).toContain("toUInt64OrZero(metadata['views'])");
 		expect(sql).toContain("toYYYYMM(reporting_period) = '202608'");
 	});
 

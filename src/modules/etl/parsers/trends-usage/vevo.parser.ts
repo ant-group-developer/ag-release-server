@@ -7,13 +7,14 @@ import { BaseParser } from '../base.parser';
  * Format: TSV (tab-delimited)
  * 3 file types per day — all measure the same video views but sliced by different dimensions:
  *
- *   - devices:           views × (country, device)       → PRIMARY source for view counts
- *   - user_attributes:   views_estimate × (country, gender, age_group) → demographic breakdown only
- *   - user_interactions: views × (country) + likes/dislikes/shares    → social metrics only
+ *   - user_interactions: views × (country) + likes/dislikes/shares → PRIMARY source for view counts
+ *   - devices:           views × (country, device)                 → device breakdown only
+ *   - user_attributes:   views_estimate × (country, gender, age)   → demographic breakdown only
  *
- * Strategy: Only `devices` contributes to quantity_total (view count).
- * `user_attributes` and `user_interactions` store their metrics in metadata
- * with quantity_total = 0 to prevent triple-counting views.
+ * Strategy: Only `user_interactions` contributes to quantity_total (view count).
+ * The devices file lands 1–2 days later than the other two, so using it as the
+ * primary source delayed trend stats. `devices` and `user_attributes` store
+ * their metrics in metadata with quantity_total = 0 to prevent triple-counting.
  *
  * Evidence (2026-04 data):
  *   devices total=16,462  |  user_attr total=15,893  |  user_int total=16,314
@@ -54,14 +55,18 @@ export class VevoParser extends BaseParser {
 	}
 
 	/**
-	 * devices: PRIMARY source for view counts.
+	 * devices: Device breakdown only.
 	 * Each row = views for (ISRC, country, device).
-	 * quantity_total = views (the actual count).
+	 * quantity_total = 0 so this file does not delay / double-count trend stats.
+	 * views stored in metadata for the demographics cube.
 	 */
 	private parseDevices(
 		record: Record<string, string>,
 		batchId: string,
 	): FactDspRow | null {
+		const views = this.safeInt(record['views']);
+		if (views === 0) return null;
+
 		const row = this.createBaseRow(batchId);
 		row.reporting_period = this.normalizeDate(
 			record['date'] || record['view_date'],
@@ -74,11 +79,12 @@ export class VevoParser extends BaseParser {
 		row.licensor = record['member_name'] || '';
 		row.upc = record['upc'] || '';
 		row.partner_id = record['dpid'] || '';
-		row.quantity_total = this.safeInt(record['views']);
+		row.quantity_total = 0; // DO NOT count views — user_interactions is the primary source
 		row.usage_type = 'view';
 
 		row.metadata = {
 			sub_type: 'devices',
+			views: String(views),
 			...(record['device'] ? { device: record['device'] } : {}),
 			...(record['genre'] ? { genre: record['genre'] } : {}),
 			...(record['video_length']
@@ -123,7 +129,7 @@ export class VevoParser extends BaseParser {
 		row.licensor = record['member_name'] || '';
 		row.upc = record['upc'] || '';
 		row.partner_id = record['dpid'] || '';
-		row.quantity_total = 0; // DO NOT count views — devices is the primary source
+		row.quantity_total = 0; // DO NOT count views — user_interactions is the primary source
 		row.usage_type = 'view_demo';
 
 		row.metadata = {
@@ -142,9 +148,10 @@ export class VevoParser extends BaseParser {
 	}
 
 	/**
-	 * user_interactions: Social metrics only (likes, dislikes, shares).
-	 * quantity_total = 0 to avoid double-counting views.
-	 * views stored in metadata for reference.
+	 * user_interactions: PRIMARY source for view counts.
+	 * Each row = views for (ISRC, country) plus likes/dislikes/shares.
+	 * quantity_total = views (the actual count used by trend cubes).
+	 * Social metrics stay in metadata for the demographics cube.
 	 */
 	private parseUserInteractions(
 		record: Record<string, string>,
@@ -162,7 +169,7 @@ export class VevoParser extends BaseParser {
 		row.licensor = record['member_name'] || '';
 		row.upc = record['upc'] || '';
 		row.partner_id = record['dpid'] || '';
-		row.quantity_total = 0; // DO NOT count views — devices is the primary source
+		row.quantity_total = this.safeInt(record['views']);
 		row.usage_type = 'view_social';
 
 		row.metadata = {
