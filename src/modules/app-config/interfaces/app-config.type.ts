@@ -70,6 +70,13 @@ export interface GeneralConfig {
 	preview: number;
 }
 
+export interface MultipartUploadConfig {
+	partSizeMb: number;
+	presignExpiresSeconds: number;
+	sessionExpiresSeconds: number;
+	maxFileSizeMb: number;
+}
+
 export interface IGenerator {
 	prefixUpcDefaultId: string;
 	prefixIsrcDefaultId: string;
@@ -97,6 +104,7 @@ export interface AppConfigShape {
 	telegram: Telegram; // Cấu hình bot Telegram và hệ thống thông báo
 	acrCloud: AcrCloud; // Cấu hình ACRCloud dùng cho nhận diện âm thanh
 	general: GeneralConfig; // Các cấu hình chung ở cấp độ toàn hệ thống
+	multipartUpload: MultipartUploadConfig;
 	generator: IGenerator;
 
 	other: OtherAppconfig;

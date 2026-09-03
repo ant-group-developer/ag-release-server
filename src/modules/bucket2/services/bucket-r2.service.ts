@@ -1,11 +1,16 @@
 import {
+	AbortMultipartUploadCommand,
+	CompleteMultipartUploadCommand,
 	CopyObjectCommand,
+	CreateMultipartUploadCommand,
 	DeleteObjectCommand,
 	GetObjectCommand,
 	HeadObjectCommand,
 	ListObjectsV2Command,
+	ListPartsCommand,
 	PutObjectCommand,
 	S3Client,
+	UploadPartCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
@@ -137,7 +142,10 @@ export class BucketR2Service {
 				return { bucketName, key };
 			} catch (error) {
 				lastError = error;
-				if (attempt >= maxAttempts || !this.isRetryableUploadError(error)) {
+				if (
+					attempt >= maxAttempts ||
+					!this.isRetryableUploadError(error)
+				) {
 					throw error;
 				}
 				await this.sleep(500 * attempt);
@@ -381,5 +389,175 @@ export class BucketR2Service {
 			}),
 		);
 		await this.delete({ bucketName, key: fromKey });
+	}
+
+	// Multipart upload
+	async createMultipartUpload(data: {
+		bucketName: string;
+		key: string;
+		contentType: string;
+		metadata?: Record<string, string>;
+	}): Promise<{ uploadId: string }> {
+		const result = await this.client.send(
+			new CreateMultipartUploadCommand({
+				Bucket: data.bucketName,
+				Key: data.key,
+				ContentType: data.contentType,
+				Metadata: data.metadata,
+			}),
+		);
+
+		if (!result.UploadId) {
+			throw new Error('R2 did not return multipart uploadId');
+		}
+
+		return { uploadId: result.UploadId };
+	}
+
+	async getSignedUrlUploadPart(data: {
+		bucketName: string;
+		key: string;
+		uploadId: string;
+		partNumber: number;
+		expiresIn: number;
+	}): Promise<string> {
+		const command = new UploadPartCommand({
+			Bucket: data.bucketName,
+			Key: data.key,
+			UploadId: data.uploadId,
+			PartNumber: data.partNumber,
+		});
+
+		return getSignedUrl(this.client, command, {
+			expiresIn: data.expiresIn,
+		});
+	}
+
+	async completeMultipartUpload(data: {
+		bucketName: string;
+		key: string;
+		uploadId: string;
+		parts: Array<{ PartNumber: number; ETag: string }>;
+	}): Promise<void> {
+		await this.client.send(
+			new CompleteMultipartUploadCommand({
+				Bucket: data.bucketName,
+				Key: data.key,
+				UploadId: data.uploadId,
+				MultipartUpload: { Parts: data.parts },
+			}),
+		);
+	}
+
+	async abortMultipartUpload(data: {
+		bucketName: string;
+		key: string;
+		uploadId: string;
+	}): Promise<void> {
+		await this.client.send(
+			new AbortMultipartUploadCommand({
+				Bucket: data.bucketName,
+				Key: data.key,
+				UploadId: data.uploadId,
+			}),
+		);
+	}
+
+	async headObject(data: {
+		bucketName: string;
+		key: string;
+	}): Promise<{ contentLength: number; contentType?: string }> {
+		const result = await this.client.send(
+			new HeadObjectCommand({
+				Bucket: data.bucketName,
+				Key: data.key,
+			}),
+		);
+
+		return {
+			contentLength: result.ContentLength ?? 0,
+			contentType: result.ContentType,
+		};
+	}
+
+	async objectExists(data: {
+		bucketName: string;
+		key: string;
+	}): Promise<boolean> {
+		try {
+			await this.headObject(data);
+			return true;
+		} catch (error) {
+			const status = (
+				error as {
+					$metadata?: { httpStatusCode?: number };
+				}
+			).$metadata?.httpStatusCode;
+			if (status === 404) return false;
+			throw error;
+		}
+	}
+
+	async listMultipartParts(data: {
+		bucketName: string;
+		key: string;
+		uploadId: string;
+	}): Promise<
+		Array<{
+			partNumber: number;
+			eTag: string;
+			size: number;
+		}>
+	> {
+		const parts: Array<{
+			partNumber: number;
+			eTag: string;
+			size: number;
+		}> = [];
+		let partNumberMarker: string | undefined;
+
+		do {
+			const result = await this.client.send(
+				new ListPartsCommand({
+					Bucket: data.bucketName,
+					Key: data.key,
+					UploadId: data.uploadId,
+					PartNumberMarker: partNumberMarker,
+				}),
+			);
+
+			for (const part of result.Parts ?? []) {
+				if (
+					part.PartNumber === undefined ||
+					!part.ETag ||
+					part.Size === undefined
+				) {
+					continue;
+				}
+				parts.push({
+					partNumber: part.PartNumber,
+					eTag: part.ETag,
+					size: part.Size,
+				});
+			}
+
+			partNumberMarker = result.IsTruncated
+				? result.NextPartNumberMarker
+				: undefined;
+		} while (partNumberMarker !== undefined);
+
+		return parts;
+	}
+
+	async deleteObject(data: {
+		bucketName: string;
+		key: string;
+	}): Promise<void> {
+		await this.client.send(
+			new DeleteObjectCommand({
+				Bucket: data.bucketName,
+				Key: data.key,
+			}),
+		);
 	}
 }
