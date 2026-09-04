@@ -114,6 +114,26 @@ export class UpdateTrackConfigDto {
 	preview: number;
 }
 
+export class UpdateMultipartUploadConfigDto {
+	@IsNumber()
+	@Min(5)
+	partSizeMb: number;
+
+	@IsNumber()
+	@Min(60)
+	@Max(86400)
+	presignExpiresSeconds: number;
+
+	@IsNumber()
+	@Min(3600)
+	@Max(604800)
+	sessionExpiresSeconds: number;
+
+	@IsNumber()
+	@Min(5)
+	maxFileSizeMb: number;
+}
+
 export class UpdateGeneratorDto {
 	@IsOptional()
 	// @IsNotEmpty()
@@ -245,6 +265,11 @@ export class UpdateConfigDto {
 	@ValidateNested()
 	@Type(() => UpdateTrackConfigDto)
 	general?: UpdateTrackConfigDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdateMultipartUploadConfigDto)
+	multipartUpload?: UpdateMultipartUploadConfigDto;
 
 	@IsOptional()
 	@ValidateNested()

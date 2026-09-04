@@ -41,3 +41,12 @@ export enum Type {
 // 	// MINIO = 'minio',
 // 	R2 = 'r2',
 // }
+
+export enum MultipartUploadStatus {
+	INITIATED = 'initiated',
+	COMPLETING = 'completing',
+	COMPLETED = 'completed',
+	ABORTING = 'aborting',
+	ABORTED = 'aborted',
+	FAILED = 'failed',
+}
