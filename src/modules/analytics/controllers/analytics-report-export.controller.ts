@@ -3,10 +3,12 @@ import {
 	Body,
 	Controller,
 	ForbiddenException,
+	Get,
 	MessageEvent,
 	NotFoundException,
 	Param,
 	Post,
+	Query,
 	Req,
 	Sse,
 } from '@nestjs/common';
@@ -21,8 +23,8 @@ import {
 	switchMap,
 	takeWhile,
 } from 'rxjs/operators';
-import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { ImportJob } from 'src/modules/etl/interfaces';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { ImportJob, ImportJobSourceType } from 'src/modules/etl/interfaces';
 import {
 	computeProgressDetail,
 	ImportJobsService,
@@ -33,6 +35,7 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	AnalyticsReportExportDto,
 	CancelAnalyticsReportExportJobsDto,
+	QueryAnalyticsReportExportsDto,
 } from '../dto/analytics-report-export.dto';
 import {
 	AnalyticsReportExportCancelAllResult,
@@ -140,6 +143,42 @@ export class AnalyticsReportExportController {
 			req.user!.tenantId,
 		);
 		return new ResponseSuccess({ data });
+	}
+
+	@Get('exports')
+	@ApiOperation({
+		summary: 'List analytics report export jobs',
+		description:
+			'Tenant-scoped listing for analytics exports. Normal tenants see only their own jobs; system tenant can filter by tenantId or see all. ' +
+			'Analytics exports are excluded from GET /etl/jobs by default and live here.',
+	})
+	@ApiResponse({ status: 200, description: 'Paginated export jobs.' })
+	async listExports(
+		@Req() req: Request,
+		@Query() query: QueryAnalyticsReportExportsDto,
+	): Promise<ResponseSuccess<PageDto<ReturnType<typeof formatExportJob>>>> {
+		const isSystem = checkIsSystemTenant(req.user!.tenantId);
+		// Normal tenants: force own tenant; ignore any tenantId passed in query.
+		const tenantId = isSystem ? query.tenantId : req.user!.tenantId;
+		const result = await this.importJobsService.list({
+			sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+			status: query.status,
+			tenantId,
+			limit: query.pageSize,
+			offset: (query.page - 1) * query.pageSize,
+			fieldOrder: query.fieldOrder,
+			orderBy: query.orderBy,
+		});
+		return new ResponseSuccess({
+			data: new PageDto({
+				items: result.items.map((job) => formatExportJob(job)),
+				metadata: {
+					page: query.page,
+					pageSize: query.pageSize,
+					totalItems: result.totalItems,
+				},
+			}),
+		});
 	}
 
 	@Sse('export/:jobId/events')

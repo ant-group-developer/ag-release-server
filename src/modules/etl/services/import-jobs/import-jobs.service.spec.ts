@@ -65,7 +65,40 @@ describe('ImportJobsService.list reportSource filter', () => {
 		await service.list({ reportSource: ImportJobReportSource.WARNER });
 
 		const [countSql] = clickHouseService.query.mock.calls[1];
-		expect(countSql).toContain('WHERE 0');
+		expect(countSql).toMatch(/\b0\b/);
+	});
+
+	it('hides analytics report exports from the default ETL job list', async () => {
+		const { clickHouseService, service } = createService();
+		clickHouseService.query.mockResolvedValueOnce([{ total: '0' }]);
+
+		await service.list();
+
+		const [countSql, params] = clickHouseService.query.mock.calls[0];
+		expect(countSql).toContain(
+			'source_type != {analyticsExportExcludedSourceType:String}',
+		);
+		expect(params.analyticsExportExcludedSourceType).toBe(
+			ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+		);
+	});
+
+	it('does not exclude analytics exports when sourceType is set explicitly', async () => {
+		const { clickHouseService, service } = createService();
+		clickHouseService.query.mockResolvedValueOnce([{ total: '0' }]);
+
+		await service.list({
+			sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+		});
+
+		const [countSql, params] = clickHouseService.query.mock.calls[0];
+		expect(countSql).toContain('source_type = {sourceType:String}');
+		expect(countSql).not.toContain(
+			'source_type != {analyticsExportExcludedSourceType:String}',
+		);
+		expect(params.sourceType).toBe(
+			ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+		);
 	});
 
 	it('leaves analytics export PENDING jobs to the dedicated one-hour timeout', async () => {

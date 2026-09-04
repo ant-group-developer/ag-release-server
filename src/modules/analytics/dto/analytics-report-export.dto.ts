@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	IsEnum,
 	Allow,
 	ArrayNotEmpty,
 	IsArray,
@@ -10,6 +11,9 @@ import {
 	IsUUID,
 	Matches,
 } from 'class-validator';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import { OrderDirection } from 'src/common/enums/common';
+import { ImportJobStatus } from 'src/modules/etl/interfaces';
 import type { AnalyticsVideoScope } from '../services/analytics-video-scope.service';
 
 const normalizeOptionalReleaseType = (value: unknown): unknown => {
@@ -172,4 +176,43 @@ export class CancelAnalyticsReportExportJobsDto {
 	@ArrayNotEmpty()
 	@IsUUID('4', { each: true })
 	jobIds: string[];
+}
+
+export class QueryAnalyticsReportExportsDto extends BaseQueryDto {
+	@ApiPropertyOptional({
+		description: 'Filter by job status',
+		enum: ImportJobStatus,
+		required: false,
+	})
+	@IsOptional()
+	@IsEnum(ImportJobStatus)
+	status?: ImportJobStatus;
+
+	@ApiPropertyOptional({
+		description:
+			'Filter by tenant. System tenant can filter any; normal tenants are forced to own tenant.',
+		required: false,
+	})
+	@IsOptional()
+	@IsString()
+	tenantId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Field to order by',
+		default: 'createdAt',
+		example: 'createdAt',
+	})
+	@IsOptional()
+	@IsString()
+	fieldOrder: string = 'createdAt';
+
+	@ApiPropertyOptional({
+		description: 'Order direction',
+		enum: OrderDirection,
+		default: OrderDirection.DESC,
+		example: OrderDirection.DESC,
+	})
+	@IsOptional()
+	@IsEnum(OrderDirection)
+	orderBy: OrderDirection = OrderDirection.DESC;
 }
