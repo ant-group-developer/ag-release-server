@@ -1,4 +1,5 @@
 import {
+	BadRequestException,
 	Body,
 	Controller,
 	ForbiddenException,
@@ -227,39 +228,50 @@ export class AnalyticsReportExportController {
 
 	/**
 	 * Validate quyền truy cập workspace:
+	 * - tenantId và tenantIds là mutual exclusive (400 nếu truyền cả hai).
 	 * - System tenant → cho phép chọn bất kỳ workspace.
-	 * - Normal tenant → chỉ được chọn workspace hiện tại + descendant.
-	 * - Nếu dto.tenantIds trống → mặc định gán [currentTenantId].
+	 * - Normal tenant → chỉ được chọn workspace hiện tại + descendant. Danh sách
+	 *   hợp lệ luôn resolve từ token (currentTenantId), không từ dto.tenantId —
+	 *   dto chỉ khai báo ý định, token mới là nguồn quyền hạn.
+	 * - Nếu cả hai đều trống → normal tenant mặc định [currentTenantId]; system = all.
 	 */
 	private async validateAndResolveTenantIds(
 		dto: AnalyticsReportExportDto,
 		currentTenantId: string,
 	): Promise<void> {
-		// Nếu không truyền tenantIds → mặc định workspace hiện tại
-		if (!dto.tenantIds?.length) {
-			if (!checkIsSystemTenant(currentTenantId)) {
-				dto.tenantIds = [currentTenantId];
-			}
-			// System tenant không truyền → lấy tất cả (tenantIds = undefined)
-			return;
+		if (dto.tenantId && dto.tenantIds?.length) {
+			throw new BadRequestException(
+				'tenantId and tenantIds are mutually exclusive. Use exactly one.',
+			);
 		}
 
-		// System tenant → cho phép chọn bất kỳ
+		// System tenant → cho phép chọn bất kỳ, không cần validate
 		if (checkIsSystemTenant(currentTenantId)) {
 			return;
 		}
 
-		// Normal tenant → kiểm tra tất cả tenantIds phải nằm trong descendant tree
-		const allowedIds =
-			await this.tenantService.getDescendantIds(currentTenantId);
-		const allowedSet = new Set(allowedIds);
+		// Normal tenant → mọi workspace được yêu cầu phải nằm trong descendant tree
+		const requested = dto.tenantIds?.length
+			? dto.tenantIds
+			: dto.tenantId
+				? [dto.tenantId]
+				: [];
 
-		const forbidden = dto.tenantIds.filter((id) => !allowedSet.has(id));
-		if (forbidden.length > 0) {
-			throw new ForbiddenException(
-				`You do not have access to workspace(s): ${forbidden.join(', ')}`,
-			);
+		if (requested.length > 0) {
+			const allowedIds =
+				await this.tenantService.getDescendantIds(currentTenantId);
+			const allowedSet = new Set(allowedIds);
+			const forbidden = requested.filter((id) => !allowedSet.has(id));
+			if (forbidden.length > 0) {
+				throw new ForbiddenException(
+					`You do not have access to workspace(s): ${forbidden.join(', ')}`,
+				);
+			}
+			return;
 		}
+
+		// Không truyền gì → mặc định workspace hiện tại
+		dto.tenantIds = [currentTenantId];
 	}
 
 	private assertReadableJob(

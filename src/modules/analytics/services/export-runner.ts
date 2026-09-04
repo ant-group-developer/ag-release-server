@@ -125,10 +125,6 @@ export class ExportRunner {
 	): Promise<AnalyticsReportExportResult> {
 		await this.throwIfCancelled();
 		this.getMonthRange(dto);
-		const trackIsrc = await this.resolveTrackIsrc(dto.trackId);
-		if (dto.trackId && !trackIsrc) {
-			throw new Error('trackId does not have a valid ISRC');
-		}
 
 		const tenantNamesMap = await this.getTenantNames([tenantId]);
 		const tenantName = tenantNamesMap.get(tenantId) || 'unnamed_workspace';
@@ -182,85 +178,80 @@ export class ExportRunner {
 				);
 			};
 
-			await this.streamRawDetails(
-				tenantId,
-				dto,
-				trackIsrc,
-				async (rawRows) => {
-					if (!receivedFirstRows) {
-						receivedFirstRows = true;
-						await this.deps.onProgress?.(
-							{
-								progressCurrent: 2,
-								progressLabel: 'Streaming data',
-							},
-							true,
-						);
-					}
-					for (
-						let start = 0;
-						start < rawRows.length;
-						start += ExportRunner.METADATA_WINDOW_SIZE
-					) {
-						const window = rawRows.slice(
-							start,
-							start + ExportRunner.METADATA_WINDOW_SIZE,
-						);
-						await this.hydrateMetadataWindow(window, cache);
+			await this.streamRawDetails(tenantId, dto, async (rawRows) => {
+				if (!receivedFirstRows) {
+					receivedFirstRows = true;
+					await this.deps.onProgress?.(
+						{
+							progressCurrent: 2,
+							progressLabel: 'Streaming data',
+						},
+						true,
+					);
+				}
+				for (
+					let start = 0;
+					start < rawRows.length;
+					start += ExportRunner.METADATA_WINDOW_SIZE
+				) {
+					const window = rawRows.slice(
+						start,
+						start + ExportRunner.METADATA_WINDOW_SIZE,
+					);
+					await this.hydrateMetadataWindow(window, cache);
 
-						for (const raw of window) {
-							const detail = this.enrichSingleRow(
-								raw,
-								stringPool,
-								cache,
+					for (const raw of window) {
+						const detail = this.enrichSingleRow(
+							raw,
+							stringPool,
+							cache,
+						);
+						const groupKeys = this.getRowGroupKeys(detail);
+
+						for (const gk of groupKeys) {
+							let group = groups.get(gk);
+							if (!group) {
+								const groupFolder = path.join(tempDir, gk);
+								await fs.promises.mkdir(groupFolder, {
+									recursive: true,
+								});
+								group = {
+									summary: createEmptyAccumulator(),
+									detailFilePath: path.join(
+										groupFolder,
+										`detail.${format}`,
+									),
+									hasWrittenDetailFile: false,
+								};
+								groups.set(gk, group);
+							}
+							const writer = await this.acquireWriter(
+								gk,
+								group,
+								format,
+								openCsvWriters,
 							);
-							const groupKeys = this.getRowGroupKeys(detail, dto);
-
-							for (const gk of groupKeys) {
-								let group = groups.get(gk);
-								if (!group) {
-									const groupFolder = path.join(tempDir, gk);
-									await fs.promises.mkdir(groupFolder, {
-										recursive: true,
-									});
-									group = {
-										summary: createEmptyAccumulator(),
-										detailFilePath: path.join(
-											groupFolder,
-											`detail.${format}`,
-										),
-										hasWrittenDetailFile: false,
-									};
-									groups.set(gk, group);
-								}
-								const writer = await this.acquireWriter(
-									gk,
-									group,
-									format,
-									openCsvWriters,
-								);
-								if (!writer.appendRow(detail as any)) {
-									await writer.ready();
-								}
-								updateAccumulator(group.summary, detail as any);
+							if (!writer.appendRow(detail as any)) {
+								await writer.ready();
 							}
-							totalRows++;
-							sinceYield++;
+							updateAccumulator(group.summary, detail as any);
+						}
+						totalRows++;
+						sinceYield++;
 
-							if (sinceYield >= 1000) {
-								sinceYield = 0;
-								await new Promise((resolve) =>
-									setImmediate(resolve),
-								);
-								await emitStreamingProgress();
-							}
+						if (sinceYield >= 1000) {
+							sinceYield = 0;
+							await new Promise((resolve) =>
+								setImmediate(resolve),
+							);
+							await emitStreamingProgress();
 						}
 					}
+				}
 
-					await this.throwIfCancelled();
-					await emitStreamingProgress();
-				},
-			);
+				await this.throwIfCancelled();
+				await emitStreamingProgress();
+			});
 			stringPool.clear();
 
 			// Step 3: Flush writers, ghi summary
@@ -277,7 +268,6 @@ export class ExportRunner {
 				group.writer = undefined;
 				const summary = this.buildSummaryFromAccumulator(
 					group.summary,
-					gk,
 					dto,
 				);
 				await this.writeSummaryFile(
@@ -381,72 +371,21 @@ export class ExportRunner {
 		return group.writer;
 	}
 
-	private getRowGroupKeys(
-		row: DetailRow,
-		dto: AnalyticsReportExportDto,
-	): string[] {
-		const keys: string[] = [];
+	private getRowGroupKeys(row: DetailRow): string[] {
 		const tenantFolder = this.sanitizeFileName(
 			row.tenant || 'unnamed_workspace',
 		);
-		const isExportArtist =
-			dto.isExportArtist === true ||
-			(dto.isExportArtist as any) === 'true';
-		const periodUnit = dto.periodUnit || 'none';
-		keys.push(tenantFolder);
-
-		if (periodUnit === 'month' || periodUnit === 'quarter') {
-			const periodKey = this.getPeriodKey(row.date, periodUnit);
-			keys.push(`${tenantFolder}/${periodKey}`);
-			if (isExportArtist) {
-				keys.push(
-					`${tenantFolder}/${periodKey}/${this.sanitizeFileName(row.artistName || 'unnamed_artist')}`,
-				);
-			}
-		} else if (isExportArtist) {
-			keys.push(
-				`${tenantFolder}/${this.sanitizeFileName(row.artistName || 'unnamed_artist')}`,
-			);
-		}
-		return keys;
-	}
-
-	private getPeriodKey(date: string, unit: string): string {
-		if (unit === 'quarter' || unit === 'quater') {
-			const [year, month] = date.split('-').map(Number);
-			return `${year}-Q${Math.ceil(month / 3)}`;
-		}
-		return date;
+		return [tenantFolder];
 	}
 
 	private buildSummaryFromAccumulator(
 		acc: SummaryAccumulator,
-		groupPath: string,
 		dto: AnalyticsReportExportDto,
 	): SummaryRow {
-		const parts = groupPath.split('/');
-		let artistName = '';
-		let period = '';
-		const periodUnit = dto.periodUnit || 'none';
-		const isExportArtist =
-			dto.isExportArtist === true ||
-			(dto.isExportArtist as any) === 'true';
-
-		if (parts.length === 2) {
-			if (periodUnit === 'month' || periodUnit === 'quarter')
-				period = parts[1];
-			else if (isExportArtist) artistName = parts[1];
-		} else if (parts.length === 3) {
-			period = parts[1];
-			artistName = parts[2];
-		}
-
 		return {
 			startDate: acc.minStartDate || `${dto.fromDate}-01`,
 			endDate: acc.maxEndDate || this.lastDayOfMonth(dto.endDate),
 			tenantName: acc.tenantName || 'unnamed_workspace',
-			artistName: artistName || undefined,
-			period: period || undefined,
 			totalUsage: acc.totalUsage,
 			revenueUsd: formatRevenueSum(acc),
 			currency: 'USD',
@@ -749,19 +688,9 @@ export class ExportRunner {
 		};
 	}
 
-	private async resolveTrackIsrc(trackId?: string): Promise<string | null> {
-		if (!trackId) return null;
-		const rows = await this.deps.pgQuery(
-			`SELECT isrc FROM tracks WHERE id = $1 LIMIT 1`,
-			[trackId],
-		);
-		return rows[0]?.isrc || null;
-	}
-
 	private buildFilters(
 		tenantId: string,
 		dto: AnalyticsReportExportDto,
-		trackIsrc: string | null,
 	) {
 		const params: Record<string, unknown> = {
 			from: `${dto.fromDate}-01`,
@@ -773,11 +702,15 @@ export class ExportRunner {
 			`(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`,
 		];
 
-		const resolvedTenantIds = dto.tenantIds?.length
-			? dto.tenantIds
-			: !checkIsSystemTenant(tenantId)
-				? [tenantId]
-				: [];
+		// tenant: tenantIds (batch) ưu tiên hơn tenantId (single) > current tenant > system all
+		let resolvedTenantIds: string[] = [];
+		if (dto.tenantIds?.length) {
+			resolvedTenantIds = dto.tenantIds;
+		} else if (dto.tenantId) {
+			resolvedTenantIds = [dto.tenantId];
+		} else if (!checkIsSystemTenant(tenantId)) {
+			resolvedTenantIds = [tenantId];
+		}
 
 		if (resolvedTenantIds.length > 0) {
 			filters.push('t.is_deleted = 0');
@@ -813,6 +746,22 @@ export class ExportRunner {
 			params.releaseType = dto.releaseType;
 		}
 
+		if (dto.channelId) {
+			filters.push('t.is_deleted = 0');
+			filters.push('t.channel_id = {channelId:String}');
+			params.channelId = dto.channelId;
+		}
+
+		if (dto.isrc) {
+			filters.push('s.isrc = {isrc:String}');
+			params.isrc = dto.isrc;
+		}
+
+		if (dto.importSource) {
+			filters.push('s.import_source = {importSource:String}');
+			params.importSource = dto.importSource;
+		}
+
 		const scopedFilter = appendAnalyticsVideoScopeFilter(
 			'',
 			params,
@@ -823,12 +772,16 @@ export class ExportRunner {
 			filters.push(scopedFilter.trim().replace(/^AND\s+/i, ''));
 		}
 
-		if (trackIsrc) {
-			filters.push('s.isrc = {trackIsrc:String}');
-			params.trackIsrc = trackIsrc;
-		}
-
-		if (dto.dspId) {
+		// DSP: pgDspId ưu tiên nhất > dspReportId > dspId generic
+		if (dto.pgDspId) {
+			filters.push(
+				`s.dsp_id IN (SELECT id_dsps_report FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE pg_uuid = {pgDspId:String})`,
+			);
+			params.pgDspId = dto.pgDspId;
+		} else if (dto.dspReportId) {
+			filters.push('s.dsp_id = {dspReportId:String}');
+			params.dspReportId = dto.dspReportId;
+		} else if (dto.dspId) {
 			filters.push(`(
         s.dsp_id = {dspId:String}
         OR r.pg_uuid = {dspId:String}
@@ -851,7 +804,7 @@ export class ExportRunner {
         AND s.period >= o.revenue_effective_from
         AND (o.revenue_effective_to IS NULL OR s.period < o.revenue_effective_to)
       LEFT JOIN (
-        SELECT isrc, tenant_id, label_id, release_id, artist_ids, release_type, is_deleted
+        SELECT isrc, tenant_id, label_id, release_id, artist_ids, release_type, is_deleted, channel_id
         FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL
       ) t ON s.isrc = t.isrc
       LEFT JOIN (
@@ -868,14 +821,9 @@ export class ExportRunner {
 	private async streamRawDetails(
 		tenantId: string,
 		dto: AnalyticsReportExportDto,
-		trackIsrc: string | null,
 		onRows: (rows: RawDetailRow[]) => Promise<void>,
 	): Promise<number> {
-		const { params, whereSql } = this.buildFilters(
-			tenantId,
-			dto,
-			trackIsrc,
-		);
+		const { params, whereSql } = this.buildFilters(tenantId, dto);
 		const resolvedDspName =
 			"coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)";
 
