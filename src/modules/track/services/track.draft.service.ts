@@ -5,6 +5,7 @@ import {
 	BulkCreateTrackDraft,
 	BulkUpdateTrackDraft,
 	CreateTrackDraftDto,
+	ReplaceTrackAudioDto,
 	UpdateTrackDraftDto,
 	UpdateTrackPolicyDto,
 } from '../dto/track.draft.dto';
@@ -15,7 +16,11 @@ import {
 	ITrackDraft,
 } from '../interfaces/track.interface';
 
-import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import {
+	PageDto,
+	ResponseError,
+	ResponseSuccess,
+} from 'src/common/dtos/common.response.dto';
 import { AudioFileService } from 'src/modules/audio-file/services/audio-file.service';
 import { CopyrightService } from 'src/modules/copyright/services/copyright.service';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
@@ -498,5 +503,36 @@ export class TrackDraftService {
 				await this.trackArtistService.deleteArtistSource1(track.id);
 			}
 		}
+	}
+
+	async replaceAudio(
+		trackId: string,
+		data: ReplaceTrackAudioDto,
+	): Promise<ITrackDraft> {
+		const track = await this.trackQueryService.getDetailOne(trackId);
+
+		if (!track.audioFile) {
+			throw new ResponseError({
+				statusCode: 400,
+				message: 'Track does not have an audio file',
+			});
+		}
+
+		const { preview, sampleLength } =
+			this.trackQueryService.calculatePreviewAndSampleLength(
+				data.duration,
+			);
+
+		await this.audioFileService.replace({
+			audioFileId: track.audioFile.id,
+			data: {
+				...data,
+				preview,
+				sampleLength,
+			},
+		});
+		return this.trackQueryService.ensureDraftTrack(
+			await this.trackQueryService.getDetailOne(trackId),
+		);
 	}
 }

@@ -17,6 +17,7 @@ import { AppResponseSuccess } from 'src/app.const';
 import {
 	BulkCreateTrackDraft,
 	BulkUpdateTrackDraft,
+	ReplaceTrackAudioDto,
 	UpdateTrackDraftDto,
 	UpdateTrackPolicyDto,
 } from '../dto/track.draft.dto';
@@ -109,5 +110,18 @@ export class TrackDraftController {
 	async bulkDelete(@Body() data: BulkDeleteTracksDto) {
 		const result = await this.trackDraftService.bulkDelete(data);
 		return new ResponseSuccess({ ...result });
+	}
+
+	@Put(':id/audio')
+	async replaceAudio(
+		@Param('id') id: string,
+		@Body() data: ReplaceTrackAudioDto,
+	): Promise<ResponseSuccess<ITrackDraft>> {
+		const result = await this.trackDraftService.replaceAudio(id, data);
+
+		return new ResponseSuccess({
+			data: result,
+			messageCode: TrackMessageCodeSuccess.UPDATE,
+		});
 	}
 }

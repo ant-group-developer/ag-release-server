@@ -54,3 +54,23 @@ export class FileEntity extends BaseUUIDEntity {
 	})
 	bucket: string;
 }
+
+export interface ReplaceAudioInput {
+	fileId: string;
+	sampleRate: string;
+	bitDepth: number;
+	bitrate?: number | null;
+	duration: number;
+	preview: number;
+	sampleLength: number;
+}
+
+export type ReplaceAudioParams = {
+	audioFileId: string;
+	data: ReplaceAudioInput;
+};
+
+export type OldFileIds = {
+	fileId: string;
+	peakId: string | null;
+};
