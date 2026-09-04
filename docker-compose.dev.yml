@@ -23,6 +23,11 @@ services:
             - ./backups:/app/backups
         mem_limit: 1500m
         cpus: 1.5
+        logging:
+            driver: json-file
+            options:
+                max-size: '10m'
+                max-file: '3'
         depends_on:
             - app-dev-worker
 
@@ -45,3 +50,8 @@ services:
             - ./release_parsed:${RELEASE_PARSED_DIR}
         mem_limit: 1g
         cpus: 0.5
+        logging:
+            driver: json-file
+            options:
+                max-size: '10m'
+                max-file: '3'
