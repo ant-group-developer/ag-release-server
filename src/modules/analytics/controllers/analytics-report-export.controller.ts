@@ -1,11 +1,14 @@
 import {
+	BadRequestException,
 	Body,
 	Controller,
 	ForbiddenException,
+	Get,
 	MessageEvent,
 	NotFoundException,
 	Param,
 	Post,
+	Query,
 	Req,
 	Sse,
 } from '@nestjs/common';
@@ -20,8 +23,8 @@ import {
 	switchMap,
 	takeWhile,
 } from 'rxjs/operators';
-import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { ImportJob } from 'src/modules/etl/interfaces';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { ImportJob, ImportJobSourceType } from 'src/modules/etl/interfaces';
 import {
 	computeProgressDetail,
 	ImportJobsService,
@@ -32,6 +35,7 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	AnalyticsReportExportDto,
 	CancelAnalyticsReportExportJobsDto,
+	QueryAnalyticsReportExportsDto,
 } from '../dto/analytics-report-export.dto';
 import {
 	AnalyticsReportExportCancelAllResult,
@@ -141,6 +145,42 @@ export class AnalyticsReportExportController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Get('exports')
+	@ApiOperation({
+		summary: 'List analytics report export jobs',
+		description:
+			'Tenant-scoped listing for analytics exports. Normal tenants see only their own jobs; system tenant can filter by tenantId or see all. ' +
+			'Analytics exports are excluded from GET /etl/jobs by default and live here.',
+	})
+	@ApiResponse({ status: 200, description: 'Paginated export jobs.' })
+	async listExports(
+		@Req() req: Request,
+		@Query() query: QueryAnalyticsReportExportsDto,
+	): Promise<ResponseSuccess<PageDto<ReturnType<typeof formatExportJob>>>> {
+		const isSystem = checkIsSystemTenant(req.user!.tenantId);
+		// Normal tenants: force own tenant; ignore any tenantId passed in query.
+		const tenantId = isSystem ? query.tenantId : req.user!.tenantId;
+		const result = await this.importJobsService.list({
+			sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+			status: query.status,
+			tenantId,
+			limit: query.pageSize,
+			offset: (query.page - 1) * query.pageSize,
+			fieldOrder: query.fieldOrder,
+			orderBy: query.orderBy,
+		});
+		return new ResponseSuccess({
+			data: new PageDto({
+				items: result.items.map((job) => formatExportJob(job)),
+				metadata: {
+					page: query.page,
+					pageSize: query.pageSize,
+					totalItems: result.totalItems,
+				},
+			}),
+		});
+	}
+
 	@Sse('export/:jobId/events')
 	@ApiOperation({
 		summary: 'Stream analytics report export progress via SSE',
@@ -227,39 +267,50 @@ export class AnalyticsReportExportController {
 
 	/**
 	 * Validate quyền truy cập workspace:
+	 * - tenantId và tenantIds là mutual exclusive (400 nếu truyền cả hai).
 	 * - System tenant → cho phép chọn bất kỳ workspace.
-	 * - Normal tenant → chỉ được chọn workspace hiện tại + descendant.
-	 * - Nếu dto.tenantIds trống → mặc định gán [currentTenantId].
+	 * - Normal tenant → chỉ được chọn workspace hiện tại + descendant. Danh sách
+	 *   hợp lệ luôn resolve từ token (currentTenantId), không từ dto.tenantId —
+	 *   dto chỉ khai báo ý định, token mới là nguồn quyền hạn.
+	 * - Nếu cả hai đều trống → normal tenant mặc định [currentTenantId]; system = all.
 	 */
 	private async validateAndResolveTenantIds(
 		dto: AnalyticsReportExportDto,
 		currentTenantId: string,
 	): Promise<void> {
-		// Nếu không truyền tenantIds → mặc định workspace hiện tại
-		if (!dto.tenantIds?.length) {
-			if (!checkIsSystemTenant(currentTenantId)) {
-				dto.tenantIds = [currentTenantId];
-			}
-			// System tenant không truyền → lấy tất cả (tenantIds = undefined)
-			return;
+		if (dto.tenantId && dto.tenantIds?.length) {
+			throw new BadRequestException(
+				'tenantId and tenantIds are mutually exclusive. Use exactly one.',
+			);
 		}
 
-		// System tenant → cho phép chọn bất kỳ
+		// System tenant → cho phép chọn bất kỳ, không cần validate
 		if (checkIsSystemTenant(currentTenantId)) {
 			return;
 		}
 
-		// Normal tenant → kiểm tra tất cả tenantIds phải nằm trong descendant tree
-		const allowedIds =
-			await this.tenantService.getDescendantIds(currentTenantId);
-		const allowedSet = new Set(allowedIds);
+		// Normal tenant → mọi workspace được yêu cầu phải nằm trong descendant tree
+		const requested = dto.tenantIds?.length
+			? dto.tenantIds
+			: dto.tenantId
+				? [dto.tenantId]
+				: [];
 
-		const forbidden = dto.tenantIds.filter((id) => !allowedSet.has(id));
-		if (forbidden.length > 0) {
-			throw new ForbiddenException(
-				`You do not have access to workspace(s): ${forbidden.join(', ')}`,
-			);
+		if (requested.length > 0) {
+			const allowedIds =
+				await this.tenantService.getDescendantIds(currentTenantId);
+			const allowedSet = new Set(allowedIds);
+			const forbidden = requested.filter((id) => !allowedSet.has(id));
+			if (forbidden.length > 0) {
+				throw new ForbiddenException(
+					`You do not have access to workspace(s): ${forbidden.join(', ')}`,
+				);
+			}
+			return;
 		}
+
+		// Không truyền gì → mặc định workspace hiện tại
+		dto.tenantIds = [currentTenantId];
 	}
 
 	private assertReadableJob(

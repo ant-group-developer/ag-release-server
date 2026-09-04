@@ -27,6 +27,11 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import {
+	buildOwnershipJoin,
+	getOwnershipLedgerFallbackPredicate,
+	getOwnershipTenantExpr,
+} from '../utils/ownership-join.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	appendAnalyticsVideoScopeFilter,
@@ -108,6 +113,8 @@ export class DspAnalyticsService {
 			tableHasDspId?: boolean;
 			importSource?: string;
 			analyticsVideoScope?: ReturnType<typeof getAnalyticsVideoScope>;
+			ownershipPeriod?: 'trend' | 'revenue';
+			factDateExpr?: string;
 		},
 	): {
 		joinSql: string;
@@ -180,10 +187,13 @@ export class DspAnalyticsService {
 			};
 		}
 
-		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-		let filterSql = ' AND t.is_deleted = 0';
+		const ownershipPeriod = opts?.ownershipPeriod ?? 'trend';
+		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      ${buildOwnershipJoin(ownershipPeriod, opts?.factDateExpr)}`;
+		let filterSql = ` AND t.is_deleted = 0
+      AND ${getOwnershipLedgerFallbackPredicate()}`;
 		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
+			filterSql += ` AND ${getOwnershipTenantExpr()} = {tenantId:String}`;
 			params.tenantId = tenantId;
 		}
 		if (releaseType) {
@@ -219,7 +229,7 @@ export class DspAnalyticsService {
 		dto: DspAnalyticsSummaryQueryDto,
 		tenantId: string,
 	): Promise<AnalyticsSummaryResponse> {
-		const { joinSql, filterSql, params } = this.buildDspFilters(
+		const trendFilters = this.buildDspFilters(
 			tenantId,
 			dto.pgDspId,
 			dto.dspReportId,
@@ -227,11 +237,27 @@ export class DspAnalyticsService {
 			{
 				importSource: dto.importSource,
 				analyticsVideoScope: getAnalyticsVideoScope(dto),
+				ownershipPeriod: 'trend',
 			},
 		);
-		const trendParams = { ...params, from: dto.fromDate, to: dto.toDate };
+		const salesFilters = this.buildDspFilters(
+			tenantId,
+			dto.pgDspId,
+			dto.dspReportId,
+			dto.releaseType,
+			{
+				importSource: dto.importSource,
+				analyticsVideoScope: getAnalyticsVideoScope(dto),
+				ownershipPeriod: 'revenue',
+			},
+		);
+		const trendParams = {
+			...trendFilters.params,
+			from: dto.fromDate,
+			to: dto.toDate,
+		};
 		const salesParams = {
-			...params,
+			...salesFilters.params,
 			from: normalizeDateToFirstOfMonth(dto.fromDate),
 			to: normalizeDateToFirstOfMonth(dto.toDate),
 		};
@@ -239,20 +265,20 @@ export class DspAnalyticsService {
 		const trendSql = `
       SELECT sum(s.total_quantity) AS total_trend_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-      ${joinSql}
+      ${trendFilters.joinSql}
       WHERE s.reporting_date >= toDate({from:String})
         AND s.reporting_date <= toDate({to:String})
-        ${filterSql}
+        ${trendFilters.filterSql}
     `;
 		const salesSql = `
       SELECT
         sum(s.total_quantity) AS total_usage,
         sum(s.total_revenue_usd) AS total_revenue_usd
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      ${joinSql}
+      ${salesFilters.joinSql}
       WHERE s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
-        ${filterSql}
+        ${salesFilters.filterSql}
     `;
 
 		const [trendRows, salesRows] = await Promise.all([
@@ -405,42 +431,64 @@ export class DspAnalyticsService {
 	): Promise<DspOverviewResponse> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
-		const { joinSql, filterSql, params } = this.buildDspFilters(
+		const trendFilters = this.buildDspFilters(
 			tenantId,
 			dto.pgDspId,
 			dto.dspReportId,
 			dto.releaseType,
-			{ analyticsVideoScope: getAnalyticsVideoScope(dto) },
+			{
+				analyticsVideoScope: getAnalyticsVideoScope(dto),
+				ownershipPeriod: 'trend',
+				factDateExpr: 's.period',
+			},
 		);
-		params.from = fromDate;
-		params.to = toDate;
+		const salesFilters = this.buildDspFilters(
+			tenantId,
+			dto.pgDspId,
+			dto.dspReportId,
+			dto.releaseType,
+			{
+				analyticsVideoScope: getAnalyticsVideoScope(dto),
+				ownershipPeriod: 'revenue',
+			},
+		);
+		const trendParams = {
+			...trendFilters.params,
+			from: fromDate,
+			to: toDate,
+		};
+		const salesParams = {
+			...salesFilters.params,
+			from: fromDate,
+			to: toDate,
+		};
 
 		const trendSql = `
       SELECT sum(s.total_quantity) AS total_trend_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
-      ${joinSql}
+      ${trendFilters.joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
-        ${filterSql}
+        ${trendFilters.filterSql}
     `;
 		const salesSql = `
       SELECT
         sum(s.total_quantity) AS total_sales_views,
         sum(s.total_revenue_usd) AS total_revenue_usd
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      ${joinSql}
+      ${salesFilters.joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
-        ${filterSql}
+        ${salesFilters.filterSql}
     `;
 
 		const [trendRows, salesRows, dspMeta] = await Promise.all([
 			this.clickHouseService.query<{ total_trend_views: string }>(
 				trendSql,
-				params,
+				trendParams,
 			),
 			this.clickHouseService.query<{
 				total_sales_views: string;
 				total_revenue_usd: string;
-			}>(salesSql, params),
+			}>(salesSql, salesParams),
 			this.loadDspMeta(dto.pgDspId, dto.dspReportId),
 		]);
 
@@ -529,7 +577,10 @@ export class DspAnalyticsService {
 			dto.pgDspId,
 			dto.dspReportId,
 			dto.releaseType,
-			{ analyticsVideoScope: getAnalyticsVideoScope(dto) },
+			{
+				analyticsVideoScope: getAnalyticsVideoScope(dto),
+				ownershipPeriod: 'revenue',
+			},
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -662,6 +713,7 @@ export class DspAnalyticsService {
 			{
 				tableHasDspId: false,
 				analyticsVideoScope: getAnalyticsVideoScope(dto),
+				ownershipPeriod: 'revenue',
 			},
 		);
 		params.from = fromDate;
@@ -780,7 +832,7 @@ export class DspAnalyticsService {
 		const isSystem = checkIsSystemTenant(tenantId);
 		const tenantFilter = isSystem
 			? ''
-			: 'AND t.tenant_id = {tenantId:String}';
+			: `AND ${getOwnershipTenantExpr()} = {tenantId:String}`;
 		if (!isSystem) baseParams.tenantId = tenantId;
 		const releaseTypeFilter = dto.releaseType
 			? 'AND t.release_type = {releaseType:String}'
@@ -798,21 +850,27 @@ export class DspAnalyticsService {
       SELECT uniq(t.isrc) AS total
       FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
       LEFT JOIN (
-        SELECT isrc, sum(total_quantity) AS total_views
+        SELECT s.isrc AS isrc, sum(s.total_quantity) AS total_views
         FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-        WHERE ${dspSubquery} AND s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter}
-        GROUP BY isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+        ${buildOwnershipJoin('trend')}
+        WHERE t.is_deleted = 0 AND ${getOwnershipLedgerFallbackPredicate()}
+          AND ${dspSubquery} AND s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter} ${tenantFilter}
+        GROUP BY s.isrc
       ) tr ON t.isrc = tr.isrc
       LEFT JOIN (
         SELECT
-          isrc,
-          sum(total_quantity) AS total_usage,
-          sum(total_revenue_usd) AS total_revenue_usd
+          s.isrc AS isrc,
+          sum(s.total_quantity) AS total_usage,
+          sum(s.total_revenue_usd) AS total_revenue_usd
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-        WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
-        GROUP BY isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+        ${buildOwnershipJoin('revenue')}
+        WHERE t.is_deleted = 0 AND ${getOwnershipLedgerFallbackPredicate()}
+          AND ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter} ${tenantFilter}
+        GROUP BY s.isrc
       ) sa ON t.isrc = sa.isrc
-      WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
+      WHERE ${validUpcFilter} ${releaseTypeFilter}
         AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
     `;
 
@@ -835,21 +893,27 @@ export class DspAnalyticsService {
         toString(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd
       FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
       LEFT JOIN (
-        SELECT isrc, sum(total_quantity) AS total_views
+        SELECT s.isrc AS isrc, sum(s.total_quantity) AS total_views
         FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-        WHERE ${dspSubquery} AND s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter}
-        GROUP BY isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+        ${buildOwnershipJoin('trend')}
+        WHERE t.is_deleted = 0 AND ${getOwnershipLedgerFallbackPredicate()}
+          AND ${dspSubquery} AND s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter} ${tenantFilter}
+        GROUP BY s.isrc
       ) tr ON t.isrc = tr.isrc
       LEFT JOIN (
         SELECT
-          isrc,
-          sum(total_quantity) AS total_usage,
-          sum(total_revenue_usd) AS total_revenue_usd
+          s.isrc AS isrc,
+          sum(s.total_quantity) AS total_usage,
+          sum(s.total_revenue_usd) AS total_revenue_usd
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-        WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
-        GROUP BY isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+        ${buildOwnershipJoin('revenue')}
+        WHERE t.is_deleted = 0 AND ${getOwnershipLedgerFallbackPredicate()}
+          AND ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter} ${tenantFilter}
+        GROUP BY s.isrc
       ) sa ON t.isrc = sa.isrc
-      WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
+      WHERE ${validUpcFilter} ${releaseTypeFilter}
         AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
       ORDER BY ${sortCol} DESC
       LIMIT ${topNLimit} OFFSET ${topNSkip}
@@ -902,7 +966,7 @@ export class DspAnalyticsService {
           WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
           GROUP BY isrc
         ) sa ON t.isrc = sa.isrc
-        WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
+        WHERE ${validUpcFilter} ${releaseTypeFilter}
           AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
       `;
 			const totalsRow = (
@@ -1069,7 +1133,7 @@ export class DspAnalyticsService {
 		const isSystem = checkIsSystemTenant(tenantId);
 		const tenantFilter = isSystem
 			? ''
-			: 'AND t.tenant_id = {tenantId:String}';
+			: `AND ${getOwnershipTenantExpr()} = {tenantId:String}`;
 		if (!isSystem) baseParams.tenantId = tenantId;
 		const releaseTypeFilter = dto.releaseType
 			? 'AND t.release_type = {releaseType:String}'
@@ -1087,21 +1151,27 @@ export class DspAnalyticsService {
       SELECT uniq(t.release_id) AS total
       FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
       LEFT JOIN (
-        SELECT isrc, sum(total_quantity) AS total_views
+        SELECT s.isrc AS isrc, sum(s.total_quantity) AS total_views
         FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-        WHERE ${dspSubquery} AND s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter}
-        GROUP BY isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+        ${buildOwnershipJoin('trend')}
+        WHERE t.is_deleted = 0 AND ${getOwnershipLedgerFallbackPredicate()}
+          AND ${dspSubquery} AND s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter} ${tenantFilter}
+        GROUP BY s.isrc
       ) tr ON t.isrc = tr.isrc
       LEFT JOIN (
         SELECT
-          isrc,
-          sum(total_quantity) AS total_usage,
-          sum(total_revenue_usd) AS total_revenue_usd
+          s.isrc AS isrc,
+          sum(s.total_quantity) AS total_usage,
+          sum(s.total_revenue_usd) AS total_revenue_usd
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-        WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
-        GROUP BY isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+        ${buildOwnershipJoin('revenue')}
+        WHERE t.is_deleted = 0 AND ${getOwnershipLedgerFallbackPredicate()}
+          AND ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter} ${tenantFilter}
+        GROUP BY s.isrc
       ) sa ON t.isrc = sa.isrc
-      WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
+      WHERE ${validUpcFilter} ${releaseTypeFilter}
         AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
         AND t.release_id != ''
     `;
@@ -1125,21 +1195,27 @@ export class DspAnalyticsService {
         toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
       FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
       LEFT JOIN (
-        SELECT isrc, sum(total_quantity) AS total_views
+        SELECT s.isrc AS isrc, sum(s.total_quantity) AS total_views
         FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-        WHERE ${dspSubquery} AND s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter}
-        GROUP BY isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+        ${buildOwnershipJoin('trend')}
+        WHERE t.is_deleted = 0 AND ${getOwnershipLedgerFallbackPredicate()}
+          AND ${dspSubquery} AND s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter} ${tenantFilter}
+        GROUP BY s.isrc
       ) tr ON t.isrc = tr.isrc
       LEFT JOIN (
         SELECT
-          isrc,
-          sum(total_quantity) AS total_usage,
-          sum(total_revenue_usd) AS total_revenue_usd
+          s.isrc AS isrc,
+          sum(s.total_quantity) AS total_usage,
+          sum(s.total_revenue_usd) AS total_revenue_usd
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-        WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
-        GROUP BY isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+        ${buildOwnershipJoin('revenue')}
+        WHERE t.is_deleted = 0 AND ${getOwnershipLedgerFallbackPredicate()}
+          AND ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter} ${tenantFilter}
+        GROUP BY s.isrc
       ) sa ON t.isrc = sa.isrc
-      WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
+      WHERE ${validUpcFilter} ${releaseTypeFilter}
         AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
         AND t.release_id != ''
       GROUP BY t.release_id
@@ -1194,7 +1270,7 @@ export class DspAnalyticsService {
           WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
           GROUP BY isrc
         ) sa ON t.isrc = sa.isrc
-        WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
+        WHERE ${validUpcFilter} ${releaseTypeFilter}
           AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
           AND t.release_id != ''
       `;

@@ -25,6 +25,32 @@ export class ChannelHistory extends BaseUUIDEntity {
 	})
 	channel: Channel;
 
+	@Column({
+		type: 'date',
+		nullable: true,
+		comment: 'Ngày hiệu lực views khi chuyển tenant kênh',
+	})
+	effectiveDate: string | null;
+
+	@Column({
+		type: 'date',
+		nullable: true,
+		comment: 'Ngày hiệu lực revenue khi chuyển tenant kênh',
+	})
+	revenueEffectiveFrom: string | null;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+	})
+	fromTenantId: string | null;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+	})
+	toTenantId: string | null;
+
 	@ManyToOne(() => Channel, (channel) => channel.histories)
 	@JoinColumn({ name: 'channel_id' })
 	channelEntity: Channel;

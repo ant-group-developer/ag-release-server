@@ -82,6 +82,35 @@ export class CreateChannelDto {
 
 export class UpdateChannelDto extends PartialType(CreateChannelDto) {}
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export class TransferChannelTenantDto {
+	@ApiProperty({
+		format: 'uuid',
+		description: 'Workspace đích của kênh và video trên kênh',
+	})
+	@IsUUID('4')
+	tenantId: string;
+
+	@ApiProperty({
+		example: '2026-09-01',
+		description:
+			'Ngày bắt đầu gán views/trend cho workspace mới (YYYY-MM-DD, inclusive)',
+	})
+	@Matches(ISO_DATE, { message: 'effectiveDate phải có dạng YYYY-MM-DD' })
+	effectiveDate: string;
+
+	@ApiProperty({
+		example: '2026-09-01',
+		description:
+			'Ngày bắt đầu gán revenue cho workspace mới (YYYY-MM-DD; backend truncate về YYYY-MM-01)',
+	})
+	@Matches(ISO_DATE, {
+		message: 'revenueEffectiveFrom phải có dạng YYYY-MM-DD',
+	})
+	revenueEffectiveFrom: string;
+}
+
 export class QueryGetListChannelDto extends BaseQueryDto {
 	@IsOptional()
 	@IsString()

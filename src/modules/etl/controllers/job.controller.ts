@@ -158,7 +158,9 @@ export class JobController {
 	@ApiOperation({
 		summary: 'List recent import/sync jobs',
 		description:
-			'Filter by status / sourceType / reportSource / tenantId. Sorted by createdAt DESC.',
+			'Filter by status / sourceType / reportSource / tenantId. Sorted by createdAt DESC. ' +
+			'Analytics report exports are hidden by default; list them at GET /analytics/reports/exports, ' +
+			'or pass sourceType=ANALYTICS_REPORT_EXPORT to include only those jobs.',
 	})
 	async listJobs(
 		@Query() query: QueryGetListJobsDto,
