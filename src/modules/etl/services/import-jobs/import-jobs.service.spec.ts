@@ -1,5 +1,117 @@
-import { ImportJobReportSource, ImportJobSourceType } from '../../interfaces';
+import {
+	ImportJobReportSource,
+	ImportJobSourceType,
+	ImportJobStatus,
+} from '../../interfaces';
 import { ImportJobsService } from './import-jobs.service';
+
+describe('ImportJobsService ordered persistence', () => {
+	function setup() {
+		const db = {
+			insert: jest.fn().mockResolvedValue(undefined),
+			query: jest.fn(),
+		};
+		const events = { emit: jest.fn() };
+		const service = new ImportJobsService(
+			db as never,
+			events as never,
+			{} as never,
+		);
+		return { db, events, service };
+	}
+
+	it('can mark a job failed after its completion write fails without emitting completed', async () => {
+		const { db, events, service } = setup();
+		const job = await service.create({
+			sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+		});
+		await service.markProcessing(job.id);
+		const processingRow = db.insert.mock.calls[1][1][0];
+		db.query.mockResolvedValue([processingRow]);
+		db.insert.mockRejectedValueOnce(new Error('completion insert failed'));
+		events.emit.mockClear();
+		await expect(
+			service.markCompleted(job.id, { totalRows: 7 }),
+		).rejects.toThrow('completion insert failed');
+		expect(events.emit).not.toHaveBeenCalled();
+		await service.markFailed(job.id, 'completion insert failed');
+		expect(events.emit.mock.calls[0][0].type).toBe('failed');
+	});
+
+	it('waits for earlier writes and emits the persisted snapshot with unique versions', async () => {
+		const { db, events, service } = setup();
+		const now = jest.spyOn(Date, 'now').mockReturnValue(Date.now());
+		try {
+			const job = await service.create({
+				sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+				progressTotal: 5,
+			});
+			await service.markProcessing(job.id);
+			events.emit.mockClear();
+			let releaseProgress!: () => void;
+			let releaseCompleted!: () => void;
+			db.insert
+				.mockImplementationOnce(
+					() =>
+						new Promise<void>((resolve) => {
+							releaseProgress = resolve;
+						}),
+				)
+				.mockImplementationOnce(
+					() =>
+						new Promise<void>((resolve) => {
+							releaseCompleted = resolve;
+						}),
+				);
+			const progress = service.updateProgress(
+				job.id,
+				{ processedRows: 7 },
+				true,
+			);
+			await new Promise<void>((resolve) => setImmediate(resolve));
+			const completed = service.markCompleted(job.id, { totalRows: 7 });
+			await new Promise<void>((resolve) => setImmediate(resolve));
+			expect(db.insert).toHaveBeenCalledTimes(3);
+			expect(events.emit).not.toHaveBeenCalled();
+			releaseProgress();
+			await progress;
+			await new Promise<void>((resolve) => setImmediate(resolve));
+			expect(events.emit.mock.calls[0][0]).toMatchObject({
+				type: 'progress',
+				data: { status: ImportJobStatus.PROCESSING, result: null },
+			});
+			expect(events.emit).toHaveBeenCalledTimes(1);
+			releaseCompleted();
+			await completed;
+			expect(events.emit.mock.calls[1][0].type).toBe('completed');
+			const versions = db.insert.mock.calls.map(
+				([, rows]) => rows[0].updated_at,
+			);
+			for (let i = 1; i < versions.length; i++)
+				expect(versions[i] > versions[i - 1]).toBe(true);
+		} finally {
+			now.mockRestore();
+		}
+	});
+
+	it.each([
+		ImportJobStatus.COMPLETED,
+		ImportJobStatus.FAILED,
+		ImportJobStatus.CANCELLED,
+	])('does not reopen a %s job or accept late progress', async (status) => {
+		const { db, service } = setup();
+		const job = await service.create({
+			sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+		});
+		job.status = status;
+		db.insert.mockClear();
+		await service.markProcessing(job.id);
+		await service.markQueued(job.id);
+		await service.updateProgress(job.id, { processedRows: 99 }, true);
+		expect(db.insert).not.toHaveBeenCalled();
+		expect(job.status).toBe(status);
+	});
+});
 
 describe('ImportJobsService.list reportSource filter', () => {
 	function createService() {

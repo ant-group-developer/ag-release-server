@@ -71,7 +71,7 @@ export class AnalyticsReportExportService {
 			sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
 			params: dto as unknown as Record<string, unknown>,
 			fileName: this.buildPlaceholderFileName(dto),
-			progressTotal: 4,
+			progressTotal: 5,
 			tenantId,
 			createdBy: userId,
 		});

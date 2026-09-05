@@ -23,11 +23,11 @@ import {
 	getTenantNamesQuery,
 	getTrackMetadataQuery,
 } from '../queries/analytics-report-export.queries';
+import { getDedupedOwnershipSubquerySql } from '../utils/ownership-join.util';
 import {
 	appendAnalyticsVideoScopeFilter,
 	getAnalyticsVideoScope,
 } from './analytics-video-scope.service';
-import { getDedupedOwnershipSubquerySql } from '../utils/ownership-join.util';
 import {
 	GroupState,
 	IStreamDetailWriter,
@@ -146,7 +146,11 @@ export class ExportRunner {
 
 			// Step 1: Pre-fetch metadata vào cache job-local
 			await this.deps.onProgress?.(
-				{ progressCurrent: 1, progressLabel: 'Preparing data stream' },
+				{
+					progressCurrent: 1,
+					progressTotal: 5,
+					progressLabel: 'Preparing data stream',
+				},
 				true,
 			);
 			await this.throwIfCancelled();
@@ -259,6 +263,8 @@ export class ExportRunner {
 				{
 					progressCurrent: 3,
 					progressLabel: `Finalizing ${groups.size} folders`,
+					processedRows: totalRows,
+					totalRows,
 				},
 				true,
 			);
@@ -688,10 +694,7 @@ export class ExportRunner {
 		};
 	}
 
-	private buildFilters(
-		tenantId: string,
-		dto: AnalyticsReportExportDto,
-	) {
+	private buildFilters(tenantId: string, dto: AnalyticsReportExportDto) {
 		const params: Record<string, unknown> = {
 			from: `${dto.fromDate}-01`,
 			to: `${dto.endDate}-01`,

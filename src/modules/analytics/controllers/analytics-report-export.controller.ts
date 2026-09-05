@@ -256,6 +256,14 @@ export class AnalyticsReportExportController {
 
 		return merge(initial$, heartbeat$).pipe(
 			takeWhile((evt) => {
+				if (
+					evt.type === 'snapshot' &&
+					['COMPLETED', 'FAILED', 'CANCELLED'].includes(
+						(evt.data as any)?.status,
+					)
+				) {
+					return false;
+				}
 				return (
 					evt.type !== 'completed' &&
 					evt.type !== 'failed' &&
