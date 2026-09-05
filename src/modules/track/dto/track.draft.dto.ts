@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
 	ArrayMinSize,
 	IsBoolean,
+	IsIn,
 	IsInt,
 	IsNotEmpty,
 	IsNumber,
@@ -191,4 +192,28 @@ export class BulkUpdateTrackDraft {
 	@ValidateNested({ each: true })
 	@Type(() => UpdateTrackDraftDto)
 	trackDrafts: UpdateTrackDraftDto[];
+}
+
+export class ReplaceTrackAudioDto {
+	@IsUUID()
+	@IsNotEmpty()
+	fileId: string;
+
+	@IsString()
+	@IsIn(['44100', '48000'])
+	sampleRate: string;
+
+	@IsInt()
+	@IsIn([16, 24])
+	bitDepth: number;
+
+	@IsOptional()
+	@IsNumber()
+	@Min(1)
+	bitrate?: number | null;
+
+	@IsInt()
+	@Min(1)
+	@Max(2147483647)
+	duration: number;
 }

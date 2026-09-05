@@ -1014,21 +1014,26 @@ export class ReleaseService {
 	) {
 		if (!release?.ciData) return;
 
-		const currentNeedImportAgain = release.ciData.needImportAgain;
-		let needImportAgain = currentNeedImportAgain;
+		// const currentNeedImportAgain = release.ciData.needImportAgain;
+		// let needImportAgain = currentNeedImportAgain;
 
-		if (requestedNeedImportAgain === true) {
-			needImportAgain = true;
-		} else if (
-			requestedNeedImportAgain === false &&
-			currentNeedImportAgain === true
-		) {
-			needImportAgain = false;
-		}
+		// if (requestedNeedImportAgain === true) {
+		// 	needImportAgain = true;
+		// } else if (
+		// 	requestedNeedImportAgain === false &&
+		// 	currentNeedImportAgain === true
+		// ) {
+		// 	needImportAgain = false;
+		// }
+
+		// release.ciData = {
+		// 	needImportAgain,
+		// } as typeof release.ciData;
 
 		release.ciData = {
-			needImportAgain,
-		} as typeof release.ciData;
+			...release.ciData,
+			needImportAgain: requestedNeedImportAgain !== false,
+		};
 	}
 
 	async submit3(

@@ -156,8 +156,11 @@ export class Ern382Builder {
 		}
 
 		// Display artists (inline)
-		for (const artist of track.artists) {
-			const da = details.ele('DisplayArtist');
+		for (let i = 0; i < track.artists.length; i++) {
+			const artist = track.artists[i];
+			const da = details.ele('DisplayArtist', {
+				SequenceNumber: String(i + 1),
+			});
 			const pn = da.ele('PartyName');
 			if (artist.languageAndScriptCode) {
 				pn.att('LanguageAndScriptCode', artist.languageAndScriptCode);
@@ -415,8 +418,11 @@ export class Ern382Builder {
 		details.ele('LabelName').txt(this.input.release.labelName);
 
 		// Display artists
-		for (const artist of track.artists) {
-			const da = details.ele('DisplayArtist');
+		for (let i = 0; i < track.artists.length; i++) {
+			const artist = track.artists[i];
+			const da = details.ele('DisplayArtist', {
+				SequenceNumber: String(i + 1),
+			});
 			const pn = da.ele('PartyName');
 			if (artist.languageAndScriptCode) {
 				pn.att('LanguageAndScriptCode', artist.languageAndScriptCode);
@@ -535,8 +541,11 @@ export class Ern382Builder {
 		details.ele('DisplayArtistName').txt(artistName);
 		details.ele('LabelName').txt(this.input.release.labelName);
 
-		for (const artist of this.input.release.artists) {
-			const da = details.ele('DisplayArtist');
+		for (let i = 0; i < this.input.release.artists.length; i++) {
+			const artist = this.input.release.artists[i];
+			const da = details.ele('DisplayArtist', {
+				SequenceNumber: String(i + 1),
+			});
 			const pn = da.ele('PartyName');
 			if (artist.languageAndScriptCode) {
 				pn.att('LanguageAndScriptCode', artist.languageAndScriptCode);
