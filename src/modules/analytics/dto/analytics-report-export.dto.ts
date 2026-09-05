@@ -123,6 +123,7 @@ export class AnalyticsReportExportDto {
 	})
 	@IsOptional()
 	@IsString()
+	@Matches(/^[a-z0-9_]+$/)
 	importSource?: string;
 
 	@ApiPropertyOptional({

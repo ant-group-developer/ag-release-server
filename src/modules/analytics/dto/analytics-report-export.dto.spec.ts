@@ -44,3 +44,36 @@ describe('AnalyticsReportExportDto date normalization', () => {
 		expect(errors.map((e) => e.property)).toContain('fromDate');
 	});
 });
+
+describe('AnalyticsReportExportDto importSource validation', () => {
+	const base = { fromDate: '2026-03', endDate: '2026-09' };
+
+	it('accepts known import sources', () => {
+		for (const importSource of [
+			'bombshelter',
+			'ftp',
+			'wmg_report',
+			'spotify_report',
+		]) {
+			const { errors } = validate({ ...base, importSource });
+			expect(errors.map((e) => e.property)).toEqual([]);
+		}
+	});
+
+	it('accepts a missing importSource', () => {
+		const { errors } = validate(base);
+		expect(errors.map((e) => e.property)).toEqual([]);
+	});
+
+	it('rejects values with invalid characters', () => {
+		for (const importSource of ['Bad Value!', 'WMG', 'ftp; DROP']) {
+			const { errors } = validate({ ...base, importSource });
+			expect(errors.map((e) => e.property)).toContain('importSource');
+		}
+	});
+
+	it('rejects empty string', () => {
+		const { errors } = validate({ ...base, importSource: '' });
+		expect(errors.map((e) => e.property)).toContain('importSource');
+	});
+});
