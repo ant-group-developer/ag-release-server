@@ -326,6 +326,12 @@ export interface ChannelRankingItem {
 		title: string;
 		logo: string | null;
 	} | null;
+	currentTenant?: {
+		id: string;
+		name: string;
+		title: string;
+		logo: string | null;
+	} | null;
 }
 
 export interface RevenueChannelItem {
@@ -341,6 +347,12 @@ export interface RevenueChannelItem {
 	quantity: number;
 	bySource?: SourceBreakdownItem[];
 	tenant?: {
+		id: string;
+		name: string;
+		title: string;
+		logo: string | null;
+	} | null;
+	currentTenant?: {
 		id: string;
 		name: string;
 		title: string;

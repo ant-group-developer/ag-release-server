@@ -15,6 +15,7 @@ import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	RequirePermissions,
 	SystemAdminOnly,
 	TenantOwnerOrAdminOnly,
 } from '../../auth/decorators/auth.decorator';
@@ -23,6 +24,7 @@ import {
 	AssignUsersToChannelDto,
 	CreateChannelDto,
 	QueryGetListChannelDto,
+	TransferChannelTenantDto,
 	UpdateChannelDto,
 } from '../dto/channel.dto';
 import { ChannelStatus } from '../enum/channel.enum';
@@ -179,7 +181,65 @@ export class ChannelController {
 		return new ResponseSuccess();
 	}
 
+	@Post(':id/transfer/preview')
+	@RequirePermissions('channel.update')
+	@TenantOwnerOrAdminOnly()
+	@ApiOperation({
+		summary: 'Preview dated tenant transfer for a channel and its videos',
+	})
+	@ApiParam({ name: 'id', format: 'uuid' })
+	@ApiBody({ type: TransferChannelTenantDto })
+	async previewTransfer(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: TransferChannelTenantDto,
+		@Req() req: Request,
+	) {
+		const result = await this.channelService.previewTransfer(
+			id,
+			dto,
+			req.user!.tenantId,
+		);
+		const {
+			channel: _channel,
+			releasesToTransfer,
+			...preview
+		} = result;
+		return new ResponseSuccess({
+			data: {
+				...preview,
+				channelId: result.channel.id,
+				channelName: result.channel.name,
+				releasesToTransferCount: releasesToTransfer.length,
+			},
+		});
+	}
+
+	@Post(':id/transfer')
+	@RequirePermissions('channel.update')
+	@TenantOwnerOrAdminOnly()
+	@ApiOperation({
+		summary:
+			'Transfer channel workspace with required view and revenue effective dates',
+	})
+	@ApiParam({ name: 'id', format: 'uuid' })
+	@ApiBody({ type: TransferChannelTenantDto })
+	async transferTenant(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: TransferChannelTenantDto,
+		@Req() req: Request,
+	) {
+		const result = await this.channelService.transferTenant(
+			id,
+			dto,
+			req.user!.tenantId,
+			req.user!.sub,
+		);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Put(':id')
+	@RequirePermissions('channel.update')
+	@TenantOwnerOrAdminOnly()
 	@ApiOperation({ summary: 'Update channel' })
 	@ApiParam({ name: 'id', format: 'uuid' })
 	@ApiBody({ type: UpdateChannelDto })
@@ -198,6 +258,8 @@ export class ChannelController {
 	}
 
 	@Delete(':id')
+	@RequirePermissions('channel.delete')
+	@TenantOwnerOrAdminOnly()
 	@ApiOperation({ summary: 'Delete channel' })
 	@ApiParam({ name: 'id', format: 'uuid' })
 	async remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {

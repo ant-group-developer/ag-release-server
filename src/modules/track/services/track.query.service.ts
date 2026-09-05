@@ -1141,7 +1141,7 @@ export class TrackQueryService {
 		};
 	}
 
-	private calculatePreviewAndSampleLength(duration: number) {
+	calculatePreviewAndSampleLength(duration: number) {
 		const { sampleLength: sampleConfig, preview: previewConfig } =
 			this.appConfigService.cache.config.general;
 		const preview =

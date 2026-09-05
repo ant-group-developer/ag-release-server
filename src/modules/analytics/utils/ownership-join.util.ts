@@ -72,6 +72,18 @@ export function buildOwnershipJoin(
 	return `LEFT JOIN ${getDedupedOwnershipSubquery(ownershipPeriod)} AS o ON s.isrc = o.isrc AND ${predicate}`;
 }
 
+export function getOwnershipTenantExpr(): string {
+	return "coalesce(nullIf(o.tenant_id, ''), t.tenant_id)";
+}
+
+export function getOwnershipLedgerFallbackPredicate(): string {
+	return `(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`;
+}
+
+export function buildPgTracksJoin(): string {
+	return `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+}
+
 /** For export-runner style joins where alias and table are assembled separately. */
 export function getDedupedOwnershipSubquerySql(
 	ownershipPeriod: OwnershipPeriod,

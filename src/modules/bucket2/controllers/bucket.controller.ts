@@ -9,7 +9,9 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import * as path from 'path';
+import { User } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { UserReq } from 'src/common/interface/common.interface';
 import { PublicRoute } from 'src/modules/auth/decorators/auth.decorator';
 import {
 	BulkCreateBucketDto,
@@ -17,6 +19,12 @@ import {
 	CreateBucketDto,
 	GetUrlDownNonFile,
 } from '../dto/bucket.dto';
+import {
+	CompleteMultipartUploadDto,
+	InitiateMultipartUploadDto,
+	PresignMultipartPartDto,
+	PresignMultipartPartsDto,
+} from '../dto/bucket.multipart.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.r2.dto';
 import { BucketService2 } from '../services/bucket2.service';
 
@@ -24,6 +32,79 @@ import { BucketService2 } from '../services/bucket2.service';
 @Controller('bucket2')
 export class BucketController2 {
 	constructor(private readonly bucketService: BucketService2) {}
+
+	// Multipart upload
+	@Post('private/multipart/initiate')
+	async initiateMultipartUpload(
+		@Body() dto: InitiateMultipartUploadDto,
+		@User() user: UserReq,
+	) {
+		const data = await this.bucketService.initiateMultipartUpload(
+			dto,
+			user,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('private/:id/multipart/presign-parts')
+	async presignMultipartParts(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: PresignMultipartPartsDto,
+		@User() user: UserReq,
+	) {
+		const data = await this.bucketService.presignMultipartParts(
+			id,
+			dto,
+			user,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('private/:id/multipart/presign-part')
+	async presignMultipartPart(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: PresignMultipartPartDto,
+		@User() user: UserReq,
+	) {
+		const data = await this.bucketService.presignMultipartPart(
+			id,
+			dto,
+			user,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Get('private/:id/multipart/parts')
+	async listMultipartParts(
+		@Param('id', ParseUUIDPipe) id: string,
+		@User() user: UserReq,
+	) {
+		const data = await this.bucketService.listUploadedParts(id, user);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('private/:id/multipart/complete')
+	async completeMultipartUpload(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: CompleteMultipartUploadDto,
+		@User() user: UserReq,
+	) {
+		const data = await this.bucketService.completeMultipartUpload(
+			id,
+			dto,
+			user,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('private/:id/multipart/abort')
+	async abortMultipartUpload(
+		@Param('id', ParseUUIDPipe) id: string,
+		@User() user: UserReq,
+	) {
+		const data = await this.bucketService.abortMultipartUpload(id, user);
+		return new ResponseSuccess({ data });
+	}
 
 	// create
 	@Post('private')

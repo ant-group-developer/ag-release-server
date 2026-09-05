@@ -153,6 +153,37 @@ export class RankingService {
 		return { joinSql, filterSql, params };
 	}
 
+	private async resolveAttributingTenant(
+		actorTenantId: string,
+		queryTenantId?: string,
+	): Promise<{
+		id: string;
+		name: string;
+		title: string;
+		logo: string | null;
+	} | null> {
+		const isSystem = checkIsSystemTenant(actorTenantId);
+		const effectiveTenantId = isSystem ? queryTenantId : actorTenantId;
+		if (!effectiveTenantId) return null;
+		const meta = await this.isrcResolverService.getTenantMetadata([
+			effectiveTenantId,
+		]);
+		const workspace = meta.get(effectiveTenantId);
+		if (!workspace)
+			return {
+				id: effectiveTenantId,
+				name: '',
+				title: '',
+				logo: null,
+			};
+		return {
+			id: effectiveTenantId,
+			name: workspace.name,
+			title: workspace.title ?? '',
+			logo: workspace.logo,
+		};
+	}
+
 	private hasDspFilter(query: RankingQueryDto): boolean {
 		return !!(query.pgDspId || query.dspReportId || query.dspId);
 	}
@@ -1081,6 +1112,10 @@ export class RankingService {
 		const channelsMeta =
 			await this.isrcResolverService.getChannelMetadata(channelIds);
 
+		const attributingTenant = await this.resolveAttributingTenant(
+			tenantId,
+			query.tenantId,
+		);
 		const items: ChannelRankingItem[] = paged.map((c, index) => {
 			const meta = channelsMeta.get(c.channelId);
 			return {
@@ -1092,7 +1127,8 @@ export class RankingService {
 				releaseCount: Number(c.releaseCount),
 				trackCount: Number(c.trackCount),
 				totalViews: Number(c.totalViews),
-				tenant: meta?.tenant ?? null,
+				tenant: attributingTenant ?? meta?.tenant ?? null,
+				currentTenant: meta?.tenant ?? null,
 			};
 		});
 

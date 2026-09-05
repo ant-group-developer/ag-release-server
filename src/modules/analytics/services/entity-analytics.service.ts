@@ -29,7 +29,13 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
-import { buildOwnershipJoin } from '../utils/ownership-join.util';
+import {
+	buildOwnershipJoin,
+	buildPgTracksJoin,
+	getOwnershipLedgerFallbackPredicate,
+	getOwnershipTenantExpr,
+} from '../utils/ownership-join.util';
+import { getTrendPeriodExprs } from '../utils/trend-period.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	AnalyticsVideoScope,
@@ -206,6 +212,39 @@ export class EntityAnalyticsService {
 		);
 
 		return { joinSql, filterSql, params };
+	}
+
+	private ownershipTenantClause(
+		entityType: EntityType,
+		isSystem: boolean,
+	): string {
+		if (entityType === 'tenant') {
+			return `AND ${getOwnershipTenantExpr()} = {entityId:String}`;
+		}
+		if (!isSystem) {
+			return `AND ${getOwnershipTenantExpr()} = {tenantId:String}`;
+		}
+		return '';
+	}
+
+	private ownershipAwareIsrcCubeSql(
+		table: string,
+		dateCol: 'reporting_date' | 'period',
+		ownershipPeriod: 'trend' | 'revenue',
+		selectSql: string,
+		extraWhere: string,
+	): string {
+		return `
+				SELECT s.isrc, ${selectSql}
+				FROM music_analytics.${table} s
+				${buildPgTracksJoin()}
+				${buildOwnershipJoin(ownershipPeriod, `s.${dateCol}`)}
+				WHERE t.is_deleted = 0
+					AND ${getOwnershipLedgerFallbackPredicate()}
+					AND s.${dateCol} >= toDate({${dateCol === 'period' ? 'fromMonth' : 'from'}:String})
+					AND s.${dateCol} <= toDate({${dateCol === 'period' ? 'toMonth' : 'to'}:String})
+					${extraWhere}
+				GROUP BY s.isrc`;
 	}
 
 	// DSP name resolution constants (dùng lại pattern từ global-timeline.service)
@@ -577,16 +616,18 @@ export class EntityAnalyticsService {
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
 
+		const { periodExpr, groupExpr } = getTrendPeriodExprs(dto.granularity);
+
 		const sql = `
       SELECT
-        formatDateTime(s.reporting_date, '%Y-%m-%d') AS period,
+        ${periodExpr} AS period,
         sum(s.total_quantity) AS total_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
       ${joinSql}
       WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
-      GROUP BY s.reporting_date, period
-      ORDER BY s.reporting_date ASC
+      GROUP BY ${groupExpr}, period
+      ORDER BY ${groupExpr} ASC
     `;
 		const rows = await this.clickHouseService.query<{
 			period: string;
@@ -1138,10 +1179,7 @@ export class EntityAnalyticsService {
 		const importFilter = effectiveImportSource
 			? 'AND s.import_source = {importSource:String}'
 			: '';
-		const tenantFilter =
-			isSystem || entityType === 'tenant'
-				? ''
-				: 'AND t.tenant_id = {tenantId:String}';
+		const tenantFilter = this.ownershipTenantClause(entityType, isSystem);
 		const releaseTypeFilter = dto.releaseType
 			? 'AND t.release_type = {releaseType:String}'
 			: '';
@@ -1154,7 +1192,7 @@ export class EntityAnalyticsService {
 					release: 'AND t.release_id = {entityId:String}',
 					artist: 'AND has(t.artist_ids, {entityId:String})',
 					label: 'AND t.label_id = {entityId:String}',
-					tenant: 'AND t.tenant_id = {entityId:String}',
+					tenant: '',
 					sourceType: '',
 				} as Record<string, string>
 			)[entityType] ?? 'AND t.release_id = {entityId:String}';
@@ -1164,22 +1202,28 @@ export class EntityAnalyticsService {
 			baseParams,
 			getAnalyticsVideoScope(dto),
 		);
-		const whereConditions = `1 = 1 ${tenantFilter} ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter}`;
+		const whereConditions = `1 = 1 ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter}`;
+		const trendCube = this.ownershipAwareIsrcCubeSql(
+			CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE,
+			'reporting_date',
+			'trend',
+			'sum(s.total_quantity) AS total_views',
+			`${importFilter} ${tenantFilter}`,
+		);
+		const salesCube = this.ownershipAwareIsrcCubeSql(
+			CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+			'period',
+			'revenue',
+			'sum(s.total_quantity) AS total_usage, sum(s.total_revenue_usd) AS total_revenue_usd',
+			`${importFilter} ${tenantFilter}`,
+		);
 
 		const countSql = `
 			SELECT uniq(t.release_id) AS total
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
-			LEFT JOIN (
-				SELECT isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} s
-				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter}
-				GROUP BY isrc
+			LEFT JOIN (${trendCube}
 			) tr ON t.isrc = tr.isrc
-			LEFT JOIN (
-				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
-				GROUP BY isrc
+			LEFT JOIN (${salesCube}
 			) sa ON t.isrc = sa.isrc
 			WHERE ${whereConditions}
 				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
@@ -1204,17 +1248,9 @@ export class EntityAnalyticsService {
 				sum(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd_raw,
 				toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
-			LEFT JOIN (
-				SELECT isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} s
-				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter}
-				GROUP BY isrc
+			LEFT JOIN (${trendCube}
 			) tr ON t.isrc = tr.isrc
-			LEFT JOIN (
-				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
-				GROUP BY isrc
+			LEFT JOIN (${salesCube}
 			) sa ON t.isrc = sa.isrc
 			WHERE ${whereConditions}
 				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
@@ -1435,10 +1471,7 @@ export class EntityAnalyticsService {
 		const importFilter = effectiveImportSource
 			? 'AND s.import_source = {importSource:String}'
 			: '';
-		const tenantFilter =
-			isSystem || entityType === 'tenant'
-				? ''
-				: 'AND t.tenant_id = {tenantId:String}';
+		const tenantFilter = this.ownershipTenantClause(entityType, isSystem);
 		const releaseTypeFilter = dto.releaseType
 			? 'AND t.release_type = {releaseType:String}'
 			: '';
@@ -1451,7 +1484,7 @@ export class EntityAnalyticsService {
 					release: 'AND t.release_id = {entityId:String}',
 					artist: 'AND has(t.artist_ids, {entityId:String})',
 					label: 'AND t.label_id = {entityId:String}',
-					tenant: 'AND t.tenant_id = {entityId:String}',
+					tenant: '',
 					sourceType: '',
 				} as Record<string, string>
 			)[entityType] ?? 'AND t.isrc = {entityId:String}';
@@ -1461,22 +1494,28 @@ export class EntityAnalyticsService {
 			baseParams,
 			getAnalyticsVideoScope(dto),
 		);
-		const whereConditions = `1 = 1 ${tenantFilter} ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter}`;
+		const whereConditions = `1 = 1 ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter}`;
+		const trendCube = this.ownershipAwareIsrcCubeSql(
+			CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE,
+			'reporting_date',
+			'trend',
+			'sum(s.total_quantity) AS total_views',
+			`${importFilter} ${tenantFilter}`,
+		);
+		const salesCube = this.ownershipAwareIsrcCubeSql(
+			CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+			'period',
+			'revenue',
+			'sum(s.total_quantity) AS total_usage, sum(s.total_revenue_usd) AS total_revenue_usd',
+			`${importFilter} ${tenantFilter}`,
+		);
 
 		const countSql = `
 			SELECT uniq(t.isrc) AS total
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
-			LEFT JOIN (
-				SELECT isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} s
-				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter}
-				GROUP BY isrc
+			LEFT JOIN (${trendCube}
 			) tr ON t.isrc = tr.isrc
-			LEFT JOIN (
-				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
-				GROUP BY isrc
+			LEFT JOIN (${salesCube}
 			) sa ON t.isrc = sa.isrc
 			WHERE ${whereConditions}
 				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
@@ -1500,17 +1539,9 @@ export class EntityAnalyticsService {
 				coalesce(sa.total_revenue_usd, 0) AS total_revenue_usd_raw,
 				toString(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
-			LEFT JOIN (
-				SELECT isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} s
-				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter}
-				GROUP BY isrc
+			LEFT JOIN (${trendCube}
 			) tr ON t.isrc = tr.isrc
-			LEFT JOIN (
-				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
-				GROUP BY isrc
+			LEFT JOIN (${salesCube}
 			) sa ON t.isrc = sa.isrc
 			WHERE ${whereConditions}
 				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
@@ -1724,10 +1755,7 @@ export class EntityAnalyticsService {
 		const importFilter = effectiveImportSource
 			? 'AND s.import_source = {importSource:String}'
 			: '';
-		const tenantFilter =
-			isSystem || entityType === 'tenant'
-				? ''
-				: 'AND t.tenant_id = {tenantId:String}';
+		const tenantFilter = this.ownershipTenantClause(entityType, isSystem);
 		const releaseTypeFilter = dto.releaseType
 			? 'AND t.release_type = {releaseType:String}'
 			: '';
@@ -1738,19 +1766,22 @@ export class EntityAnalyticsService {
 					track: 'AND t.isrc = {entityId:String}',
 					label: 'AND t.label_id = {entityId:String}',
 					artist: 'AND has(t.artist_ids, {entityId:String})',
-					tenant: 'AND t.tenant_id = {entityId:String}',
+					tenant: '',
 					channel: 'AND t.channel_id = {entityId:String}',
 					sourceType: '',
 				} as Record<string, string>
 			)[entityType] ?? '';
 
-		const trackJoin = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t ON s.isrc = t.isrc`;
+		const trendJoin = `${buildPgTracksJoin()}
+			${buildOwnershipJoin('trend')}`;
+		const salesJoin = `${buildPgTracksJoin()}
+			${buildOwnershipJoin('revenue')}`;
 		const videoScopeFilter = appendAnalyticsVideoScopeFilter(
 			'',
 			params,
 			getAnalyticsVideoScope(dto),
 		);
-		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter}`;
+		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter} AND ${getOwnershipLedgerFallbackPredicate()}`;
 
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
@@ -1763,7 +1794,7 @@ export class EntityAnalyticsService {
 				0 AS total_usage,
 				0 AS total_revenue_usd
 			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-			${trackJoin}
+			${trendJoin}
 			WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 				${importFilter} ${whereTrack}
 			GROUP BY s.dsp_id
@@ -1774,7 +1805,7 @@ export class EntityAnalyticsService {
 				sum(s.total_quantity) AS total_usage,
 				sum(s.total_revenue_usd) AS total_revenue_usd
 			FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-			${trackJoin}
+			${salesJoin}
 			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 				${importFilter} ${whereTrack}
 			GROUP BY s.dsp_id
@@ -1968,10 +1999,7 @@ export class EntityAnalyticsService {
 		const importFilter = effectiveImportSource
 			? 'AND s.import_source = {importSource:String}'
 			: '';
-		const tenantFilter =
-			isSystem || entityType === 'tenant'
-				? ''
-				: 'AND t.tenant_id = {tenantId:String}';
+		const tenantFilter = this.ownershipTenantClause(entityType, isSystem);
 		const releaseTypeFilter = dto.releaseType
 			? 'AND t.release_type = {releaseType:String}'
 			: '';
@@ -1982,19 +2010,22 @@ export class EntityAnalyticsService {
 					track: 'AND t.isrc = {entityId:String}',
 					label: 'AND t.label_id = {entityId:String}',
 					artist: 'AND has(t.artist_ids, {entityId:String})',
-					tenant: 'AND t.tenant_id = {entityId:String}',
+					tenant: '',
 					channel: 'AND t.channel_id = {entityId:String}',
 					sourceType: '',
 				} as Record<string, string>
 			)[entityType] ?? '';
 
-		const trackJoin = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t ON s.isrc = t.isrc`;
+		const trendJoin = `${buildPgTracksJoin()}
+			${buildOwnershipJoin('trend')}`;
+		const salesJoin = `${buildPgTracksJoin()}
+			${buildOwnershipJoin('revenue')}`;
 		const videoScopeFilter = appendAnalyticsVideoScopeFilter(
 			'',
 			params,
 			getAnalyticsVideoScope(dto),
 		);
-		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter}`;
+		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter} AND ${getOwnershipLedgerFallbackPredicate()}`;
 
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
@@ -2007,7 +2038,7 @@ export class EntityAnalyticsService {
 				0 AS total_usage,
 				0 AS total_revenue_usd
 			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
-			${trackJoin}
+			${trendJoin}
 			WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 				${importFilter} ${whereTrack}
 			GROUP BY s.territory_code
@@ -2018,7 +2049,7 @@ export class EntityAnalyticsService {
 				sum(s.total_quantity) AS total_usage,
 				sum(s.total_revenue_usd) AS total_revenue_usd
 			FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
-			${trackJoin}
+			${salesJoin}
 			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 				${importFilter} ${whereTrack}
 			GROUP BY s.territory_code

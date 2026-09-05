@@ -1446,6 +1446,25 @@ export class TimelineAnalyticsService {
 			const channelsMeta =
 				await this.isrcResolverService.getChannelMetadata(channelIds);
 
+			const attributingTenantId = checkIsSystemTenant(tenantId)
+				? query.tenantId
+				: tenantId;
+			const attributingMeta = attributingTenantId
+				? (
+						await this.isrcResolverService.getTenantMetadata([
+							attributingTenantId,
+						])
+					).get(attributingTenantId)
+				: undefined;
+			const attributingTenant = attributingTenantId
+				? {
+						id: attributingTenantId,
+						name: attributingMeta?.name ?? '',
+						title: attributingMeta?.title ?? '',
+						logo: attributingMeta?.logo ?? null,
+					}
+				: null;
+
 			rows.forEach((r, index) => {
 				const meta = channelsMeta.get(r.channelId);
 				items.push({
@@ -1459,7 +1478,8 @@ export class TimelineAnalyticsService {
 					revenueUsd: this.revenueNumber(r.revenue_usd),
 					revenueUsdExact: this.revenueExact(r.revenue_usd),
 					quantity: Number(r.quantity),
-					tenant: meta?.tenant ?? null,
+					tenant: attributingTenant ?? meta?.tenant ?? null,
+					currentTenant: meta?.tenant ?? null,
 				});
 			});
 
@@ -2495,7 +2515,11 @@ export class TimelineAnalyticsService {
 		params.from = query.fromDate;
 		params.to = query.toDate;
 
-		const sql = queries.getTrendViewLineChartQuery(joinSql, filterSql);
+		const sql = queries.getTrendViewLineChartQuery(
+			joinSql,
+			filterSql,
+			query.granularity,
+		);
 
 		const rows = await this.clickHouseService.query<{
 			period: string;

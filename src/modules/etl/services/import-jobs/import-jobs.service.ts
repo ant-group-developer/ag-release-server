@@ -539,6 +539,14 @@ export class ImportJobsService implements OnModuleInit {
 		if (filters.sourceType) {
 			where.push('source_type = {sourceType:String}');
 			params.sourceType = filters.sourceType;
+		} else {
+			// Default: hide analytics exports from the ETL job surface.
+			// They have their own listing at GET /analytics/reports/exports.
+			where.push(
+				'source_type != {analyticsExportExcludedSourceType:String}',
+			);
+			params.analyticsExportExcludedSourceType =
+				ImportJobSourceType.ANALYTICS_REPORT_EXPORT;
 		}
 		if (filters.status) {
 			where.push('status = {status:String}');

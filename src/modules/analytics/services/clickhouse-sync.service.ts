@@ -85,6 +85,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger(ClickHouseSyncService.name);
 	private pgListenClient: Client | null = null;
 	private isProcessing = false;
+	private pendingDrain = false;
 
 	constructor(
 		@InjectEntityManager()
@@ -436,56 +437,67 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 	// ======================================================
 
 	private async processOutboxQueue() {
-		if (this.isProcessing) return;
+		if (this.isProcessing) {
+			this.pendingDrain = true;
+			return;
+		}
 		this.isProcessing = true;
 
 		try {
-			while (true) {
-				const jobs: OutboxJob[] = await this.entityManager.query(
-					`SELECT id, entity_name, entity_id, action
+			do {
+				this.pendingDrain = false;
+				while (true) {
+					const jobs: OutboxJob[] = await this.entityManager.query(
+						`SELECT id, entity_name, entity_id, action
            FROM clickhouse_sync_outbox
            WHERE processed = false
            ORDER BY created_at ASC
            LIMIT $1`,
-					[OUTBOX_BATCH_SIZE],
-				);
-
-				if (jobs.length === 0) break;
-
-				this.logger.log(
-					`Processing ${jobs.length} sync jobs from outbox...`,
-				);
-
-				try {
-					await this.syncJobsToClickHouse(jobs);
-
-					// Danh dau hoan tat
-					const jobIds = jobs.map((j) => j.id);
-					await this.entityManager.query(
-						`UPDATE clickhouse_sync_outbox
-             SET processed = true, processed_at = NOW(), error_message = NULL
-             WHERE id = ANY($1)`,
-						[jobIds],
+						[OUTBOX_BATCH_SIZE],
 					);
+
+					if (jobs.length === 0) break;
 
 					this.logger.log(
-						`Synced ${jobs.length} jobs to ClickHouse successfully.`,
+						`Processing ${jobs.length} sync jobs from outbox...`,
 					);
-				} catch (err: any) {
-					// Ghi nhan loi nhung KHONG cap nhat processed → se retry lan sau
-					this.logger.error(`Sync batch failed: ${err.message}`);
-					const jobIds = jobs.map((j) => j.id);
-					await this.entityManager.query(
-						`UPDATE clickhouse_sync_outbox
+
+					try {
+						await this.syncJobsToClickHouse(jobs);
+
+						// Danh dau hoan tat
+						const jobIds = jobs.map((j) => j.id);
+						await this.entityManager.query(
+							`UPDATE clickhouse_sync_outbox
+             SET processed = true, processed_at = NOW(), error_message = NULL
+             WHERE id = ANY($1)`,
+							[jobIds],
+						);
+
+						this.logger.log(
+							`Synced ${jobs.length} jobs to ClickHouse successfully.`,
+						);
+					} catch (err: any) {
+						// Ghi nhan loi nhung KHONG cap nhat processed → se retry lan sau
+						this.logger.error(`Sync batch failed: ${err.message}`);
+						const jobIds = jobs.map((j) => j.id);
+						await this.entityManager.query(
+							`UPDATE clickhouse_sync_outbox
              SET error_message = $1
              WHERE id = ANY($2) AND processed = false`,
-						[err.message.substring(0, 500), jobIds],
-					);
-					break; // Dung lai, doi notification tiep theo de retry
+							[err.message.substring(0, 500), jobIds],
+						);
+						this.pendingDrain = false;
+						break;
+					}
 				}
-			}
+			} while (this.pendingDrain);
 		} finally {
 			this.isProcessing = false;
+			if (this.pendingDrain) {
+				this.pendingDrain = false;
+				void this.processOutboxQueue();
+			}
 		}
 	}
 

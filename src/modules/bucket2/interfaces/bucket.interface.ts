@@ -32,3 +32,31 @@ export interface IGetSignedUrlDown {
 	fileName: string;
 	bucket?: string;
 }
+
+export interface IInitiateMultipartUploadResponse {
+	fileId: string;
+	key: string;
+	partSize: number;
+	partCount: number;
+	expiresAt: Date;
+}
+
+export interface IMultipartUploadResult {
+	fileId: string;
+	key: string;
+	fileSize: number;
+	contentType: string;
+	readUrl: string;
+	downloadUrl: string;
+}
+
+export interface IListUploadedPartsResponse {
+	fileId: string;
+	partSize: number;
+	partCount: number;
+	parts: Array<{
+		partNumber: number;
+		eTag: string;
+		size: number;
+	}>;
+}

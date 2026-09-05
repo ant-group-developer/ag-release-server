@@ -70,6 +70,13 @@ export const appConfigDefault: AppConfigShape = {
 		preview: 60 + 42,
 	},
 
+	multipartUpload: {
+		partSizeMb: 128,
+		presignExpiresSeconds: 3600,
+		sessionExpiresSeconds: 86400,
+		maxFileSizeMb: 102400,
+	},
+
 	generator: {
 		prefixUpcDefaultId: '',
 		prefixIsrcDefaultId: '',
