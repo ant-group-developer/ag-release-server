@@ -95,12 +95,15 @@ export class LabelController {
 		status: 200,
 		description: 'List of labels',
 	})
-	async getListSimple(@Req() req: Request) {
-		const tenantId = req.user!.tenantId;
-		let tenantIds;
-		if (checkIsNotSystemTenant(tenantId)) {
-			tenantIds = [tenantId];
-		}
+	async getListSimple(
+		@Query() query: QueryGetListLabelDto,
+		@Req() req: Request,
+	) {
+		const actorTenantId = req.user!.tenantId;
+
+		const tenantIds = checkIsNotSystemTenant(actorTenantId)
+			? [actorTenantId]
+			: query.tenantIds;
 
 		const result = await this.labelService.getListSimple(tenantIds);
 		return new ResponseSuccess({ data: result });
