@@ -2515,7 +2515,11 @@ export class TimelineAnalyticsService {
 		params.from = query.fromDate;
 		params.to = query.toDate;
 
-		const sql = queries.getTrendViewLineChartQuery(joinSql, filterSql);
+		const sql = queries.getTrendViewLineChartQuery(
+			joinSql,
+			filterSql,
+			query.granularity,
+		);
 
 		const rows = await this.clickHouseService.query<{
 			period: string;

@@ -143,6 +143,7 @@ export class CubeRebuildService {
               f.dsp_id,
               f.territory_code,
               f.isrc,
+              if(f.import_source = '', 'ftp', f.import_source) AS import_source,
               any(f.upc) AS upc,
               any(f.track_title) AS track_title,
               any(f.album_title) AS album_title,
@@ -155,7 +156,7 @@ export class CubeRebuildService {
               ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
               AND f.revenue_currency = er.currency
           WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
-          GROUP BY period, f.dsp_id, f.territory_code, f.isrc
+          GROUP BY period, f.dsp_id, f.territory_code, f.isrc, import_source
         `);
 
 				this.logger.log(
@@ -447,7 +448,7 @@ export class CubeRebuildService {
       GROUP BY period, f.territory_code, f.dsp_id, f.isrc, import_source
     `);
 
-		// 4. Rebuild Export cube (was MISSING before — root cause of revenue mismatch)
+		// 4. Rebuild Export cube
 		await this.clickHouseService.execute(`
       INSERT INTO music_analytics.${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY}
       SELECT
@@ -455,6 +456,7 @@ export class CubeRebuildService {
           f.dsp_id,
           f.territory_code,
           f.isrc,
+          if(f.import_source = '', 'ftp', f.import_source) AS import_source,
           any(f.upc) AS upc,
           any(f.track_title) AS track_title,
           any(f.album_title) AS album_title,
@@ -466,7 +468,7 @@ export class CubeRebuildService {
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
           AND f.revenue_currency = er.currency
-      GROUP BY period, f.dsp_id, f.territory_code, f.isrc
+      GROUP BY period, f.dsp_id, f.territory_code, f.isrc, import_source
     `);
 
 		const dspCount = await this.clickHouseService.query<{ cnt: string }>(

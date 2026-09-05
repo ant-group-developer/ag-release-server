@@ -1,4 +1,8 @@
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
+import {
+	getTrendPeriodExprs,
+	type TrendChartGranularity,
+} from '../utils/trend-period.util';
 
 export function getRevenueOverviewQuery(
 	joinSql: string,
@@ -689,10 +693,12 @@ export function getTrendsOverviewArtistQuery(
 export function getTrendViewLineChartQuery(
 	joinSql: string,
 	filterSql: string,
+	granularity: TrendChartGranularity | undefined = 'day',
 ): string {
+	const { periodExpr, groupExpr } = getTrendPeriodExprs(granularity);
 	return `
     SELECT
-      formatDateTime(s.reporting_date, '%Y-%m-%d') AS period,
+      ${periodExpr} AS period,
       sum(s.total_quantity) AS total_views
     FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
     ${joinSql}
@@ -700,8 +706,8 @@ export function getTrendViewLineChartQuery(
       AND s.reporting_date >= toDate({from:String})
       AND s.reporting_date <= toDate({to:String})
       ${filterSql}
-    GROUP BY s.reporting_date, period
-    ORDER BY s.reporting_date ASC
+    GROUP BY ${groupExpr}, period
+    ORDER BY ${groupExpr} ASC
   `;
 }
 

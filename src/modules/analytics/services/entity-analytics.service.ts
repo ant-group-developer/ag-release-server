@@ -35,6 +35,7 @@ import {
 	getOwnershipLedgerFallbackPredicate,
 	getOwnershipTenantExpr,
 } from '../utils/ownership-join.util';
+import { getTrendPeriodExprs } from '../utils/trend-period.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	AnalyticsVideoScope,
@@ -615,16 +616,18 @@ export class EntityAnalyticsService {
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
 
+		const { periodExpr, groupExpr } = getTrendPeriodExprs(dto.granularity);
+
 		const sql = `
       SELECT
-        formatDateTime(s.reporting_date, '%Y-%m-%d') AS period,
+        ${periodExpr} AS period,
         sum(s.total_quantity) AS total_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
       ${joinSql}
       WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
-      GROUP BY s.reporting_date, period
-      ORDER BY s.reporting_date ASC
+      GROUP BY ${groupExpr}, period
+      ORDER BY ${groupExpr} ASC
     `;
 		const rows = await this.clickHouseService.query<{
 			period: string;
