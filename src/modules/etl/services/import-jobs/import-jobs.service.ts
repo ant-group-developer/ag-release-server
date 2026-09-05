@@ -34,6 +34,7 @@ export class ImportJobsService implements OnModuleInit {
 	private readonly logger = new Logger(ImportJobsService.name);
 	private readonly snapshots = new Map<string, ImportJob>();
 	private readonly lastFlushAt = new Map<string, number>();
+	private readonly pendingWrites = new Map<string, Promise<void>>();
 	/** Thời điểm snapshot được tạo — dùng cho TTL sweep, xem sweepStaleSnapshots(). */
 	private readonly snapshotCreatedAt = new Map<string, number>();
 	private static readonly PROGRESS_FLUSH_MS = 1000;
@@ -124,9 +125,9 @@ export class ImportJobsService implements OnModuleInit {
 
 	async markProcessing(id: string): Promise<void> {
 		const job = await this.requireSnapshot(id);
-		if (job.status === ImportJobStatus.CANCELLED) {
+		if (this.isTerminalStatus(job.status)) {
 			this.logger.warn(
-				`Job ${id} already CANCELLED. Skipping PROCESSING transition.`,
+				`Job ${id} already ${job.status}. Skipping PROCESSING transition.`,
 			);
 			return;
 		}
@@ -141,6 +142,7 @@ export class ImportJobsService implements OnModuleInit {
 
 	async markQueued(id: string): Promise<ImportJob> {
 		const job = await this.requireSnapshot(id);
+		if (this.isTerminalStatus(job.status)) return job;
 		job.status = ImportJobStatus.QUEUED;
 		job.progressLabel = 'Queued';
 		job.finishedAt = null;
@@ -161,7 +163,7 @@ export class ImportJobsService implements OnModuleInit {
 		force = false,
 	): Promise<void> {
 		const job = this.snapshots.get(id);
-		if (!job) return;
+		if (!job || this.isTerminalStatus(job.status)) return;
 
 		if (patch.progressCurrent !== undefined)
 			job.progressCurrent = patch.progressCurrent;
@@ -191,10 +193,10 @@ export class ImportJobsService implements OnModuleInit {
 		result: Record<string, unknown>,
 	): Promise<void> {
 		const job = await this.requireSnapshot(id);
-		if (job.status === ImportJobStatus.CANCELLED) {
+		if (this.isTerminalStatus(job.status)) {
 			this.cleanup(id);
 			this.logger.warn(
-				`Job ${id} already CANCELLED. Skipping COMPLETED transition.`,
+				`Job ${id} already ${job.status}. Skipping COMPLETED transition.`,
 			);
 			return;
 		}
@@ -240,10 +242,10 @@ export class ImportJobsService implements OnModuleInit {
 
 	async markFailed(id: string, error: Error | string): Promise<void> {
 		const job = await this.requireSnapshot(id);
-		if (job.status === ImportJobStatus.CANCELLED) {
+		if (this.isTerminalStatus(job.status)) {
 			this.cleanup(id);
 			this.logger.warn(
-				`Job ${id} already CANCELLED. Skipping FAILED transition.`,
+				`Job ${id} already ${job.status}. Skipping FAILED transition.`,
 			);
 			return;
 		}
@@ -291,7 +293,7 @@ export class ImportJobsService implements OnModuleInit {
 
 	async updateFileName(id: string, fileName: string): Promise<void> {
 		const job = this.snapshots.get(id);
-		if (!job) return;
+		if (!job || this.isTerminalStatus(job.status)) return;
 		job.fileName = fileName;
 		await this.persist(job);
 	}
@@ -778,26 +780,51 @@ export class ImportJobsService implements OnModuleInit {
 	 * im lặng, đứng QUEUED vĩnh viễn.
 	 */
 	private async persist(job: ImportJob, wait = false): Promise<void> {
-		job.updatedAt = nowDt64();
-		const rows = [domainToRow(job)] as unknown as Record<string, unknown>[];
-
-		if (wait) {
-			await this.clickHouseService.insert(
-				CLICKHOUSE_TABLES.IMPORT_JOBS,
-				rows,
-			);
-		} else {
-			this.clickHouseService
-				.insert(CLICKHOUSE_TABLES.IMPORT_JOBS, rows)
-				.catch((err) => {
-					this.logger.error(
-						`Failed to persist job ${job.id} to ClickHouse: ${err.message}`,
-						err.stack,
-					);
-				});
-		}
+		// ReplacingMergeTree needs strictly increasing versions, even when two
+		// transitions happen within the same millisecond.
+		const previousVersion = Date.parse(
+			job.updatedAt.replace(' ', 'T') + 'Z',
+		);
+		job.updatedAt = new Date(Math.max(Date.now(), previousVersion + 1))
+			.toISOString()
+			.replace('T', ' ')
+			.replace('Z', '');
+		// Capture both the row and event before awaiting: the live snapshot is mutable.
+		const row = domainToRow(job);
+		const snapshot = rowToDomain(row);
 		this.lastFlushAt.set(job.id, Date.now());
+		const previous = this.pendingWrites.get(job.id) ?? Promise.resolve();
+		const write = previous.then(async () => {
+			await this.clickHouseService.insert(CLICKHOUSE_TABLES.IMPORT_JOBS, [
+				row,
+			] as unknown as Record<string, unknown>[]);
+			this.emitSnapshot(snapshot);
+		});
+		const pending = write.catch((err) => {
+			this.logger.error(
+				`Failed to persist job ${job.id} to ClickHouse: ${err.message}`,
+				err.stack,
+			);
+		});
+		this.pendingWrites.set(job.id, pending);
+		void pending.then(() => {
+			if (this.pendingWrites.get(job.id) === pending) {
+				this.pendingWrites.delete(job.id);
+			}
+		});
+		if (wait) {
+			try {
+				await write;
+			} catch (err) {
+				// Do not retain an uncommitted terminal status when the caller retries
+				// or attempts to mark the job failed.
+				this.cleanup(job.id);
+				throw err;
+			}
+		}
+	}
 
+	private emitSnapshot(job: ImportJob): void {
 		this.jobEvents.emit({
 			jobId: job.id,
 			type:
@@ -859,6 +886,14 @@ export class ImportJobsService implements OnModuleInit {
 		this.snapshots.delete(id);
 		this.lastFlushAt.delete(id);
 		this.snapshotCreatedAt.delete(id);
+	}
+
+	private isTerminalStatus(status: ImportJobStatus): boolean {
+		return (
+			status === ImportJobStatus.COMPLETED ||
+			status === ImportJobStatus.FAILED ||
+			status === ImportJobStatus.CANCELLED
+		);
 	}
 }
 

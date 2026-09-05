@@ -1,6 +1,44 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { ImportJobSourceType, ImportJobStatus } from 'src/modules/etl/interfaces';
+import { EMPTY, lastValueFrom, toArray } from 'rxjs';
+import {
+	ImportJobSourceType,
+	ImportJobStatus,
+} from 'src/modules/etl/interfaces';
 import { AnalyticsReportExportController } from './analytics-report-export.controller';
+
+describe('AnalyticsReportExportController terminal SSE snapshot', () => {
+	it.each(['COMPLETED', 'FAILED', 'CANCELLED'])(
+		'closes the connection for a %s snapshot',
+		async (status) => {
+			const controller = new AnalyticsReportExportController(
+				{} as never,
+				{
+					findById: jest
+						.fn()
+						.mockResolvedValue({
+							id: 'job-1',
+							tenantId: 'tenant-1',
+							status,
+							progressTotal: 5,
+							params: {},
+						}),
+				} as never,
+				{ subscribe: () => EMPTY } as never,
+				{} as never,
+			);
+			const events = await lastValueFrom(
+				controller
+					.streamExportEvents(
+						{ user: { tenantId: 'tenant-1' } } as any,
+						'job-1',
+					)
+					.pipe(toArray()),
+			);
+			expect(events).toHaveLength(1);
+			expect(events[0].type).toBe('snapshot');
+		},
+	);
+});
 
 describe('AnalyticsReportExportController.validateAndResolveTenantIds', () => {
 	function createController(descendantIds: string[] = []) {
@@ -28,10 +66,7 @@ describe('AnalyticsReportExportController.validateAndResolveTenantIds', () => {
 	it('rejects tenantId + tenantIds supplied together', async () => {
 		const { validate } = createController(['A']);
 		await expect(
-			validate(
-				{ tenantId: 'A', tenantIds: ['A'] },
-				'A',
-			),
+			validate({ tenantId: 'A', tenantIds: ['A'] }, 'A'),
 		).rejects.toBeInstanceOf(BadRequestException);
 	});
 
