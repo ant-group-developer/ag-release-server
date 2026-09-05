@@ -264,6 +264,7 @@ export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 
 			this.running.set(jobId, { worker, cancelFlag });
 			let settled = false;
+			let messages = Promise.resolve();
 			const done = (fn: () => void) => {
 				if (settled) return;
 				settled = true;
@@ -271,21 +272,35 @@ export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 			};
 
 			worker.on('message', (msg: any) => {
-				void this.handleMessage(jobId, msg, done, resolve, reject);
+				messages = messages
+					.then(async () => {
+						if (settled) return;
+						await this.handleMessage(
+							jobId,
+							msg,
+							done,
+							resolve,
+							reject,
+						);
+					})
+					.catch((err) => done(() => reject(err)));
 			});
 
 			worker.on('error', (err) => {
-				done(() => reject(err));
+				messages = messages.then(() => done(() => reject(err)));
 			});
 
 			worker.on('exit', (code) => {
-				done(() => {
-					if (code === 0) resolve();
-					else
+				// Exit can arrive while the done message is still persisting to DB.
+				messages = messages.then(() =>
+					done(() =>
 						reject(
-							new Error(`Export worker exited with code ${code}`),
-						);
-				});
+							new Error(
+								`Export worker exited with code ${code} without a terminal result`,
+							),
+						),
+					),
+				);
 			});
 		});
 	}
@@ -326,12 +341,10 @@ export class ExportWorkerPoolService implements OnModuleInit, OnModuleDestroy {
 					break;
 				}
 
-				await this.importJobsService
-					.markCompleted(jobId, {
-						...msg.result,
-						totalProcessedRows: msg.result?.totalRows,
-					})
-					.catch(() => undefined);
+				await this.importJobsService.markCompleted(jobId, {
+					...msg.result,
+					totalProcessedRows: msg.result?.totalRows,
+				});
 				done(resolve);
 				break;
 			}
