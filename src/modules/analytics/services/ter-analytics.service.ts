@@ -20,6 +20,7 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { getTrendPeriodExprs } from '../utils/trend-period.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	appendAnalyticsVideoScopeFilter,
@@ -260,16 +261,18 @@ export class TerAnalyticsService {
 		params.fromDate = dto.fromDate;
 		params.toDate = dto.toDate;
 
+		const { periodExpr, groupExpr } = getTrendPeriodExprs(dto.granularity);
+
 		const sql = `
 			SELECT
-				formatDateTime(s.reporting_date, '%Y-%m-%d') AS period,
+				${periodExpr} AS period,
 				sum(s.total_quantity) AS total_views
 			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
 			${trackJoin}
 			WHERE s.reporting_date >= toDate({fromDate:String}) AND s.reporting_date <= toDate({toDate:String})
 				${terFilter} ${trackFilter}
-			GROUP BY s.reporting_date, period
-			ORDER BY s.reporting_date ASC
+			GROUP BY ${groupExpr}, period
+			ORDER BY ${groupExpr} ASC
 		`;
 		const rows = await this.clickHouseService.query<{
 			period: string;

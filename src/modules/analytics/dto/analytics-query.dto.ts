@@ -314,7 +314,18 @@ export class DspOverviewQueryDto extends DspAnalyticsBaseDto {
 /**
  * DTO cho DSP chart endpoints (line-chart, bar-chart).
  */
-export class DspChartQueryDto extends DspOverviewQueryDto {}
+export class DspChartQueryDto extends DspOverviewQueryDto {
+	@ApiPropertyOptional({
+		description:
+			'Bucket granularity for the trend-view line chart: per day (default) or per month ' +
+			'(buckets labeled YYYY-MM-01, covering only the days inside fromDate..toDate).',
+		enum: ['day', 'month'],
+		default: 'day',
+	})
+	@IsOptional()
+	@IsIn(['day', 'month'])
+	granularity?: 'day' | 'month' = 'day';
+}
 
 /**
  * DTO cho Vevo trend-view device/gender/age bar charts.
@@ -581,6 +592,17 @@ export class ChartQueryDto {
 	@IsOptional()
 	@IsString()
 	pgDspId?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Bucket granularity for the trend-view line chart: per day (default) or per month ' +
+			'(buckets labeled YYYY-MM-01, covering only the days inside fromDate..toDate).',
+		enum: ['day', 'month'],
+		default: 'day',
+	})
+	@IsOptional()
+	@IsIn(['day', 'month'])
+	granularity?: 'day' | 'month' = 'day';
 }
 
 /** DTO dành riêng cho revenue chart; trend-view chart không nhận sortBy này. */
