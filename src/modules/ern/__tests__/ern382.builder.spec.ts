@@ -139,6 +139,7 @@ describe('Ern382Builder', () => {
 	});
 
 	it('should have inline DisplayArtist with ArtistRole', () => {
+		expect(xml).toContain('<DisplayArtist SequenceNumber="1">');
 		expect(xml).toContain('<FullName>TEST Artist</FullName>');
 		expect(xml).toContain('<ArtistRole>MainArtist</ArtistRole>');
 	});

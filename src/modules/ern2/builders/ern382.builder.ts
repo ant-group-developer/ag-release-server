@@ -158,8 +158,11 @@ export class Ern382Builder2 {
 		}
 
 		// Display artists (inline)
+		let displayArtistSequence = 1;
 		for (const artist of track.artists) {
-			const da = details.ele('DisplayArtist');
+			const da = details.ele('DisplayArtist', {
+				SequenceNumber: String(displayArtistSequence++),
+			});
 			const pn = da.ele('PartyName');
 			if (artist.languageAndScriptCode) {
 				pn.att('LanguageAndScriptCode', artist.languageAndScriptCode);
@@ -172,7 +175,9 @@ export class Ern382Builder2 {
 		if (track.contributors) {
 			for (const c of track.contributors) {
 				if (c.role === 'FeaturedArtist') {
-					const da = details.ele('DisplayArtist');
+					const da = details.ele('DisplayArtist', {
+						SequenceNumber: String(displayArtistSequence++),
+					});
 					const pn = da.ele('PartyName');
 					if (c.languageAndScriptCode) {
 						pn.att(
@@ -471,8 +476,11 @@ export class Ern382Builder2 {
 		details.ele('LabelName').txt(this.input.release.labelName);
 
 		// Display artists
+		let displayArtistSequence = 1;
 		for (const artist of track.artists) {
-			const da = details.ele('DisplayArtist');
+			const da = details.ele('DisplayArtist', {
+				SequenceNumber: String(displayArtistSequence++),
+			});
 			const pn = da.ele('PartyName');
 			if (artist.languageAndScriptCode) {
 				pn.att('LanguageAndScriptCode', artist.languageAndScriptCode);
@@ -485,7 +493,9 @@ export class Ern382Builder2 {
 		if (track.contributors) {
 			for (const c of track.contributors) {
 				if (c.role === 'FeaturedArtist') {
-					const da = details.ele('DisplayArtist');
+					const da = details.ele('DisplayArtist', {
+						SequenceNumber: String(displayArtistSequence++),
+					});
 					const pn = da.ele('PartyName');
 					if (c.languageAndScriptCode) {
 						pn.att(
@@ -609,8 +619,11 @@ export class Ern382Builder2 {
 		details.ele('DisplayArtistName').txt(artistName);
 		details.ele('LabelName').txt(this.input.release.labelName);
 
-		for (const artist of this.input.release.artists) {
-			const da = details.ele('DisplayArtist');
+		for (let i = 0; i < this.input.release.artists.length; i++) {
+			const artist = this.input.release.artists[i];
+			const da = details.ele('DisplayArtist', {
+				SequenceNumber: String(i + 1),
+			});
 			const pn = da.ele('PartyName');
 			if (artist.languageAndScriptCode) {
 				pn.att('LanguageAndScriptCode', artist.languageAndScriptCode);

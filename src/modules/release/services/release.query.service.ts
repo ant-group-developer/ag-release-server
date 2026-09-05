@@ -2077,6 +2077,7 @@ export class ReleaseQueryService {
 			)
 			.where('track.release_id = :releaseId', { releaseId })
 			.orderBy('track.order', 'ASC')
+			.addOrderBy('trackArtists.createdAt', 'ASC')
 			.getMany();
 
 		// Query 4: optional DSP deliveries
