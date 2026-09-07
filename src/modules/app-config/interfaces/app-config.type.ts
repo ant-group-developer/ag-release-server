@@ -136,3 +136,11 @@ export interface PartnersConfig {
 	spotify: PartnerSpotifyConfig;
 	vevo: PartnerVevoConfig;
 }
+
+export interface AppConfigChangedEvent {
+	version: 1;
+	eventId: string;
+	sourceInstanceId: string;
+	appConfigId: string;
+	updatedAt: string;
+}

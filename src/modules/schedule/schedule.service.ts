@@ -3,6 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { AppEvent } from 'src/common/enums/common';
+import { AppConfigCoordinatorService } from '../app-config/app-config-coordinator.service';
 import { AppConfigService } from '../app-config/app-config.service';
 import { DatabaseBackupService } from '../database/services/database.backup.service';
 import { DspReportService } from '../dsp-report/services/dsp-report.service';
@@ -16,6 +17,7 @@ export class ScheduleService implements OnApplicationBootstrap {
 		private readonly databaseBackupService: DatabaseBackupService,
 		private readonly schedulerRegistry: SchedulerRegistry,
 		private readonly appConfigService: AppConfigService,
+		private readonly appConfigCoordinatorService: AppConfigCoordinatorService,
 
 		private readonly releaseExecution3CronJobService: ReleaseExecution3CronJobService,
 		private readonly dspReportService: DspReportService,
@@ -144,7 +146,7 @@ export class ScheduleService implements OnApplicationBootstrap {
 	@Cron('0 0 * * *') // mỗi ngày lúc 00:00
 	async refreshCiToolToken() {
 		try {
-			await this.appConfigService.refreshCiToolToken();
+			await this.appConfigCoordinatorService.refreshCiToolToken();
 			this.logger.log('[CRON] CI Tool token refreshed');
 		} catch (err) {
 			this.logger.error(

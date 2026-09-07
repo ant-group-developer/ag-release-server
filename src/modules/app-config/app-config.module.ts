@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 import { CiToolModule } from '../partners-api/ci-tool/ci-tool.module';
 import { CiModule } from '../partners-api/ci/ci.module';
+import { AppConfigCoordinatorService } from './app-config-coordinator.service';
+import { AppConfigSyncService } from './app-config-sync.service';
 import { AppConfigController } from './app-config.controller';
 import { AppConfigService } from './app-config.service';
 import { AppConfig } from './entities/app-config.entity';
@@ -15,7 +17,11 @@ import { AppConfig } from './entities/app-config.entity';
 		forwardRef(() => CiModule),
 	],
 	controllers: [AppConfigController],
-	providers: [AppConfigService],
-	exports: [AppConfigService],
+	providers: [
+		AppConfigService,
+		AppConfigSyncService,
+		AppConfigCoordinatorService,
+	],
+	exports: [AppConfigService, AppConfigCoordinatorService],
 })
 export class AppConfigModule {}
