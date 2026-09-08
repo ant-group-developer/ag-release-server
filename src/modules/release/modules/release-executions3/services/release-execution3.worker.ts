@@ -2,7 +2,10 @@ import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import path from 'path';
-import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
+import {
+	CI_IMPORT_MAX_EMPTY_CHECKS,
+	DEFAULT_WAIT_MINUTES,
+} from 'src/common/constants/common.default.constants';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
@@ -538,9 +541,88 @@ export class ReleaseExecution3Worker {
 			});
 
 			if (imports.length === 0) {
-				throw new Error(
-					'Không tìm thấy import, có thể do CI chưa xử lý xong',
+				const previousEmptyChecks =
+					Number(step.metadata?.output?.emptyCheckCount) || 0;
+				const emptyCheckCount = previousEmptyChecks + 1;
+
+				if (emptyCheckCount >= CI_IMPORT_MAX_EMPTY_CHECKS) {
+					step.metadata = {
+						...step.metadata,
+						input: {
+							...step.metadata?.input,
+							package_id: upc,
+							external_identifier: batchId,
+							page_size: 999,
+						},
+						output: {
+							imports: [],
+							errors: [],
+							hasIssues: true,
+							emptyCheckCount,
+							lastCheckedAt: new Date().toISOString(),
+						},
+					};
+
+					delete step.metadata.scheduledAt;
+
+					await this.manager.save(ReleaseExecutionStep3, step);
+
+					this.logService.error({
+						message:
+							`[GET_RESULT_IMPORT_CI] Không tìm thấy import ` +
+							`sau ${emptyCheckCount} lần kiểm tra`,
+						releaseExecutionId: releaseExecution.id,
+						releaseExecutionStepId: step.id,
+						data: {
+							upc,
+							batchId,
+							emptyCheckCount,
+						},
+					});
+
+					return ReleaseExecutionStepStatus.FAILED;
+				}
+
+				const scheduledAt = new Date(
+					Date.now() + DEFAULT_WAIT_MINUTES * 60 * 1000,
 				);
+
+				step.metadata = {
+					...step.metadata,
+					scheduledAt: scheduledAt.toISOString(),
+					input: {
+						...step.metadata?.input,
+						package_id: upc,
+						external_identifier: batchId,
+						page_size: 999,
+					},
+					output: {
+						imports: [],
+						errors: [],
+						hasIssues: false,
+						emptyCheckCount,
+						lastCheckedAt: new Date().toISOString(),
+					},
+				};
+
+				await this.manager.save(ReleaseExecutionStep3, step);
+
+				this.logService.log({
+					message:
+						`[GET_RESULT_IMPORT_CI] Chưa tìm thấy import, ` +
+						`kiểm tra lại sau ${DEFAULT_WAIT_MINUTES} phút ` +
+						`(${emptyCheckCount}/${CI_IMPORT_MAX_EMPTY_CHECKS})`,
+					releaseExecutionId: releaseExecution.id,
+					releaseExecutionStepId: step.id,
+					data: {
+						upc,
+						batchId,
+						emptyCheckCount,
+						scheduledAt: scheduledAt.toISOString(),
+					},
+				});
+
+				return ReleaseExecutionStepStatus.WAITING_PARTNER;
 			}
 
 			const errors = imports.flatMap((item: any) =>
