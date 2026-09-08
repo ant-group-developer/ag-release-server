@@ -211,4 +211,16 @@ export class AppConfigService implements OnModuleInit {
 		this.logger.log(`Event: ${AppEvent.UPDATE_APP_CONFIG}`);
 		this.eventEmitter.emit(AppEvent.UPDATE_APP_CONFIG);
 	}
+
+	async reloadFromDatabase(): Promise<AppConfig> {
+		const appConfig = await this.findOneDb();
+
+		if (!appConfig) {
+			throw new Error('App config not found');
+		}
+
+		this.setCache(appConfig);
+
+		return appConfig;
+	}
 }

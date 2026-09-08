@@ -9,6 +9,9 @@ import {
 import { ReleaseStatus } from '../../release/enum/release.enum';
 import { AppConfigShape } from '../interfaces/app-config.type';
 
+export const APP_CONFIG_CHANGED_CHANNEL = 'app-config:changed';
+export const APP_CONFIG_EVENT_VERSION = 1 as const;
+
 export const appConfigDefault: AppConfigShape = {
 	resend: {
 		apiKey: '',
