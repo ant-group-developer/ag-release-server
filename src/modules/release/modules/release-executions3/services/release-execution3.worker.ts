@@ -545,7 +545,7 @@ export class ReleaseExecution3Worker {
 					Number(step.metadata?.output?.emptyCheckCount) || 0;
 				const emptyCheckCount = previousEmptyChecks + 1;
 
-				if (emptyCheckCount >= CI_IMPORT_MAX_EMPTY_CHECKS) {
+				if (emptyCheckCount > CI_IMPORT_MAX_EMPTY_CHECKS) {
 					step.metadata = {
 						...step.metadata,
 						input: {
@@ -583,8 +583,11 @@ export class ReleaseExecution3Worker {
 					return ReleaseExecutionStepStatus.FAILED;
 				}
 
+				const retryDelayMinutes =
+					DEFAULT_WAIT_MINUTES * Math.pow(emptyCheckCount, 3);
+
 				const scheduledAt = new Date(
-					Date.now() + DEFAULT_WAIT_MINUTES * 60 * 1000,
+					Date.now() + retryDelayMinutes * 60 * 1000,
 				);
 
 				step.metadata = {
@@ -610,7 +613,7 @@ export class ReleaseExecution3Worker {
 				this.logService.log({
 					message:
 						`[GET_RESULT_IMPORT_CI] Chưa tìm thấy import, ` +
-						`kiểm tra lại sau ${DEFAULT_WAIT_MINUTES} phút ` +
+						`kiểm tra lại sau ${retryDelayMinutes} phút ` +
 						`(${emptyCheckCount}/${CI_IMPORT_MAX_EMPTY_CHECKS})`,
 					releaseExecutionId: releaseExecution.id,
 					releaseExecutionStepId: step.id,
