@@ -98,6 +98,8 @@ export interface ErnReleaseInput {
 	cLine?: ErnCopyrightInput;
 	/** Display artists for the release */
 	artists: ErnArtistInput[];
+	/** Contributors for the release (including featured artists) */
+	contributors?: ErnContributorInput[];
 	/** Cover art file */
 	coverArt?: ErnCoverArtInput;
 	/** Territory codes (ISO 3166), default: ['Worldwide'] */

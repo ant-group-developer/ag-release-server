@@ -921,6 +921,13 @@ export class ReleaseDdexService {
 					appleMusicId: ra.artist?.appleMusicId,
 				})),
 
+				contributors: release.releaseContributors?.map(
+					(contributor) => ({
+						name: contributor.artist?.name ?? '',
+						role: contributor.artistRole?.code ?? '',
+					}),
+				),
+
 				parentalWarning,
 
 				pLine:

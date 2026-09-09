@@ -534,17 +534,28 @@ export class Ern382Builder {
 			details.ele('TerritoryCode').txt(t);
 		}
 
-		// Display artist
-		const artistName = this.input.release.artists
-			.map((a) => a.name)
+		// Display artist name (combined main feat. featured for DSP display)
+		const mainArtists = this.input.release.artists;
+		const featuredArtists =
+			this.input.release.contributors?.filter(
+				(contributor) => contributor.role === 'FeaturedArtist',
+			) ?? [];
+		const mainArtistName = mainArtists
+			.map((artist) => artist.name)
 			.join(', ');
+		const featuredArtistName = featuredArtists
+			.map((artist) => artist.name)
+			.join(', ');
+		const artistName = featuredArtistName
+			? `${mainArtistName} feat. ${featuredArtistName}`
+			: mainArtistName;
 		details.ele('DisplayArtistName').txt(artistName);
 		details.ele('LabelName').txt(this.input.release.labelName);
 
-		for (let i = 0; i < this.input.release.artists.length; i++) {
-			const artist = this.input.release.artists[i];
+		let displayArtistSequence = 1;
+		for (const artist of mainArtists) {
 			const da = details.ele('DisplayArtist', {
-				SequenceNumber: String(i + 1),
+				SequenceNumber: String(displayArtistSequence++),
 			});
 			const pn = da.ele('PartyName');
 			if (artist.languageAndScriptCode) {
@@ -552,6 +563,18 @@ export class Ern382Builder {
 			}
 			pn.ele('FullName').txt(artist.name);
 			da.ele('ArtistRole').txt(artist.role);
+		}
+
+		for (const artist of featuredArtists) {
+			const da = details.ele('DisplayArtist', {
+				SequenceNumber: String(displayArtistSequence++),
+			});
+			const pn = da.ele('PartyName');
+			if (artist.languageAndScriptCode) {
+				pn.att('LanguageAndScriptCode', artist.languageAndScriptCode);
+			}
+			pn.ele('FullName').txt(artist.name);
+			da.ele('ArtistRole').txt('FeaturedArtist');
 		}
 
 		// Parental warning
