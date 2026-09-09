@@ -28,6 +28,7 @@ import {
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
+import { buildDetailFilters } from '../utils/detail-analytics-filter.util';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import {
 	buildOwnershipJoin,
@@ -212,6 +213,39 @@ export class EntityAnalyticsService {
 		);
 
 		return { joinSql, filterSql, params };
+	}
+
+	private buildEntityChartFilters(
+		tenantId: string,
+		entityType: EntityType,
+		entityId: string,
+		dto: ChartQueryDto,
+		ownershipPeriod: 'trend' | 'revenue' = 'trend',
+	) {
+		// The tenant controller has already authorized the target (including
+		// descendant workspaces). Scope that route to its target workspace.
+		const scopeTenantId =
+			entityType === 'tenant' && !checkIsSystemTenant(tenantId)
+				? entityId
+				: tenantId;
+		const filters = buildDetailFilters(
+			scopeTenantId,
+			dto,
+			ownershipPeriod,
+			entityType !== 'track',
+		);
+		const entityPredicates: Record<EntityType, string> = {
+			release: 't.release_id = {entityId:String}',
+			label: "coalesce(nullIf(o.label_id, ''), t.label_id) = {entityId:String}",
+			artist: 'has(t.artist_ids, {entityId:String})',
+			track: 's.isrc = {entityId:String}',
+			tenant: "coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {entityId:String}",
+			channel: 't.channel_id = {entityId:String}',
+			sourceType: 's.import_source = {entityId:String}',
+		};
+		filters.filterSql += ` AND ${entityPredicates[entityType]}`;
+		filters.params.entityId = entityId;
+		return filters;
 	}
 
 	private ownershipTenantClause(
@@ -605,13 +639,11 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<TrendViewLineChartItem[]> {
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
+		const { joinSql, filterSql, params } = this.buildEntityChartFilters(
 			tenantId,
 			entityType,
 			entityId,
-			dto.releaseType,
-			dto.importSource,
-			getAnalyticsVideoScope(dto),
+			dto,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -664,13 +696,11 @@ export class EntityAnalyticsService {
 	): Promise<RevenueLineChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
+		const { joinSql, filterSql, params } = this.buildEntityChartFilters(
 			tenantId,
 			entityType,
 			entityId,
-			dto.releaseType,
-			dto.importSource,
-			getAnalyticsVideoScope(dto),
+			dto,
 			'revenue',
 		);
 		params.from = fromDate;
@@ -729,13 +759,11 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<DspBarChartItem[]> {
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
+		const { joinSql, filterSql, params } = this.buildEntityChartFilters(
 			tenantId,
 			entityType,
 			entityId,
-			dto.releaseType,
-			dto.importSource,
-			getAnalyticsVideoScope(dto),
+			dto,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -831,13 +859,11 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
+		const { joinSql, filterSql, params } = this.buildEntityChartFilters(
 			tenantId,
 			entityType,
 			entityId,
-			dto.releaseType,
-			dto.importSource,
-			getAnalyticsVideoScope(dto),
+			dto,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -916,13 +942,11 @@ export class EntityAnalyticsService {
 	): Promise<DspBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
+		const { joinSql, filterSql, params } = this.buildEntityChartFilters(
 			tenantId,
 			entityType,
 			entityId,
-			dto.releaseType,
-			dto.importSource,
-			getAnalyticsVideoScope(dto),
+			dto,
 			'revenue',
 		);
 		params.from = fromDate;
@@ -1040,13 +1064,11 @@ export class EntityAnalyticsService {
 	): Promise<TerritoryBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
+		const { joinSql, filterSql, params } = this.buildEntityChartFilters(
 			tenantId,
 			entityType,
 			entityId,
-			dto.releaseType,
-			dto.importSource,
-			getAnalyticsVideoScope(dto),
+			dto,
 			'revenue',
 		);
 		params.from = fromDate;
