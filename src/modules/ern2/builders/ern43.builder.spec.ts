@@ -100,4 +100,30 @@ describe('Ern43Builder2 video metadata', () => {
 
 		expect(xml).not.toContain('VEVO:YouTubeUnlisted');
 	});
+
+	it('renders release featured artists and registers their party', () => {
+		const input: ErnInput2 = {
+			...baseInput,
+			release: {
+				...baseInput.release,
+				artists: [{ name: 'Tia', role: 'MainArtist' }],
+				contributors: [{ name: 'BhadBoi OML', role: 'FeaturedArtist' }],
+			},
+		};
+
+		const xml = new Ern43Builder2(input).build();
+		const mainReleaseXml = xml.slice(
+			xml.indexOf('<ReleaseReference>R0</ReleaseReference>'),
+		);
+
+		expect(xml).toMatch(
+			/<PartyReference>(P\d+)<\/PartyReference>[\s\S]*?<FullName>BhadBoi OML<\/FullName>/,
+		);
+		expect(mainReleaseXml).toContain(
+			'<DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Tia feat. BhadBoi OML</DisplayArtistName>',
+		);
+		expect(mainReleaseXml).toContain(
+			'<DisplayArtistRole>FeaturedArtist</DisplayArtistRole>',
+		);
+	});
 });
