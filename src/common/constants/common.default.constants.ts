@@ -44,6 +44,7 @@ export const DEFAULT_AUTO_SCAN_TIME = '01:00';
 // export const DEFAULT_WAIT_MINUTES = 0.1; // 0.1 phút // dev
 // export const MINUTES_PER_DAY = 0.1; // 0.1 phút // dev
 export const DEFAULT_WAIT_MINUTES = 15; // 15 phút
+export const CI_IMPORT_MAX_EMPTY_CHECKS = 4;
 export const MINUTES_PER_DAY = 1440; // 1 ngày
 
 export const NO_LINGUISTIC_CONTENT_LANGUAGE = 'zxx';

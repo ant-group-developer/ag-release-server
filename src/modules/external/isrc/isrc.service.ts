@@ -2,8 +2,8 @@
 import { Metadata } from '@grpc/grpc-js';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
-import { firstValueFrom } from 'rxjs';
-import { timeout } from 'rxjs/operators';
+import { firstValueFrom, throwError, TimeoutError, timer } from 'rxjs';
+import { retry, timeout } from 'rxjs/operators';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { ISRC_CLIENT_NAME, ISRC_SERVICE_NAME } from './const/isrc.constants';
@@ -50,9 +50,20 @@ export class IsrcService implements OnModuleInit {
 	async create(payload: CreateIsrc) {
 		// return { data: { code: 'QT6KL2614737' } };
 		return firstValueFrom(
-			this.grpcService
-				.createIsrc(payload, this.buildMetadata())
-				.pipe(timeout(10_000)),
+			this.grpcService.createIsrc(payload, this.buildMetadata()).pipe(
+				timeout(30_000),
+				retry({
+					count: 1,
+					delay: (error) => {
+						if (!(error instanceof TimeoutError)) {
+							return throwError(() => error);
+						}
+
+						// Chờ 1 giây trước khi retry
+						return timer(1_000);
+					},
+				}),
+			),
 		);
 	}
 

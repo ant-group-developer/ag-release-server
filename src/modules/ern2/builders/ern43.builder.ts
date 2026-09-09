@@ -73,6 +73,9 @@ export class Ern43Builder2 {
 		for (const a of this.input.release.artists) {
 			this.addParty(a.name);
 		}
+		for (const c of this.input.release.contributors ?? []) {
+			this.addParty(c.name);
+		}
 		// Track artists + contributors
 		for (const t of this.input.tracks) {
 			for (const a of t.artists) this.addParty(a.name);
@@ -633,9 +636,20 @@ export class Ern43Builder2 {
 		}
 
 		// Display artist
-		const artistName = this.input.release.artists
-			.map((a) => a.name)
+		const mainArtists = this.input.release.artists;
+		const featuredArtists =
+			this.input.release.contributors?.filter(
+				(contributor) => contributor.role === 'FeaturedArtist',
+			) ?? [];
+		const mainArtistName = mainArtists
+			.map((artist) => artist.name)
 			.join(', ');
+		const featuredArtistName = featuredArtists
+			.map((artist) => artist.name)
+			.join(', ');
+		const artistName = featuredArtistName
+			? `${mainArtistName} feat. ${featuredArtistName}`
+			: mainArtistName;
 		release
 			.ele('DisplayArtistName', {
 				ApplicableTerritoryCode: 'Worldwide',
@@ -643,14 +657,23 @@ export class Ern43Builder2 {
 			})
 			.txt(artistName);
 
-		for (let i = 0; i < this.input.release.artists.length; i++) {
+		let displayArtistSequence = 1;
+		for (let i = 0; i < mainArtists.length; i++) {
 			const da = release.ele('DisplayArtist', {
-				SequenceNumber: String(i + 1),
+				SequenceNumber: String(displayArtistSequence++),
 			});
 			da.ele('ArtistPartyReference').txt(
-				this.getPartyRef(this.input.release.artists[i].name),
+				this.getPartyRef(mainArtists[i].name),
 			);
-			da.ele('DisplayArtistRole').txt(this.input.release.artists[i].role);
+			da.ele('DisplayArtistRole').txt(mainArtists[i].role);
+		}
+
+		for (const artist of featuredArtists) {
+			const da = release.ele('DisplayArtist', {
+				SequenceNumber: String(displayArtistSequence++),
+			});
+			da.ele('ArtistPartyReference').txt(this.getPartyRef(artist.name));
+			da.ele('DisplayArtistRole').txt('FeaturedArtist');
 		}
 
 		// Label
