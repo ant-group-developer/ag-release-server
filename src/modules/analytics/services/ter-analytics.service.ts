@@ -19,6 +19,7 @@ import {
 	RevenueLineChartItem,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
+import { buildDetailFilters } from '../utils/detail-analytics-filter.util';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { getTrendPeriodExprs } from '../utils/trend-period.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
@@ -237,27 +238,27 @@ export class TerAnalyticsService {
 	async getTrendViewLineChart(
 		isoCode: string,
 		dto: ChartQueryDto,
+		tenantId: string,
 	): Promise<TrendViewLineChartItem[]> {
-		const key = this.cache.buildKey('ter:trend-line', 'system', {
+		const key = this.cache.buildKey('ter:trend-line', tenantId, {
 			isoCode,
 			...dto,
 		});
 		return this.cache.wrap(key, () =>
-			this.computeTrendViewLineChart(isoCode, dto),
+			this.computeTrendViewLineChart(isoCode, dto, tenantId),
 		);
 	}
 
 	private async computeTrendViewLineChart(
 		isoCode: string,
 		dto: ChartQueryDto,
+		tenantId: string,
 	): Promise<TrendViewLineChartItem[]> {
-		const { terFilter, trackJoin, trackFilter, params } =
-			this.buildTerFilter(
-				isoCode,
-				dto.importSource,
-				dto.releaseType,
-				dto,
-			);
+		const { joinSql, filterSql, params } = buildDetailFilters(
+			tenantId,
+			dto,
+		);
+		params.isoCode = isoCode.toUpperCase();
 		params.fromDate = dto.fromDate;
 		params.toDate = dto.toDate;
 
@@ -268,9 +269,9 @@ export class TerAnalyticsService {
 				${periodExpr} AS period,
 				sum(s.total_quantity) AS total_views
 			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
-			${trackJoin}
+			${joinSql}
 			WHERE s.reporting_date >= toDate({fromDate:String}) AND s.reporting_date <= toDate({toDate:String})
-				${terFilter} ${trackFilter}
+				AND s.territory_code = {isoCode:String} ${filterSql}
 			GROUP BY ${groupExpr}, period
 			ORDER BY ${groupExpr} ASC
 		`;
@@ -289,29 +290,30 @@ export class TerAnalyticsService {
 	async getRevenueLineChart(
 		isoCode: string,
 		dto: RevenueChartQueryDto,
+		tenantId: string,
 	): Promise<RevenueLineChartItem[]> {
-		const key = this.cache.buildKey('ter:rev-line', 'system', {
+		const key = this.cache.buildKey('ter:rev-line', tenantId, {
 			isoCode,
 			...dto,
 		});
 		return this.cache.wrap(key, () =>
-			this.computeRevenueLineChart(isoCode, dto),
+			this.computeRevenueLineChart(isoCode, dto, tenantId),
 		);
 	}
 
 	private async computeRevenueLineChart(
 		isoCode: string,
 		dto: RevenueChartQueryDto,
+		tenantId: string,
 	): Promise<RevenueLineChartItem[]> {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
-		const { terFilter, trackJoin, trackFilter, params } =
-			this.buildTerFilter(
-				isoCode,
-				dto.importSource,
-				dto.releaseType,
-				dto,
-			);
+		const { joinSql, filterSql, params } = buildDetailFilters(
+			tenantId,
+			dto,
+			'revenue',
+		);
+		params.isoCode = isoCode.toUpperCase();
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
 
@@ -321,9 +323,9 @@ export class TerAnalyticsService {
 				sum(s.total_quantity) AS quantity,
 				sum(s.total_revenue_usd) AS revenue_usd
 			FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
-			${trackJoin}
+			${joinSql}
 			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-				${terFilter} ${trackFilter}
+				AND s.territory_code = {isoCode:String} ${filterSql}
 			GROUP BY period
 			ORDER BY period ASC
 		`;

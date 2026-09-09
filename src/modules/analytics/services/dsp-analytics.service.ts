@@ -26,6 +26,7 @@ import {
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
+import { buildDetailFilters } from '../utils/detail-analytics-filter.util';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import {
 	buildOwnershipJoin,
@@ -105,6 +106,17 @@ export class DspAnalyticsService {
 	// ─────────────────────────────────────────────────────
 	// Helper: build JOIN + WHERE scoped theo DSP + tenant
 	// ─────────────────────────────────────────────────────
+	private buildDspChartFilters(
+		tenantId: string,
+		dto: DspChartQueryDto,
+		ownershipPeriod: 'trend' | 'revenue' = 'trend',
+	) {
+		if (!dto.pgDspId && !dto.dspReportId) {
+			throw new BadRequestException('Provide pgDspId or dspReportId');
+		}
+		return buildDetailFilters(tenantId, dto, ownershipPeriod);
+	}
+
 	private buildDspFilters(
 		tenantId: string,
 		pgDspId?: string,
@@ -523,12 +535,9 @@ export class DspAnalyticsService {
 		dto: DspChartQueryDto,
 		tenantId: string,
 	): Promise<TrendViewLineChartItem[]> {
-		const { joinSql, filterSql, params } = this.buildDspFilters(
+		const { joinSql, filterSql, params } = this.buildDspChartFilters(
 			tenantId,
-			dto.pgDspId,
-			dto.dspReportId,
-			dto.releaseType,
-			{ analyticsVideoScope: getAnalyticsVideoScope(dto) },
+			dto,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -575,15 +584,10 @@ export class DspAnalyticsService {
 	): Promise<RevenueLineChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
-		const { joinSql, filterSql, params } = this.buildDspFilters(
+		const { joinSql, filterSql, params } = this.buildDspChartFilters(
 			tenantId,
-			dto.pgDspId,
-			dto.dspReportId,
-			dto.releaseType,
-			{
-				analyticsVideoScope: getAnalyticsVideoScope(dto),
-				ownershipPeriod: 'revenue',
-			},
+			dto,
+			'revenue',
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -630,12 +634,9 @@ export class DspAnalyticsService {
 		dto: DspChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
-		const { joinSql, filterSql, params } = this.buildDspFilters(
+		const { joinSql, filterSql, params } = this.buildDspChartFilters(
 			tenantId,
-			dto.pgDspId,
-			dto.dspReportId,
-			dto.releaseType,
-			{ analyticsVideoScope: getAnalyticsVideoScope(dto) },
+			dto,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -708,16 +709,10 @@ export class DspAnalyticsService {
 	): Promise<TerritoryBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
-		const { joinSql, filterSql, params } = this.buildDspFilters(
+		const { joinSql, filterSql, params } = this.buildDspChartFilters(
 			tenantId,
-			dto.pgDspId,
-			dto.dspReportId,
-			dto.releaseType,
-			{
-				tableHasDspId: false,
-				analyticsVideoScope: getAnalyticsVideoScope(dto),
-				ownershipPeriod: 'revenue',
-			},
+			dto,
+			'revenue',
 		);
 		params.from = fromDate;
 		params.to = toDate;

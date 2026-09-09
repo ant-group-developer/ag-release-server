@@ -1,11 +1,12 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
-	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import { TerAnalyticsService } from '../services/ter-analytics.service';
 
@@ -30,9 +31,14 @@ export class TerAnalyticsController {
 	async trendViewLineChart(
 		@Param('isoCode') isoCode: string,
 		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
-			data: await this.terSvc.getTrendViewLineChart(isoCode, dto),
+			data: await this.terSvc.getTrendViewLineChart(
+				isoCode,
+				dto,
+				req.user!.tenantId,
+			),
 		});
 	}
 
@@ -41,13 +47,16 @@ export class TerAnalyticsController {
 	async revenueLineChart(
 		@Param('isoCode') isoCode: string,
 		@Body() dto: RevenueChartQueryDto,
+		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
-			data: await this.terSvc.getRevenueLineChart(isoCode, dto),
+			data: await this.terSvc.getRevenueLineChart(
+				isoCode,
+				dto,
+				req.user!.tenantId,
+			),
 		});
 	}
-
-
 
 	@Post('top-tracks')
 	@ApiOperation({
@@ -64,7 +73,8 @@ export class TerAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases in a territory (sortBy: views | usage | revenue)',
+		summary:
+			'Top releases in a territory (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('isoCode') isoCode: string,
