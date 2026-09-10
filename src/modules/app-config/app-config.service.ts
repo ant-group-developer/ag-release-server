@@ -204,7 +204,10 @@ export class AppConfigService implements OnModuleInit {
 	}
 
 	private async findOneDb() {
-		return this.appConfigRepo.createQueryBuilder().getOne();
+		return this.appConfigRepo
+			.createQueryBuilder('cfg')
+			.orderBy('cfg.updatedAt', 'DESC')
+			.getOne();
 	}
 
 	private emitEventUpdate() {

@@ -282,6 +282,14 @@ export class ReleaseExecution3QueryService {
 			},
 		});
 
+		for (const step of steps) {
+			step.logs?.sort(
+				(a, b) =>
+					new Date(a.createdAt).getTime() -
+					new Date(b.createdAt).getTime(),
+			);
+		}
+
 		entity.steps = this.buildStepTreeList(steps);
 
 		return entity;
