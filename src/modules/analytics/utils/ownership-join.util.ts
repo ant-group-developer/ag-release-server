@@ -39,6 +39,7 @@ function getDedupedOwnershipSubquery(ownershipPeriod: OwnershipPeriod): string {
 		    argMax(label_id, updated_at) AS label_id,
 		    argMax(release_id, updated_at) AS release_id
 		  FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
+		  WHERE is_deleted = 0
 		  GROUP BY isrc, revenue_effective_from, revenue_effective_to, effective_from, effective_to)`;
 	}
 	return `(SELECT
@@ -51,6 +52,7 @@ function getDedupedOwnershipSubquery(ownershipPeriod: OwnershipPeriod): string {
 		    argMax(label_id, updated_at) AS label_id,
 		    argMax(release_id, updated_at) AS release_id
 		  FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
+		  WHERE is_deleted = 0
 		  GROUP BY isrc, effective_from, effective_to, revenue_effective_from, revenue_effective_to)`;
 }
 
@@ -77,7 +79,7 @@ export function getOwnershipTenantExpr(): string {
 }
 
 export function getOwnershipLedgerFallbackPredicate(): string {
-	return `(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`;
+	return `(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`;
 }
 
 export function buildPgTracksJoin(): string {

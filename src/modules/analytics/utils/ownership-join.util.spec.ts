@@ -2,6 +2,7 @@ import {
   buildOwnershipJoin,
   getDedupedOwnershipSubquerySql,
   getOwnershipDatePredicate,
+  getOwnershipLedgerFallbackPredicate,
 } from './ownership-join.util';
 
 describe('ownership-join.util', () => {
@@ -40,6 +41,14 @@ describe('ownership-join.util', () => {
         expect(sql).toContain('pg_asset_ownership_sync');
       },
     );
+
+    it.each<['trend' | 'revenue']>([['trend'], ['revenue']])(
+      'dedup query for %s filters out tombstoned rows (is_deleted = 0)',
+      (period) => {
+        const sql = getDedupedOwnershipSubquerySql(period);
+        expect(sql).toContain('is_deleted = 0');
+      },
+    );
   });
 
   describe('buildOwnershipJoin', () => {
@@ -68,6 +77,19 @@ describe('ownership-join.util', () => {
         // And no ANY JOIN — we use deterministic argMax dedup instead.
         expect(j).not.toMatch(/ANY JOIN/i);
       }
+    });
+
+    it.each<['trend' | 'revenue']>([['trend'], ['revenue']])(
+      'LEFT JOIN for %s filters out tombstoned rows',
+      (period) => {
+        expect(buildOwnershipJoin(period)).toContain('is_deleted = 0');
+      },
+    );
+  });
+
+  describe('getOwnershipLedgerFallbackPredicate', () => {
+    it('filters out tombstoned rows', () => {
+      expect(getOwnershipLedgerFallbackPredicate()).toContain('is_deleted = 0');
     });
   });
 });
