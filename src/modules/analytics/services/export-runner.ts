@@ -702,7 +702,7 @@ export class ExportRunner {
 		const filters: string[] = [
 			's.period >= toDate({from:String})',
 			's.period <= toDate({to:String})',
-			`(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`,
+			`(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`,
 		];
 
 		// tenant: tenantIds (batch) ưu tiên hơn tenantId (single) > current tenant > system all

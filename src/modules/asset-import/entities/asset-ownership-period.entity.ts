@@ -42,7 +42,7 @@ export class AssetOwnershipPeriod extends BaseUUIDEntity {
 	@Column({ type: 'uuid', nullable: true })
 	createdBy: string | null;
 
-	@ManyToOne(() => Release, { onDelete: 'RESTRICT' })
+	@ManyToOne(() => Release, { onDelete: 'CASCADE' })
 	@JoinColumn({ name: 'release_id' })
 	release: Release;
 

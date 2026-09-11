@@ -306,7 +306,9 @@ export class AssetOwnershipService {
 			`INSERT INTO clickhouse_sync_outbox (entity_name, entity_id, action, processed)
 			 VALUES ('asset_ownership_periods', $1, 'UPDATE', FALSE)
 			 ON CONFLICT (entity_name, entity_id) WHERE processed = FALSE
-			 DO UPDATE SET created_at = CURRENT_TIMESTAMP, action = EXCLUDED.action, error_message = NULL`,
+			 DO UPDATE SET created_at = CURRENT_TIMESTAMP,
+			   action = CASE WHEN EXCLUDED.action = 'DELETE' THEN 'DELETE' ELSE clickhouse_sync_outbox.action END,
+			   error_message = NULL`,
 			[releaseId],
 		);
 		if (notify) {
