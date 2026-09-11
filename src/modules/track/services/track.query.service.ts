@@ -66,7 +66,14 @@ export class TrackQueryService {
 	}
 
 	async getList2(query: QueryGetListTrackDto): Promise<[Track[], number]> {
-		// BƯỚC 1: LỌC & PHÂN TRANG
+		const { idInclude, pageSize } = query;
+
+		// idInclude: ghim các track được chỉ định (full detail) lên đầu danh sách
+		const pinnedTracks = idInclude?.length
+			? await this.getDetailsByIds(idInclude)
+			: [];
+
+		// BƯỚC 1: LỌC & PHÂN TRANG (loại trừ các track đã ghim)
 		const qbId = this.createBaseQb();
 
 		if (query.tenantIds?.length || query.labelId?.length) {
@@ -76,18 +83,43 @@ export class TrackQueryService {
 			qbId.leftJoin('track.trackArtists', 'trackArtist');
 		}
 
+		if (idInclude?.length) {
+			qbId.andWhere('track.id NOT IN (:...idInclude)', { idInclude });
+		}
+
 		this.applyFilter({ qb: qbId, filter: query });
 
-		const [rawTracks, totalItems] = await Promise.all([
+		const [rawTracks, pagedTotalItems] = await Promise.all([
 			qbId.getMany(),
 			qbId.getCount(),
 		]);
 
 		const trackIds = rawTracks.map((t) => t.id);
 
-		if (trackIds.length === 0) return [[] as Track[], 0];
+		const totalItems = pagedTotalItems + pinnedTracks.length;
+
+		if (trackIds.length === 0) {
+			return [pinnedTracks.slice(0, pageSize), totalItems];
+		}
 
 		// BƯỚC 2: LOAD CHI TIẾT TỪ ID ĐÃ LỌC
+		const itemsDb = await this.getDetailsByIds(trackIds);
+
+		const itemsMap = new Map(itemsDb.map((item) => [item.id, item]));
+		const pagedTracks = trackIds
+			.map((id) => itemsMap.get(id))
+			.filter(Boolean) as Track[];
+
+		const merged =
+			idInclude?.length && pinnedTracks.length
+				? [...pinnedTracks, ...pagedTracks].slice(0, pageSize)
+				: pagedTracks;
+
+		return [merged, totalItems];
+	}
+
+	// load full detail của các track theo thứ tự id được truyền vào
+	private async getDetailsByIds(trackIds: string[]): Promise<Track[]> {
 		const qbDetail = this.createBaseQb();
 		qbDetail.where('track.id IN (:...trackIds)', { trackIds });
 
@@ -114,11 +146,9 @@ export class TrackQueryService {
 		const itemsDb = await qbDetail.getMany();
 
 		const itemsMap = new Map(itemsDb.map((item) => [item.id, item]));
-		const items = trackIds
+		return trackIds
 			.map((id) => itemsMap.get(id))
 			.filter(Boolean) as Track[];
-
-		return [items, totalItems];
 	}
 
 	async getListSimple(query: QueryGetListTrackDto) {
