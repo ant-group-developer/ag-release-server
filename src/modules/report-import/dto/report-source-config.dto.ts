@@ -4,11 +4,16 @@ import {
 	IsEnum,
 	IsInt,
 	IsNotEmpty,
+	IsObject,
 	IsOptional,
 	IsString,
 	Min,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import {
+	ReportFieldMapping,
+	ReportParserOptions,
+} from '../configs/report-source.interface';
 
 export enum ReportType {
 	SALES = 'sales',
@@ -17,6 +22,29 @@ export enum ReportType {
 }
 
 export class CreateReportSourceConfigDto {
+	@ApiPropertyOptional({
+		example: 'wmg_report',
+		description:
+			'Analytics source, independent of the file format sourceCode',
+	})
+	@IsOptional()
+	@IsString()
+	importSource?: string;
+
+	@ApiPropertyOptional({
+		type: 'array',
+		items: { type: 'object' },
+		description:
+			'Header to fact field mappings; validated against supported targets and transforms',
+	})
+	@IsOptional()
+	@IsArray()
+	fieldMappings?: ReportFieldMapping[];
+
+	@ApiPropertyOptional({ type: 'object', additionalProperties: true })
+	@IsOptional()
+	@IsObject()
+	parserOptions?: ReportParserOptions;
 	@ApiProperty({
 		description:
 			'Unique identifier for the report source (e.g. wmg, spotify)',
@@ -51,7 +79,7 @@ export class CreateReportSourceConfigDto {
 	@IsOptional()
 	@IsArray()
 	@IsString({ each: true })
-	folderPatterns?: string[] = [];
+	folderPatterns?: string[];
 
 	@ApiProperty({
 		description: 'Regex pattern array for matching file names',
@@ -88,7 +116,7 @@ export class CreateReportSourceConfigDto {
 	})
 	@IsOptional()
 	@IsString()
-	delimiter?: string = ',';
+	delimiter?: string;
 
 	@ApiPropertyOptional({
 		description: 'Default currency code (e.g. USD)',
@@ -97,7 +125,7 @@ export class CreateReportSourceConfigDto {
 	})
 	@IsOptional()
 	@IsString()
-	defaultCurrency?: string = '';
+	defaultCurrency?: string;
 
 	@ApiPropertyOptional({
 		description: 'Default member reference',
@@ -106,7 +134,7 @@ export class CreateReportSourceConfigDto {
 	})
 	@IsOptional()
 	@IsString()
-	defaultMember?: string = '';
+	defaultMember?: string;
 
 	@ApiPropertyOptional({
 		description: 'Priority of config matching (lower = higher priority)',
@@ -116,7 +144,7 @@ export class CreateReportSourceConfigDto {
 	@IsOptional()
 	@IsInt()
 	@Min(1)
-	priority?: number = 100;
+	priority?: number;
 }
 
 export class UpdateReportSourceConfigDto extends PartialType(

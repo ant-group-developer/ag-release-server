@@ -5,7 +5,11 @@ import {
 	appendAnalyticsVideoScopeFilter,
 	getAnalyticsVideoScope,
 } from '../services/analytics-video-scope.service';
-import { buildOwnershipJoin } from './ownership-join.util';
+import {
+	buildOwnershipJoin,
+	getRevenueLabelExpr,
+	getRevenueTenantExpr,
+} from './ownership-join.util';
 
 export type DetailAnalyticsFilterQuery = {
 	tenantId?: string;
@@ -27,6 +31,7 @@ export function appendDetailFilters(
 	query: DetailAnalyticsFilterQuery,
 	filterSql: string,
 	params: Record<string, any>,
+	ownershipPeriod: 'trend' | 'revenue' = 'trend',
 ): string {
 	const isSystem = checkIsSystemTenant(tenantId);
 	if (!isSystem && query.tenantId && query.tenantId !== tenantId) {
@@ -36,14 +41,20 @@ export function appendDetailFilters(
 	}
 
 	const effectiveTenantId = isSystem ? query.tenantId : tenantId;
+	const tenantExpr =
+		ownershipPeriod === 'revenue'
+			? getRevenueTenantExpr()
+			: "coalesce(nullIf(o.tenant_id, ''), t.tenant_id)";
+	const labelExpr =
+		ownershipPeriod === 'revenue'
+			? getRevenueLabelExpr()
+			: "coalesce(nullIf(o.label_id, ''), t.label_id)";
 	if (effectiveTenantId) {
-		filterSql +=
-			" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {detailTenantId:String}";
+		filterSql += ` AND ${tenantExpr} = {detailTenantId:String}`;
 		params.detailTenantId = effectiveTenantId;
 	}
 	if (query.labelId) {
-		filterSql +=
-			" AND coalesce(nullIf(o.label_id, ''), t.label_id) = {detailLabelId:String}";
+		filterSql += ` AND ${labelExpr} = {detailLabelId:String}`;
 		params.detailLabelId = query.labelId;
 	}
 	if (query.artistId) {
@@ -111,19 +122,27 @@ export function buildDetailFilters(
 			query.isrc ||
 			getAnalyticsVideoScope(query)?.allowedChannelIds !== undefined
 		);
+	const trackJoin =
+		ownershipPeriod === 'revenue' ? 'LEFT JOIN' : 'INNER JOIN';
 	const joinSql = needsTrackJoin
-		? `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+		? `${trackJoin} (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc${ownershipPeriod === 'revenue' ? " AND s.isrc NOT IN ('', 'N/A', 'NA')" : ''}
          ${buildOwnershipJoin(ownershipPeriod)}`
 		: '';
 	// A legacy asset has no ledger row until it is first transferred/backfilled.
 	// Keep its existing pg_tracks_sync attribution, but never fall back for an
 	// ISRC that already has ownership history (that would reassign old facts).
 	let filterSql = needsTrackJoin
-		? ` AND t.is_deleted = 0
+		? ` AND (t.isrc = '' OR t.is_deleted = 0)
           AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`
 		: '';
 	const params: Record<string, any> = {};
 
-	filterSql = appendDetailFilters(tenantId, query, filterSql, params);
+	filterSql = appendDetailFilters(
+		tenantId,
+		query,
+		filterSql,
+		params,
+		ownershipPeriod,
+	);
 	return { joinSql, filterSql, params };
 }

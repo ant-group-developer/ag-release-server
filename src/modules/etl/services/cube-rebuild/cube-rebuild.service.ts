@@ -35,7 +35,32 @@ export class CubeRebuildService {
 	 * Dropped views are skipped so cubes stay rebuild-only.
 	 */
 	async resumeCubeMaterializedViews(): Promise<void> {
+		let detachedViews: Array<{ table: string }>;
+		try {
+			detachedViews = await this.clickHouseService.query<{
+				table: string;
+			}>(
+				`SELECT table
+				 FROM system.detached_tables
+				 WHERE database = {database:String}
+				   AND has({views:Array(String)}, table)`,
+				{
+					database: 'music_analytics',
+					views: [...CUBE_MATERIALIZED_VIEWS],
+				},
+			);
+		} catch (error) {
+			this.logger.warn(
+				`Could not inspect detached cube materialized views: ${error.message}`,
+			);
+			return;
+		}
+
+		const detachedViewNames = new Set(
+			detachedViews.map((row) => row.table),
+		);
 		for (const view of CUBE_MATERIALIZED_VIEWS) {
+			if (!detachedViewNames.has(view)) continue;
 			try {
 				await this.clickHouseService.execute(
 					`ATTACH TABLE IF NOT EXISTS music_analytics.${view}`,
@@ -106,6 +131,8 @@ export class CubeRebuildService {
               f.dsp_id,
               f.isrc,
               if(f.import_source = '', 'ftp', f.import_source) AS import_source,
+			  f.ingest_tenant_id,
+			  f.ingest_label_id,
               sum(f.quantity) AS total_quantity,
               ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
           FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
@@ -113,7 +140,7 @@ export class CubeRebuildService {
               ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
               AND f.revenue_currency = er.currency
           WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
-          GROUP BY period, f.dsp_id, f.isrc, import_source
+          GROUP BY period, f.dsp_id, f.isrc, import_source, f.ingest_tenant_id, f.ingest_label_id
         `);
 
 				// 3. Re-insert aggregated data for the partition into sales ter cube
@@ -125,6 +152,8 @@ export class CubeRebuildService {
               f.dsp_id,
               f.isrc,
               if(f.import_source = '', 'ftp', f.import_source) AS import_source,
+			  f.ingest_tenant_id,
+			  f.ingest_label_id,
               sum(f.quantity) AS total_quantity,
               ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
           FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
@@ -132,7 +161,7 @@ export class CubeRebuildService {
               ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
               AND f.revenue_currency = er.currency
           WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
-          GROUP BY period, f.territory_code, f.dsp_id, f.isrc, import_source
+          GROUP BY period, f.territory_code, f.dsp_id, f.isrc, import_source, f.ingest_tenant_id, f.ingest_label_id
         `);
 
 				// 4. Re-insert aggregated data for the partition into sales export cube
@@ -144,6 +173,8 @@ export class CubeRebuildService {
               f.territory_code,
               f.isrc,
               if(f.import_source = '', 'ftp', f.import_source) AS import_source,
+			  f.ingest_tenant_id,
+			  f.ingest_label_id,
               any(f.upc) AS upc,
               any(f.track_title) AS track_title,
               any(f.album_title) AS album_title,
@@ -156,7 +187,7 @@ export class CubeRebuildService {
               ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
               AND f.revenue_currency = er.currency
           WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
-          GROUP BY period, f.dsp_id, f.territory_code, f.isrc, import_source
+          GROUP BY period, f.dsp_id, f.territory_code, f.isrc, import_source, f.ingest_tenant_id, f.ingest_label_id
         `);
 
 				this.logger.log(
@@ -421,13 +452,15 @@ export class CubeRebuildService {
           f.dsp_id,
           f.isrc,
           if(f.import_source = '', 'ftp', f.import_source) AS import_source,
+		  f.ingest_tenant_id,
+		  f.ingest_label_id,
           sum(f.quantity) AS total_quantity,
           ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
       FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
           AND f.revenue_currency = er.currency
-      GROUP BY period, f.dsp_id, f.isrc, import_source
+      GROUP BY period, f.dsp_id, f.isrc, import_source, f.ingest_tenant_id, f.ingest_label_id
     `);
 
 		// 3. Rebuild Territory cube
@@ -439,13 +472,15 @@ export class CubeRebuildService {
           f.dsp_id,
           f.isrc,
           if(f.import_source = '', 'ftp', f.import_source) AS import_source,
+		  f.ingest_tenant_id,
+		  f.ingest_label_id,
           sum(f.quantity) AS total_quantity,
           ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
       FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
           AND f.revenue_currency = er.currency
-      GROUP BY period, f.territory_code, f.dsp_id, f.isrc, import_source
+      GROUP BY period, f.territory_code, f.dsp_id, f.isrc, import_source, f.ingest_tenant_id, f.ingest_label_id
     `);
 
 		// 4. Rebuild Export cube
@@ -457,6 +492,8 @@ export class CubeRebuildService {
           f.territory_code,
           f.isrc,
           if(f.import_source = '', 'ftp', f.import_source) AS import_source,
+		  f.ingest_tenant_id,
+		  f.ingest_label_id,
           any(f.upc) AS upc,
           any(f.track_title) AS track_title,
           any(f.album_title) AS album_title,
@@ -468,7 +505,7 @@ export class CubeRebuildService {
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
           AND f.revenue_currency = er.currency
-      GROUP BY period, f.dsp_id, f.territory_code, f.isrc, import_source
+      GROUP BY period, f.dsp_id, f.territory_code, f.isrc, import_source, f.ingest_tenant_id, f.ingest_label_id
     `);
 
 		const dspCount = await this.clickHouseService.query<{ cnt: string }>(

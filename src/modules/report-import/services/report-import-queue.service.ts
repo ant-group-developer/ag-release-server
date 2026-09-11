@@ -1,5 +1,6 @@
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Injectable, Logger } from '@nestjs/common';
+import { createHash, randomUUID } from 'crypto';
 import Redis from 'ioredis';
 
 @Injectable()
@@ -9,6 +10,86 @@ export class ReportImportQueueService {
 	private readonly PROCESSING_QUEUE_NAME = 'report_import_queue_processing';
 
 	constructor(@InjectRedis() private readonly redis: Redis) {}
+
+	async invalidateAnalyticsCache(): Promise<void> {
+		await this.redis.publish('analytics:invalidate', 'report-import');
+	}
+
+	/** Serialize replacements through metadata/cube completion across worker processes. */
+	async acquireImportLocks(identities: string[]): Promise<{
+		assertHeld: () => Promise<void>;
+		release: () => Promise<void>;
+	}> {
+		const keys = [...new Set(identities)]
+			.sort()
+			.map(
+				(id) =>
+					`report-import:lock:${createHash('sha256').update(id).digest('hex')}`,
+			);
+		const token = randomUUID(),
+			acquired: string[] = [];
+		const ttl = 120_000;
+		let lost = false;
+		const renew = async () => {
+			for (const key of acquired) {
+				const ok = await this.redis.eval(
+					"if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) else return 0 end",
+					1,
+					key,
+					token,
+					ttl,
+				);
+				if (!ok) lost = true;
+			}
+		};
+		const timer = setInterval(() => {
+			void renew().catch(() => {
+				lost = true;
+			});
+		}, 30_000);
+		timer.unref();
+		const release = async () => {
+			clearInterval(timer);
+			await Promise.all(
+				acquired.map((key) =>
+					this.redis.eval(
+						"if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+						1,
+						key,
+						token,
+					),
+				),
+			);
+		};
+		try {
+			const deadline = Date.now() + 10 * 60_000;
+			for (const key of keys) {
+				while (
+					(await this.redis.set(key, token, 'PX', ttl, 'NX')) !== 'OK'
+				) {
+					if (lost || Date.now() > deadline)
+						throw new Error(
+							'Timed out waiting for another import of the same file',
+						);
+					await new Promise((resolve) => setTimeout(resolve, 1000));
+				}
+				acquired.push(key);
+			}
+			return {
+				assertHeld: async () => {
+					await renew();
+					if (lost)
+						throw new Error(
+							'Report import lock lost; retry the job',
+						);
+				},
+				release,
+			};
+		} catch (error) {
+			await release();
+			throw error;
+		}
+	}
 
 	/**
 	 * Push a jobId to the import queue

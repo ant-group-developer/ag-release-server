@@ -1,6 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
+import {
+	readReportConfigExtensions,
+	validateReportConfig,
+	writeReportConfigExtensions,
+} from '../configs/report-config.util';
+import { ReportSourceConfig } from '../configs/report-source.interface';
 import {
 	CreateReportSourceConfigDto,
 	QueryGetListReportSourceConfigDto,
@@ -12,6 +18,17 @@ export class ReportSourceConfigService {
 	private readonly logger = new Logger(ReportSourceConfigService.name);
 
 	constructor(private readonly clickHouseService: ClickHouseService) {}
+
+	private validate(config: Partial<ReportSourceConfig>) {
+		try {
+			validateReportConfig({
+				...config,
+				delimiter: config.delimiter ?? ',',
+			});
+		} catch (error) {
+			throw new BadRequestException((error as Error).message);
+		}
+	}
 
 	/**
 	 * Get single config by ID
@@ -30,6 +47,7 @@ export class ReportSourceConfigService {
 		}
 		const r = rows[0];
 		return {
+			...readReportConfigExtensions(r),
 			id: r.id,
 			sourceCode: r.source_code,
 			sourceName: r.source_name,
@@ -79,6 +97,7 @@ export class ReportSourceConfigService {
 
 		// Map ClickHouse snake_case fields back to camelCase
 		const items = dataRows.map((r) => ({
+			...readReportConfigExtensions(r),
 			id: r.id,
 			sourceCode: r.source_code,
 			sourceName: r.source_name,
@@ -105,6 +124,7 @@ export class ReportSourceConfigService {
 	 * Create new config
 	 */
 	async create(dto: CreateReportSourceConfigDto) {
+		this.validate(dto);
 		const id = `${dto.sourceCode}_${dto.reportType}`;
 
 		const existing = await this.clickHouseService.query<any>(
@@ -121,6 +141,7 @@ export class ReportSourceConfigService {
 
 		const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
 		const row = {
+			...writeReportConfigExtensions(dto),
 			id,
 			source_code: dto.sourceCode,
 			source_name: dto.sourceName,
@@ -157,9 +178,17 @@ export class ReportSourceConfigService {
 	 */
 	async update(id: string, dto: UpdateReportSourceConfigDto) {
 		const existing = await this.getOne(id);
+		const merged = {
+			...existing,
+			...Object.fromEntries(
+				Object.entries(dto).filter(([, v]) => v !== undefined),
+			),
+		};
+		this.validate(merged);
 
 		const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
 		const row = {
+			...writeReportConfigExtensions(merged),
 			id,
 			source_code: dto.sourceCode ?? existing.sourceCode,
 			source_name: dto.sourceName ?? existing.sourceName,
@@ -189,6 +218,7 @@ export class ReportSourceConfigService {
 		return {
 			id,
 			sourceCode: row.source_code,
+			...readReportConfigExtensions(row),
 			sourceName: row.source_name,
 			reportType: row.report_type,
 			folderPatterns: row.folder_patterns,
@@ -212,6 +242,7 @@ export class ReportSourceConfigService {
 
 		const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
 		const row = {
+			...writeReportConfigExtensions(existing),
 			id: existing.id,
 			source_code: existing.sourceCode,
 			source_name: existing.sourceName,

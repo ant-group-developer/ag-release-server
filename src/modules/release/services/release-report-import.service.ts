@@ -13,6 +13,7 @@ import { Video } from 'src/modules/video/entities/video.entity';
 import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
 import { stringToCode } from 'src/utils/util';
 import { DataSource, EntityManager, ILike, In, Repository } from 'typeorm';
+import { AssetOwnershipService } from '../../asset-import/services/asset-ownership.service';
 import { Release } from '../entities/release.entity';
 
 export const REPORT_IMPORT_FALLBACK_TENANT_ID =
@@ -48,6 +49,8 @@ export interface ReleaseReportImportInput {
 	importFileName?: string;
 
 	importJobId?: string;
+
+	importedBy?: string;
 }
 
 @Injectable()
@@ -56,6 +59,7 @@ export class ReleaseReportImportService {
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 		private readonly dataSource: DataSource,
+		private readonly assetOwnershipService: AssetOwnershipService,
 	) {}
 
 	async importRelease(input: ReleaseReportImportInput): Promise<Release> {
@@ -66,7 +70,13 @@ export class ReleaseReportImportService {
 		const existingRelease = await this.releaseRepo.findOne({
 			where: { upc: In(equivalentUpcs) },
 		});
-		if (existingRelease) return existingRelease;
+		if (existingRelease) {
+			await this.ensureInitialOwnership(
+				existingRelease,
+				input.importedBy,
+			);
+			return existingRelease;
+		}
 
 		// Nếu bất kỳ ISRC nào đã tồn tại, bỏ qua toàn bộ report và trả về
 		// release đang sở hữu track đó để không tạo dữ liệu trùng.
@@ -74,7 +84,13 @@ export class ReleaseReportImportService {
 			this.dataSource.manager,
 			input,
 		);
-		if (existingReleaseByIsrc) return existingReleaseByIsrc;
+		if (existingReleaseByIsrc) {
+			await this.ensureInitialOwnership(
+				existingReleaseByIsrc,
+				input.importedBy,
+			);
+			return existingReleaseByIsrc;
+		}
 
 		return this.dataSource.transaction(async (manager) => {
 			// Kiểm tra lại trong transaction để giảm khả năng tạo trùng khi
@@ -82,11 +98,25 @@ export class ReleaseReportImportService {
 			const releaseInTransaction = await manager.findOne(Release, {
 				where: { upc: In(equivalentUpcs) },
 			});
-			if (releaseInTransaction) return releaseInTransaction;
+			if (releaseInTransaction) {
+				await this.recordInitialOwnership(
+					manager,
+					releaseInTransaction,
+					input.importedBy,
+				);
+				return releaseInTransaction;
+			}
 
 			const releaseByIsrcInTransaction =
 				await this.findReleaseByExistingIsrc(manager, input);
-			if (releaseByIsrcInTransaction) return releaseByIsrcInTransaction;
+			if (releaseByIsrcInTransaction) {
+				await this.recordInitialOwnership(
+					manager,
+					releaseByIsrcInTransaction,
+					input.importedBy,
+				);
+				return releaseByIsrcInTransaction;
+			}
 
 			// Resolve tenant + label theo input; chỉ dùng fallback khi không thể
 			// xác định ownership từ tenant hoặc label được truyền vào.
@@ -156,6 +186,12 @@ export class ReleaseReportImportService {
 				),
 			);
 
+			await this.recordInitialOwnership(
+				manager,
+				release,
+				input.importedBy,
+			);
+
 			// Liên kết cùng artist chính với từng track và tham chiếu quan hệ
 			// release_artist để các thao tác đồng bộ artist sau này hoạt động đúng.
 			if (artist && releaseArtist) {
@@ -174,6 +210,33 @@ export class ReleaseReportImportService {
 			}
 
 			return release;
+		});
+	}
+
+	private async ensureInitialOwnership(
+		release: Release,
+		actorId?: string,
+	): Promise<void> {
+		if (!release.tenantId) return;
+		await this.dataSource.transaction((manager) =>
+			this.recordInitialOwnership(manager, release, actorId),
+		);
+	}
+
+	private async recordInitialOwnership(
+		manager: EntityManager,
+		release: Release,
+		actorId?: string,
+	): Promise<void> {
+		if (!release.tenantId) return;
+		await this.assetOwnershipService.recordInitialOwnership(manager, {
+			releaseId: release.id,
+			tenantId: release.tenantId,
+			labelId: release.labelId ?? null,
+			effectiveDate: '1900-01-01',
+			revenueEffectiveFrom: '1900-01-01',
+			actorId: actorId ?? null,
+			notify: true,
 		});
 	}
 
@@ -361,23 +424,49 @@ export class ReleaseReportImportService {
 		const existingRelease = await this.releaseRepo.findOne({
 			where: { upc: In(equivalentUpcs), type: 'video' },
 		});
-		if (existingRelease) return existingRelease;
+		if (existingRelease) {
+			await this.ensureInitialOwnership(
+				existingRelease,
+				input.importedBy,
+			);
+			return existingRelease;
+		}
 
 		const existingReleaseByIsrc = await this.findVideoReleaseByExistingIsrc(
 			this.dataSource.manager,
 			input,
 		);
-		if (existingReleaseByIsrc) return existingReleaseByIsrc;
+		if (existingReleaseByIsrc) {
+			await this.ensureInitialOwnership(
+				existingReleaseByIsrc,
+				input.importedBy,
+			);
+			return existingReleaseByIsrc;
+		}
 
 		return this.dataSource.transaction(async (manager) => {
 			const releaseInTransaction = await manager.findOne(Release, {
 				where: { upc: In(equivalentUpcs), type: 'video' },
 			});
-			if (releaseInTransaction) return releaseInTransaction;
+			if (releaseInTransaction) {
+				await this.recordInitialOwnership(
+					manager,
+					releaseInTransaction,
+					input.importedBy,
+				);
+				return releaseInTransaction;
+			}
 
 			const releaseByIsrcInTransaction =
 				await this.findVideoReleaseByExistingIsrc(manager, input);
-			if (releaseByIsrcInTransaction) return releaseByIsrcInTransaction;
+			if (releaseByIsrcInTransaction) {
+				await this.recordInitialOwnership(
+					manager,
+					releaseByIsrcInTransaction,
+					input.importedBy,
+				);
+				return releaseByIsrcInTransaction;
+			}
 
 			const { tenantId, label } = await this.resolveOwnership(
 				manager,
@@ -428,6 +517,12 @@ export class ReleaseReportImportService {
 					releaseId: release.id,
 					isrc: input.tracks[0]?.isrc || null,
 				}),
+			);
+
+			await this.recordInitialOwnership(
+				manager,
+				release,
+				input.importedBy,
 			);
 
 			if (artist) {
