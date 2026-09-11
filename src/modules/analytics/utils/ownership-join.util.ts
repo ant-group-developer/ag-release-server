@@ -67,15 +67,22 @@ export function buildOwnershipJoin(
 	ownershipPeriod: OwnershipPeriod,
 	factDateExpr?: string,
 ): string {
-	const predicate = getOwnershipDatePredicate(
-		ownershipPeriod,
-		factDateExpr,
-	);
-	return `LEFT JOIN ${getDedupedOwnershipSubquery(ownershipPeriod)} AS o ON s.isrc = o.isrc AND ${predicate}`;
+	const predicate = getOwnershipDatePredicate(ownershipPeriod, factDateExpr);
+	return `LEFT JOIN ${getDedupedOwnershipSubquery(ownershipPeriod)} AS o ON s.isrc = o.isrc AND s.isrc NOT IN ('', 'N/A', 'NA') AND ${predicate}`;
 }
 
 export function getOwnershipTenantExpr(): string {
 	return "coalesce(nullIf(o.tenant_id, ''), t.tenant_id)";
+}
+
+/** Revenue-only attribution. Upload tenant is used only when no asset mapping exists. */
+export function getRevenueTenantExpr(): string {
+	return "coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, ''))";
+}
+
+/** Revenue-only label attribution, matching getRevenueTenantExpr precedence. */
+export function getRevenueLabelExpr(): string {
+	return "coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, ''))";
 }
 
 export function getOwnershipLedgerFallbackPredicate(): string {

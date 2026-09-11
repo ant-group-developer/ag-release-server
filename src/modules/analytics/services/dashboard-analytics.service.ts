@@ -5,7 +5,10 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { DashboardAnalyticsQueryDto } from '../dto/analytics-query.dto';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
-import { buildOwnershipJoin } from '../utils/ownership-join.util';
+import {
+	buildOwnershipJoin,
+	getRevenueTenantExpr,
+} from '../utils/ownership-join.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	appendAnalyticsVideoScopeFilter,
@@ -45,15 +48,20 @@ export class DashboardAnalyticsService {
 		}
 
 		const ownershipPeriod = query.type === 'stream' ? 'trend' : 'revenue';
+		const trackJoin =
+			ownershipPeriod === 'revenue' ? 'LEFT JOIN' : 'INNER JOIN';
 		const joinSql = `
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      ${trackJoin} (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc${ownershipPeriod === 'revenue' ? " AND s.isrc NOT IN ('', 'N/A', 'NA')" : ''}
       ${buildOwnershipJoin(ownershipPeriod, 's.period')}`;
-		filterSql += ` AND t.is_deleted = 0
+		filterSql += ` AND (t.isrc = '' OR t.is_deleted = 0)
       AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`;
 
 		if (!isSystem) {
-			filterSql +=
-				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {tenantId:String}";
+			const tenantExpr =
+				ownershipPeriod === 'revenue'
+					? getRevenueTenantExpr()
+					: "coalesce(nullIf(o.tenant_id, ''), t.tenant_id)";
+			filterSql += ` AND ${tenantExpr} = {tenantId:String}`;
 			params.tenantId = tenantId;
 		}
 

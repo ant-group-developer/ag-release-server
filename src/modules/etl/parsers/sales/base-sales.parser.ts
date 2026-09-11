@@ -275,7 +275,8 @@ export abstract class BaseSalesParser {
 				const tabCount = (line.match(/\t/g) || []).length;
 				const commaCount = (line.match(/,/g) || []).length;
 				if (tabCount > commaCount && tabCount > 3) delimiter = '\t';
-				else if (commaCount > tabCount && commaCount > 3) delimiter = ',';
+				else if (commaCount > tabCount && commaCount > 3)
+					delimiter = ',';
 
 				headers = this.parseLine(line, delimiter);
 				continue;
@@ -300,7 +301,10 @@ export abstract class BaseSalesParser {
 						rows.push(
 							...this.normalizeParsedRows(
 								parsed.map((row) =>
-									this.applyFieldMappingOverrides(row, record),
+									this.applyFieldMappingOverrides(
+										row,
+										record,
+									),
 								),
 							),
 						);
@@ -612,6 +616,8 @@ export abstract class BaseSalesParser {
 			batch_id: batchId,
 			import_source: '',
 			source_file_name: '',
+			ingest_tenant_id: '',
+			ingest_label_id: '',
 		};
 	}
 }

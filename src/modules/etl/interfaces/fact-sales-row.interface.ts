@@ -53,4 +53,6 @@ export interface FactSalesRow {
 	batch_id: string;
 	import_source?: string;
 	source_file_name?: string;
+	ingest_tenant_id?: string;
+	ingest_label_id?: string;
 }

@@ -202,6 +202,21 @@ describe('Report upload worker', () => {
 		expect(s.job.error).toBeUndefined();
 		expect(s.job.status).toBe('COMPLETED');
 		expect(s.getFacts()).toHaveLength(2);
+		expect(s.getFacts()).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					ingest_tenant_id: 'tenant',
+					ingest_label_id: '',
+				}),
+			]),
+		);
+		expect(s.queue.acquireImportLocks).toHaveBeenCalledWith([
+			JSON.stringify([
+				'tenant',
+				'audio_salad_report',
+				'22RxAudioSalad_082025-012026 - Sheet1.csv',
+			]),
+		]);
 		expect(s.dsps.resolveOrCreateDspReport).toHaveBeenCalledWith(
 			'Facebook',
 			'audio_salad_report',

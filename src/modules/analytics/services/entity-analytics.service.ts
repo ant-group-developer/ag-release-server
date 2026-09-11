@@ -35,6 +35,8 @@ import {
 	buildPgTracksJoin,
 	getOwnershipLedgerFallbackPredicate,
 	getOwnershipTenantExpr,
+	getRevenueLabelExpr,
+	getRevenueTenantExpr,
 } from '../utils/ownership-join.util';
 import { getTrendPeriodExprs } from '../utils/trend-period.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
@@ -158,15 +160,24 @@ export class EntityAnalyticsService {
 			return { joinSql: '', filterSql, params };
 		}
 
+		const trackJoin =
+			ownershipPeriod === 'revenue' ? 'LEFT JOIN' : 'INNER JOIN';
+		const tenantExpr =
+			ownershipPeriod === 'revenue'
+				? getRevenueTenantExpr()
+				: getOwnershipTenantExpr();
+		const labelExpr =
+			ownershipPeriod === 'revenue'
+				? getRevenueLabelExpr()
+				: "coalesce(nullIf(o.label_id, ''), t.label_id)";
 		const joinSql = `
-      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      ${trackJoin} (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc${ownershipPeriod === 'revenue' ? " AND s.isrc NOT IN ('', 'N/A', 'NA')" : ''}
       ${buildOwnershipJoin(ownershipPeriod, ownershipPeriod === 'revenue' ? 's.period' : factDateExpression)}`;
-		let filterSql = `AND t.is_deleted = 0
+		let filterSql = `AND (t.isrc = '' OR t.is_deleted = 0)
       AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`;
 
 		if (!isSystem && entityType !== 'tenant') {
-			filterSql +=
-				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {tenantId:String}";
+			filterSql += ` AND ${tenantExpr} = {tenantId:String}`;
 			params.tenantId = tenantId;
 		}
 
@@ -175,8 +186,7 @@ export class EntityAnalyticsService {
 				filterSql += ' AND t.release_id = {entityId:String}';
 				break;
 			case 'label':
-				filterSql +=
-					" AND coalesce(nullIf(o.label_id, ''), t.label_id) = {entityId:String}";
+				filterSql += ` AND ${labelExpr} = {entityId:String}`;
 				break;
 			case 'artist':
 				filterSql += ' AND has(t.artist_ids, {entityId:String})';
@@ -185,8 +195,7 @@ export class EntityAnalyticsService {
 				filterSql += ' AND s.isrc = {entityId:String}';
 				break;
 			case 'tenant':
-				filterSql +=
-					" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {entityId:String}";
+				filterSql += ` AND ${tenantExpr} = {entityId:String}`;
 				break;
 			case 'channel':
 				filterSql += ' AND t.channel_id = {entityId:String}';
@@ -234,12 +243,20 @@ export class EntityAnalyticsService {
 			ownershipPeriod,
 			entityType !== 'track',
 		);
+		const tenantExpr =
+			ownershipPeriod === 'revenue'
+				? getRevenueTenantExpr()
+				: getOwnershipTenantExpr();
+		const labelExpr =
+			ownershipPeriod === 'revenue'
+				? getRevenueLabelExpr()
+				: "coalesce(nullIf(o.label_id, ''), t.label_id)";
 		const entityPredicates: Record<EntityType, string> = {
 			release: 't.release_id = {entityId:String}',
-			label: "coalesce(nullIf(o.label_id, ''), t.label_id) = {entityId:String}",
+			label: `${labelExpr} = {entityId:String}`,
 			artist: 'has(t.artist_ids, {entityId:String})',
 			track: 's.isrc = {entityId:String}',
-			tenant: "coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {entityId:String}",
+			tenant: `${tenantExpr} = {entityId:String}`,
 			channel: 't.channel_id = {entityId:String}',
 			sourceType: 's.import_source = {entityId:String}',
 		};

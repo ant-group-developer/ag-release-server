@@ -58,6 +58,7 @@ type ReportImportFileStatus = 'PENDING' | 'IMPORTING' | 'FACT_IMPORTED';
 
 interface ReportImportFileCheckpoint {
 	status: ReportImportFileStatus;
+	tenantId: string;
 	sourceFileName: string;
 	importSource: string;
 	parserCode?: string;
@@ -198,13 +199,18 @@ export class ReportImportWorkerService
 
 		for (const file of files) {
 			const key = this.getFileKey(file);
-			if (!key || state.files[key]) continue;
+			if (!key) continue;
+			if (state.files[key]) {
+				state.files[key].tenantId = job.tenantId;
+				continue;
+			}
 
 			const sourceFileName = path.posix.basename(
 				file.path.replace(/\\/g, '/'),
 			);
 			state.files[key] = {
 				status: 'PENDING',
+				tenantId: job.tenantId,
 				sourceFileName,
 				importSource: resolveReportImportSource(file),
 				parserCode: file.parserCode,
@@ -268,11 +274,21 @@ export class ReportImportWorkerService
 		factTable: string,
 		filename: string,
 		importSource: string,
+		tenantId: string,
 	): Promise<string[]> {
+		const tenantPredicate =
+			factTable === CLICKHOUSE_TABLES.FACT_SALES_REPORT
+				? ` AND (ingest_tenant_id = {tenantId:String}
+				     OR (ingest_tenant_id = '' AND batch_id IN (
+				       SELECT id FROM music_analytics.${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+				       WHERE tenant_id = {tenantId:String}
+				     )))`
+				: '';
+		const params = { filename, source: importSource, tenantId };
 		const countRows = await this.clickHouseService.query<{ cnt: string }>(
 			`SELECT count() AS cnt FROM music_analytics.${factTable}
-       WHERE source_file_name = {filename:String} AND import_source = {source:String}`,
-			{ filename, source: importSource },
+			 WHERE source_file_name = {filename:String} AND import_source = {source:String}${tenantPredicate}`,
+			params,
 		);
 
 		if (Number(countRows[0]?.cnt ?? 0) === 0) return [];
@@ -285,8 +301,8 @@ export class ReportImportWorkerService
 		}>(
 			`SELECT DISTINCT formatDateTime(${dateColumn}, '%Y-%m') AS period
 			 FROM music_analytics.${factTable}
-			 WHERE source_file_name = {filename:String} AND import_source = {source:String}`,
-			{ filename, source: importSource },
+			 WHERE source_file_name = {filename:String} AND import_source = {source:String}${tenantPredicate}`,
+			params,
 		);
 
 		this.logger.warn(
@@ -295,13 +311,24 @@ export class ReportImportWorkerService
 		await this.clickHouseService.execute(
 			`ALTER TABLE music_analytics.${factTable} DELETE
        WHERE source_file_name = '${this.escapeSqlString(filename)}'
-         AND import_source = '${this.escapeSqlString(importSource)}'`,
+			 AND import_source = '${this.escapeSqlString(importSource)}'${
+					factTable === CLICKHOUSE_TABLES.FACT_SALES_REPORT
+						? ` AND (ingest_tenant_id = '${this.escapeSqlString(tenantId)}'
+					     OR (ingest_tenant_id = '' AND batch_id IN (
+					       SELECT id FROM music_analytics.${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+					       WHERE tenant_id = '${this.escapeSqlString(tenantId)}'
+					     )))`
+						: ''
+				}`,
 		);
 		await this.clickHouseService.waitForTableMutations(factTable);
 		return periodRows.map((row) => row.period).filter(Boolean);
 	}
 
-	private buildSourceFilter(checkpoints: ReportImportFileCheckpoint[]): {
+	private buildSourceFilter(
+		checkpoints: ReportImportFileCheckpoint[],
+		factTable: string,
+	): {
 		where: string;
 		params: Record<string, string>;
 	} {
@@ -311,7 +338,9 @@ export class ReportImportWorkerService
 			params[`source${index}`] = checkpoint.importSource;
 			if (checkpoint.metadataDspId)
 				params[`dsp${index}`] = checkpoint.metadataDspId;
-			return `(source_file_name = {filename${index}:String} AND import_source = {source${index}:String}${checkpoint.metadataDspId ? ` AND dsp_id = {dsp${index}:String}` : ''})`;
+			if (factTable === CLICKHOUSE_TABLES.FACT_SALES_REPORT)
+				params[`tenant${index}`] = checkpoint.tenantId;
+			return `(source_file_name = {filename${index}:String} AND import_source = {source${index}:String}${factTable === CLICKHOUSE_TABLES.FACT_SALES_REPORT ? ` AND ingest_tenant_id = {tenant${index}:String}` : ''}${checkpoint.metadataDspId ? ` AND dsp_id = {dsp${index}:String}` : ''})`;
 		});
 
 		return {
@@ -333,7 +362,10 @@ export class ReportImportWorkerService
 		}
 
 		for (const [factTable, tableCheckpoints] of byTable) {
-			const { where, params } = this.buildSourceFilter(tableCheckpoints);
+			const { where, params } = this.buildSourceFilter(
+				tableCheckpoints,
+				factTable,
+			);
 			const tableRows = await this.clickHouseService.query<ExtractedRow>(
 				`
           SELECT
@@ -382,7 +414,10 @@ export class ReportImportWorkerService
 		}
 
 		for (const [factTable, tableCheckpoints] of byTable) {
-			const { where, params } = this.buildSourceFilter(tableCheckpoints);
+			const { where, params } = this.buildSourceFilter(
+				tableCheckpoints,
+				factTable,
+			);
 			const dateColumn =
 				factTable === CLICKHOUSE_TABLES.FACT_SALES_REPORT
 					? 'reporting_period_start'
@@ -474,6 +509,7 @@ export class ReportImportWorkerService
 			importLocks = await this.queueService.acquireImportLocks(
 				files.map((file) =>
 					JSON.stringify([
+						job.tenantId,
 						resolveReportImportSource(file),
 						path.posix.basename(file.path.replace(/\\/g, '/')),
 					]),
@@ -532,6 +568,7 @@ export class ReportImportWorkerService
 				state.stage = 'FACT_IMPORT';
 				state.files[fileKey] = {
 					status: 'IMPORTING',
+					tenantId: job.tenantId,
 					sourceFileName: filename,
 					importSource,
 					factTable,
@@ -603,6 +640,7 @@ export class ReportImportWorkerService
 							factTable,
 							filename,
 							importSource,
+							job.tenantId,
 						)),
 					]),
 				];
@@ -628,6 +666,8 @@ export class ReportImportWorkerService
 					for (const row of batch) {
 						row.import_source = importSource;
 						row.source_file_name = filename;
+						row.ingest_tenant_id = job.tenantId || '';
+						row.ingest_label_id = labelId || '';
 						if (
 							file.parserCode === 'wmg-sales' ||
 							!hasMeaningfulText(row.label_name)
@@ -777,6 +817,7 @@ export class ReportImportWorkerService
 
 				state.files[fileKey] = {
 					status: 'FACT_IMPORTED',
+					tenantId: job.tenantId,
 					sourceFileName: filename,
 					importSource,
 					parserCode: file.parserCode,
@@ -800,10 +841,11 @@ export class ReportImportWorkerService
 				const dspRows = await this.clickHouseService.query<{
 					dsp_id: string;
 				}>(
-					`SELECT DISTINCT dsp_id FROM music_analytics.${checkpoint.factTable} WHERE source_file_name = {filename:String} AND import_source = {source:String}`,
+					`SELECT DISTINCT dsp_id FROM music_analytics.${checkpoint.factTable} WHERE source_file_name = {filename:String} AND import_source = {source:String}${checkpoint.factTable === CLICKHOUSE_TABLES.FACT_SALES_REPORT ? ' AND ingest_tenant_id = {tenantId:String}' : ''}`,
 					{
 						filename: checkpoint.sourceFileName,
 						source: checkpoint.importSource,
+						tenantId: checkpoint.tenantId,
 					},
 				);
 				for (const dsp of dspRows)
@@ -912,6 +954,7 @@ export class ReportImportWorkerService
 								jobId,
 								dspType,
 								dryRun,
+								createdBy: job.createdBy,
 							},
 						)
 						.catch((err) => {
