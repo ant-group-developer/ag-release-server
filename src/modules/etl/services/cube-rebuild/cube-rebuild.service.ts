@@ -35,7 +35,32 @@ export class CubeRebuildService {
 	 * Dropped views are skipped so cubes stay rebuild-only.
 	 */
 	async resumeCubeMaterializedViews(): Promise<void> {
+		let detachedViews: Array<{ table: string }>;
+		try {
+			detachedViews = await this.clickHouseService.query<{
+				table: string;
+			}>(
+				`SELECT table
+				 FROM system.detached_tables
+				 WHERE database = {database:String}
+				   AND has({views:Array(String)}, table)`,
+				{
+					database: 'music_analytics',
+					views: [...CUBE_MATERIALIZED_VIEWS],
+				},
+			);
+		} catch (error) {
+			this.logger.warn(
+				`Could not inspect detached cube materialized views: ${error.message}`,
+			);
+			return;
+		}
+
+		const detachedViewNames = new Set(
+			detachedViews.map((row) => row.table),
+		);
 		for (const view of CUBE_MATERIALIZED_VIEWS) {
+			if (!detachedViewNames.has(view)) continue;
 			try {
 				await this.clickHouseService.execute(
 					`ATTACH TABLE IF NOT EXISTS music_analytics.${view}`,

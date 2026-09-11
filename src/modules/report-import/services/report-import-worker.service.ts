@@ -14,6 +14,7 @@ import { BucketR2Service } from '../../bucket2/services/bucket-r2.service';
 import { ClickHouseMigrationService } from '../../clickhouse/clickhouse-migration.service';
 import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
+import { DspReportService } from '../../dsp-report/services/dsp-report.service';
 import { DspMappingService } from '../../dsp/services/dsp-mapping.service';
 import {
 	FactSalesRow,
@@ -21,6 +22,11 @@ import {
 	ImportJobSourceType,
 	ImportJobStatus,
 } from '../../etl/interfaces';
+import {
+	ConfiguredReportSalesParser,
+	ReportValidationSummary,
+	reportDecimalUnits,
+} from '../../etl/parsers/sales/configured-report-sales.parser';
 import { SpotifyReportSalesParser } from '../../etl/parsers/sales/spotify-report-sales.parser';
 import { WmgSalesParser } from '../../etl/parsers/sales/wmg-sales.parser';
 import { AnalyticsProjectionRefreshService } from '../../etl/services/cube-rebuild/analytics-projection-refresh.service';
@@ -35,6 +41,10 @@ import {
 	ExtractedRow,
 	ReportEntityExtractorService,
 } from '../../release/services/report-entity-extractor.service';
+import {
+	ReportSourceConfig,
+	resolveReportImportSource,
+} from '../configs/report-source.interface';
 import { ReportImportQueueService } from './report-import-queue.service';
 
 type ReportImportStage =
@@ -55,6 +65,10 @@ interface ReportImportFileCheckpoint {
 	rows: number;
 	affectedPeriods: string[];
 	updatedAt: string;
+	validation?: ReportValidationSummary;
+	skippedRows?: number;
+	dspIds?: string[];
+	metadataDspId?: string;
 }
 
 interface ReportImportState {
@@ -82,6 +96,7 @@ export class ReportImportWorkerService
 		private readonly labelRepo: Repository<Label>,
 		private readonly clickHouseMigrationService: ClickHouseMigrationService,
 		private readonly etlImportHistoryRepository: EtlImportHistoryRepository,
+		private readonly dspReportService: DspReportService,
 	) {}
 
 	onApplicationBootstrap() {
@@ -185,11 +200,13 @@ export class ReportImportWorkerService
 			const key = this.getFileKey(file);
 			if (!key || state.files[key]) continue;
 
-			const sourceFileName = path.basename(file.path);
+			const sourceFileName = path.posix.basename(
+				file.path.replace(/\\/g, '/'),
+			);
 			state.files[key] = {
 				status: 'PENDING',
 				sourceFileName,
-				importSource: `${file.sourceCode}_report`,
+				importSource: resolveReportImportSource(file),
 				parserCode: file.parserCode,
 				factTable:
 					file.reportType === 'sales'
@@ -247,15 +264,6 @@ export class ReportImportWorkerService
 		return hasMeaningfulText(label?.name) ? label!.name.trim() : undefined;
 	}
 
-	private applyWmgLabelNames(
-		rows: FactSalesRow[],
-		fallbackLabelName: string | undefined,
-	): void {
-		for (const row of rows) {
-			row.label_name = fallbackLabelName || 'N/A';
-		}
-	}
-
 	private async deleteFactRowsForFile(
 		factTable: string,
 		filename: string,
@@ -301,7 +309,9 @@ export class ReportImportWorkerService
 		const clauses = checkpoints.map((checkpoint, index) => {
 			params[`filename${index}`] = checkpoint.sourceFileName;
 			params[`source${index}`] = checkpoint.importSource;
-			return `(source_file_name = {filename${index}:String} AND import_source = {source${index}:String})`;
+			if (checkpoint.metadataDspId)
+				params[`dsp${index}`] = checkpoint.metadataDspId;
+			return `(source_file_name = {filename${index}:String} AND import_source = {source${index}:String}${checkpoint.metadataDspId ? ` AND dsp_id = {dsp${index}:String}` : ''})`;
 		});
 
 		return {
@@ -347,7 +357,7 @@ export class ReportImportWorkerService
                 + if(label_name != '' AND label_name != 'N/A', 1, 0) AS score
             FROM music_analytics.${factTable}
             WHERE (${where})
-              AND (trimBoth(toString(isrc)) != '' OR trimBoth(toString(upc)) != '')
+              AND (trimBoth(toString(isrc)) NOT IN ('', 'N/A', 'NA') OR trimBoth(toString(upc)) NOT IN ('', 'N/A', 'NA'))
           )
           GROUP BY upc, isrc
         `,
@@ -419,6 +429,11 @@ export class ReportImportWorkerService
 		let totalProcessedRows = 0;
 		const affectedSalesPeriods = new Set<string>();
 		const affectedTrendsPeriods = new Set<string>();
+		let importLocks:
+			| Awaited<
+					ReturnType<ReportImportQueueService['acquireImportLocks']>
+			  >
+			| undefined;
 		const addAffectedPeriod = (factTable: string, period: string) => {
 			if (factTable === CLICKHOUSE_TABLES.FACT_SALES_REPORT)
 				affectedSalesPeriods.add(period);
@@ -456,6 +471,14 @@ export class ReportImportWorkerService
 				isPublic: false,
 			});
 			const files = (job.params?.files as any[]) || [];
+			importLocks = await this.queueService.acquireImportLocks(
+				files.map((file) =>
+					JSON.stringify([
+						resolveReportImportSource(file),
+						path.posix.basename(file.path.replace(/\\/g, '/')),
+					]),
+				),
+			);
 			const labelIdParam = job.params?.labelId;
 			const labelId =
 				typeof labelIdParam === 'string' ? labelIdParam : undefined;
@@ -468,15 +491,27 @@ export class ReportImportWorkerService
 				const file = files[i];
 				const fileKey = this.getFileKey(file);
 				const checkpoint = state.files[fileKey];
-				const filename = path.basename(file.path);
+				const filename = path.posix.basename(
+					file.path.replace(/\\/g, '/'),
+				);
 				const localFilePath = path.join(tempDir, filename);
 				const isSales = file.reportType === 'sales';
 				const factTable = isSales
 					? CLICKHOUSE_TABLES.FACT_SALES_REPORT
 					: CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT;
-				const importSource = `${file.sourceCode}_report`;
+				const importSource = resolveReportImportSource(file);
 
 				if (checkpoint?.status === 'FACT_IMPORTED') {
+					const stored = await this.clickHouseService.query<{
+						rows: string;
+					}>(
+						`SELECT count() AS rows FROM music_analytics.${factTable} WHERE source_file_name = {filename:String} AND import_source = {source:String} AND batch_id = {batchId:String}`,
+						{ filename, source: importSource, batchId: jobId },
+					);
+					if (Number(stored[0]?.rows ?? 0) !== checkpoint.rows)
+						throw new Error(
+							`Imported file has been replaced or changed by another job: ${filename}. Start a new upload.`,
+						);
 					this.logger.log(
 						`Skipping ${filename}; fact rows already imported for job ${jobId}`,
 					);
@@ -501,7 +536,8 @@ export class ReportImportWorkerService
 					importSource,
 					factTable,
 					rows: 0,
-					affectedPeriods: [],
+					affectedPeriods: checkpoint?.affectedPeriods || [],
+					parserCode: file.parserCode,
 					updatedAt: new Date().toISOString(),
 				};
 				await this.saveReportImportState(jobId, state);
@@ -523,12 +559,53 @@ export class ReportImportWorkerService
 				});
 				const writeStream = fs.createWriteStream(localFilePath);
 				await pipeline(stream, writeStream);
+				if (
+					![
+						'configured-report-sales',
+						'wmg-sales',
+						'spotify-report-sales',
+					].includes(file.parserCode)
+				)
+					throw new Error(
+						`Unsupported parser code: ${file.parserCode}`,
+					);
+				if (
+					typeof file.size === 'number' &&
+					(await fs.promises.stat(localFilePath)).size !== file.size
+				)
+					throw new Error(
+						`Downloaded file size mismatch: ${filename}`,
+					);
+				const configuredParser =
+					file.parserCode === 'configured-report-sales'
+						? new ConfiguredReportSalesParser(
+								file as ReportSourceConfig,
+							)
+						: undefined;
+				let validation: ReportValidationSummary | undefined;
+				if (configuredParser) {
+					await this.importJobsService.updateProgress(
+						jobId,
+						{ progressLabel: `Validating: ${filename}` },
+						true,
+					);
+					validation =
+						await configuredParser.validateFile(localFilePath);
+					state.files[fileKey].validation = validation;
+					await this.saveReportImportState(jobId, state);
+				}
+				await importLocks.assertHeld();
 
-				const deletedPeriods = await this.deleteFactRowsForFile(
-					factTable,
-					filename,
-					importSource,
-				);
+				const deletedPeriods = [
+					...new Set([
+						...(checkpoint?.affectedPeriods || []),
+						...(await this.deleteFactRowsForFile(
+							factTable,
+							filename,
+							importSource,
+						)),
+					]),
+				];
 				for (const period of deletedPeriods)
 					addAffectedPeriod(factTable, period);
 
@@ -544,120 +621,120 @@ export class ReportImportWorkerService
 
 				let fileProcessedRows = 0;
 				const fileAffectedPeriods = new Set<string>();
-
-				if (file.parserCode === 'wmg-sales') {
-					const parser = new WmgSalesParser();
-
-					await parser.parseFileStreaming(
+				const fileDspIds = new Set<string>();
+				let parseStats = { totalRows: 0, skippedRows: 0 };
+				const onBatch = async (batch: FactSalesRow[]) => {
+					await importLocks!.assertHeld();
+					for (const row of batch) {
+						row.import_source = importSource;
+						row.source_file_name = filename;
+						if (
+							file.parserCode === 'wmg-sales' ||
+							!hasMeaningfulText(row.label_name)
+						)
+							row.label_name = fallbackLabelName || 'N/A';
+						normalizeFactRows([row]);
+						const period = row.reporting_period_start.slice(0, 7);
+						fileAffectedPeriods.add(period);
+						addAffectedPeriod(factTable, period);
+						fileDspIds.add(row.dsp_id);
+					}
+					// Persist periods before the write so retry can rebuild even after a crash.
+					state.files[fileKey].affectedPeriods = [
+						...new Set([...deletedPeriods, ...fileAffectedPeriods]),
+					];
+					await this.saveReportImportState(jobId, state);
+					await this.clickHouseService.insertBatched(
+						factTable,
+						batch as unknown as Record<string, unknown>[],
+						50000,
+					);
+					fileProcessedRows += batch.length;
+					totalProcessedRows += batch.length;
+					await this.importJobsService.updateProgress(jobId, {
+						processedRows: totalProcessedRows,
+						totalRows: validation
+							? totalProcessedRows -
+								fileProcessedRows +
+								validation.totalRows
+							: totalProcessedRows,
+					});
+				};
+				if (configuredParser && validation) {
+					const dspIds = new Map<string, string>();
+					for (const name of validation.dsps) {
+						const dsp =
+							await this.dspMappingService.resolveOrCreateDspReport(
+								name,
+								importSource,
+							);
+						dspIds.set(name, dsp.id_dsps_report);
+					}
+					parseStats = await configuredParser.parseFileStreaming(
 						localFilePath,
 						jobId,
-						async (batch: FactSalesRow[]) => {
-							this.applyWmgLabelNames(batch, fallbackLabelName);
-
-							// Populate audit fields on the batch rows
-							for (const r of batch) {
-								r.import_source = importSource;
-								r.source_file_name = filename;
-								normalizeFactRows([r]);
-
-								// Collect period
-								if (r.reporting_period_start) {
-									fileAffectedPeriods.add(
-										r.reporting_period_start.substring(
-											0,
-											7,
-										),
-									); // YYYY-MM
-								}
-							}
-
-							// Batch insert into ClickHouse
-							await this.clickHouseService.insertBatched(
-								factTable,
-								batch as unknown as Record<string, unknown>[],
-								50000,
-							);
-
-							fileProcessedRows += batch.length;
-							totalProcessedRows += batch.length;
-
-							await this.importJobsService.updateProgress(jobId, {
-								processedRows: totalProcessedRows,
-								totalRows: totalProcessedRows,
-							});
-						},
+						onBatch,
+						{ batchSize: 50000, dspIds },
+					);
+					const totals = await this.clickHouseService.query<{
+						rows: string;
+						revenue: string;
+					}>(
+						`SELECT count() AS rows, toString(sum(revenue_usd)) AS revenue FROM music_analytics.${factTable}
+						 WHERE source_file_name = {filename:String} AND import_source = {source:String} AND batch_id = {batchId:String}`,
+						{ filename, source: importSource, batchId: jobId },
+					);
+					if (
+						Number(totals[0]?.rows) !== validation.totalRows ||
+						reportDecimalUnits(totals[0]?.revenue || '0') !==
+							reportDecimalUnits(validation.revenueUsd)
+					)
+						throw new Error(
+							`Revenue reconciliation failed: ${filename}`,
+						);
+				} else if (file.parserCode === 'wmg-sales') {
+					parseStats = await new WmgSalesParser().parseFileStreaming(
+						localFilePath,
+						jobId,
+						onBatch,
 						{
 							batchSize: 50000,
-							resolveDspId: async (dspName: string) => {
-								const r =
+							resolveDspId: async (name) =>
+								(
 									await this.dspMappingService.resolveOrCreateDspReport(
-										dspName,
-										'wmg_report',
-									);
-								return r.id_dsps_report;
-							},
+										name,
+										importSource,
+									)
+								).id_dsps_report,
 							revenueCurrency: file.defaultCurrency || 'VND',
 							memberName: file.defaultMember || 'AMG GROUP',
 						},
 					);
 				} else if (file.parserCode === 'spotify-report-sales') {
-					const parser = new SpotifyReportSalesParser();
-					const spotifyDsp =
+					const dsp =
 						await this.dspMappingService.resolveOrCreateDspReport(
 							'Spotify',
-							'spotify_report',
+							importSource,
 						);
-					const spotifyDspId = spotifyDsp.id_dsps_report;
-
-					await parser.parseFileStreaming(
-						localFilePath,
-						jobId,
-						async (batch: FactSalesRow[]) => {
-							// Populate audit/fallback fields on the batch rows
-							for (const r of batch) {
-								r.import_source = importSource;
-								r.source_file_name = filename;
-								r.label_name =
-									r.label_name || fallbackLabelName || 'N/A';
-								r.dsp_id = spotifyDspId;
-								normalizeFactRows([r]);
-
-								// Collect period
-								if (r.reporting_period_start) {
-									fileAffectedPeriods.add(
-										r.reporting_period_start.substring(
-											0,
-											7,
-										),
-									); // YYYY-MM
-								}
-							}
-
-							// Batch insert into ClickHouse
-							await this.clickHouseService.insertBatched(
-								factTable,
-								batch as unknown as Record<string, unknown>[],
-								50000,
-							);
-
-							fileProcessedRows += batch.length;
-							totalProcessedRows += batch.length;
-
-							await this.importJobsService.updateProgress(jobId, {
-								processedRows: totalProcessedRows,
-								totalRows: totalProcessedRows,
-							});
-						},
-						{
-							batchSize: 50000,
-							memberName: file.defaultMember || 'ANT MUSIC LLC',
-						},
-					);
-				} else {
+					parseStats =
+						await new SpotifyReportSalesParser().parseFileStreaming(
+							localFilePath,
+							jobId,
+							async (batch) => {
+								for (const row of batch)
+									row.dsp_id = dsp.id_dsps_report;
+								await onBatch(batch);
+							},
+							{
+								batchSize: 50000,
+								memberName:
+									file.defaultMember || 'ANT MUSIC LLC',
+							},
+						);
+				} else
 					throw new Error(
 						`Unsupported parser code: ${file.parserCode}`,
 					);
-				}
 
 				// Delete processed local file
 				await fs.promises.unlink(localFilePath).catch(() => {});
@@ -665,7 +742,8 @@ export class ReportImportWorkerService
 				// Write per-file record to etl_import_history
 				const fileStartedAt = state.files[fileKey]?.updatedAt;
 				// affectedPeriods format: "YYYY-MM" → convert to YYYYMM
-				const firstPeriod = Array.from(fileAffectedPeriods)[0] ?? '';
+				const firstPeriod =
+					Array.from(fileAffectedPeriods).sort()[0] ?? '';
 				const periodYYYYMM = firstPeriod.replace('-', '');
 				const fileCategory = file.reportType ?? 'sales';
 				await this.etlImportHistoryRepository
@@ -682,9 +760,10 @@ export class ReportImportWorkerService
 						status: 'done',
 						file_size_bytes:
 							typeof file.size === 'number' ? file.size : 0,
-						total_lines: fileProcessedRows,
+						total_lines:
+							parseStats.totalRows + parseStats.skippedRows,
 						processed_rows: fileProcessedRows,
-						skipped_rows: 0,
+						skipped_rows: parseStats.skippedRows,
 						error_rows: 0,
 						duration_ms: fileStartedAt
 							? Date.now() - new Date(fileStartedAt).getTime()
@@ -703,13 +782,36 @@ export class ReportImportWorkerService
 					parserCode: file.parserCode,
 					factTable,
 					rows: fileProcessedRows,
-					affectedPeriods: Array.from(fileAffectedPeriods),
+					affectedPeriods: [
+						...new Set([...deletedPeriods, ...fileAffectedPeriods]),
+					],
+					validation,
+					skippedRows: parseStats.skippedRows,
+					dspIds: [...fileDspIds],
 					updatedAt: new Date().toISOString(),
 				};
 				await this.saveReportImportState(jobId, state);
 			}
 
 			const importedCheckpoints = this.getImportedFileCheckpoints(state);
+
+			const metadataCheckpoints: ReportImportFileCheckpoint[] = [];
+			for (const checkpoint of importedCheckpoints) {
+				const dspRows = await this.clickHouseService.query<{
+					dsp_id: string;
+				}>(
+					`SELECT DISTINCT dsp_id FROM music_analytics.${checkpoint.factTable} WHERE source_file_name = {filename:String} AND import_source = {source:String}`,
+					{
+						filename: checkpoint.sourceFileName,
+						source: checkpoint.importSource,
+					},
+				);
+				for (const dsp of dspRows)
+					metadataCheckpoints.push({
+						...checkpoint,
+						metadataDspId: dsp.dsp_id,
+					});
+			}
 
 			// 3. Extract and import entities into PostgreSQL
 			const entityResult = {
@@ -721,7 +823,7 @@ export class ReportImportWorkerService
 				pending: 0,
 			};
 
-			const totalMetadataRows = importedCheckpoints.reduce(
+			const totalMetadataRows = metadataCheckpoints.reduce(
 				(sum, checkpoint) => sum + checkpoint.rows,
 				0,
 			);
@@ -730,13 +832,13 @@ export class ReportImportWorkerService
 				await this.saveReportImportState(jobId, state);
 
 				this.logger.log(
-					`Extracting and importing metadata entities to PostgreSQL for ${importedCheckpoints.length} file(s)...`,
+					`Extracting and importing metadata entities to PostgreSQL for ${metadataCheckpoints.length} file(s)...`,
 				);
 				await this.importJobsService.updateProgress(
 					jobId,
 					{
 						progressCurrent: 0,
-						progressTotal: importedCheckpoints.length,
+						progressTotal: metadataCheckpoints.length,
 						progressLabel: `Importing metadata to PostgreSQL`,
 					},
 					true,
@@ -744,23 +846,12 @@ export class ReportImportWorkerService
 
 				for (
 					let index = 0;
-					index < importedCheckpoints.length;
+					index < metadataCheckpoints.length;
 					index += 1
 				) {
-					const checkpoint = importedCheckpoints[index];
+					const checkpoint = metadataCheckpoints[index];
 
-					// Fetch dsp_id from Clickhouse fact table
-					const dspIdRows = await this.clickHouseService.query<{
-						dsp_id: string;
-					}>(
-						`SELECT DISTINCT dsp_id FROM music_analytics.${checkpoint.factTable}
-             WHERE source_file_name = {filename: String} AND import_source = {source: String} LIMIT 1`,
-						{
-							filename: checkpoint.sourceFileName,
-							source: checkpoint.importSource,
-						},
-					);
-					const dspId = dspIdRows[0]?.dsp_id;
+					const dspId = checkpoint.metadataDspId;
 
 					let pgUuid: string | null = null;
 					let dspType: 'audio' | 'video' = 'audio';
@@ -897,13 +988,54 @@ export class ReportImportWorkerService
 				);
 			}
 
+			await this.queueService.invalidateAnalyticsCache();
+			await importLocks.assertHeld();
+			await this.dspReportService.refreshStats([
+				...new Set(metadataCheckpoints.map((c) => c.metadataDspId!)),
+			]);
+			if (entityResult.errors > 0)
+				throw new Error(
+					'Metadata import failed; retry to resume without importing facts again',
+				);
 			state.stage = 'COMPLETED';
 			await this.saveReportImportState(jobId, state);
+			await this.importJobsService.updateProgress(
+				jobId,
+				{
+					processedRows: totalProcessedRows,
+					totalRows: importedCheckpoints.reduce(
+						(sum, c) => sum + c.rows + (c.skippedRows || 0),
+						0,
+					),
+					skippedRows: importedCheckpoints.reduce(
+						(sum, c) => sum + (c.skippedRows || 0),
+						0,
+					),
+				},
+				true,
+			);
 
 			// Mark Job as COMPLETED
 			await this.importJobsService.markCompleted(jobId, {
 				totalProcessedRows,
 				affectedPeriods: Array.from(affectedPeriods),
+				files: importedCheckpoints.map(
+					({
+						sourceFileName,
+						importSource,
+						rows,
+						validation,
+						skippedRows,
+						affectedPeriods,
+					}) => ({
+						sourceFileName,
+						importSource,
+						rows,
+						validation,
+						skippedRows,
+						affectedPeriods,
+					}),
+				),
 				releases: {
 					total: entityResult.totalReleases,
 					imported: entityResult.created,
@@ -935,6 +1067,9 @@ export class ReportImportWorkerService
 							refreshError.stack,
 						),
 					);
+				await this.queueService
+					.invalidateAnalyticsCache()
+					.catch(() => {});
 			}
 
 			// Update job status in database to FAILED
@@ -949,6 +1084,13 @@ export class ReportImportWorkerService
 			// Remove from processing queue to prevent loop block
 			await this.queueService.ackJob(jobId).catch(() => {});
 		} finally {
+			await importLocks
+				?.release()
+				.catch((error) =>
+					this.logger.warn(
+						`Could not release report locks: ${error.message}`,
+					),
+				);
 			// Clean up temp directory
 			await fs.promises
 				.rm(tempDir, { recursive: true, force: true })

@@ -254,6 +254,7 @@ export class BucketR2Service {
 		bucketName: string;
 		key: string;
 		metadata: Record<string, string>;
+		contentLength?: number;
 	}> {
 		try {
 			const result = await this.client.send(
@@ -263,7 +264,12 @@ export class BucketR2Service {
 				}),
 			);
 
-			return { bucketName, key, metadata: result.Metadata ?? {} };
+			return {
+				bucketName,
+				key,
+				metadata: result.Metadata ?? {},
+				contentLength: result.ContentLength,
+			};
 		} catch (error) {
 			throw BucketException.FILE_NOT_FOUND_IN_STORAGE();
 		}

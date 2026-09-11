@@ -66,6 +66,10 @@ describe('CubeRebuildService', () => {
 	});
 
 	it('reattaches leftover cube materialized views after the rebuild', async () => {
+		clickHouseService.query.mockResolvedValue([
+			{ table: 'sales_dsp_monthly_cube_v2_mv' },
+		]);
+
 		await service.resumeCubeMaterializedViews();
 
 		expect(clickHouseService.execute).toHaveBeenCalledWith(
@@ -73,7 +77,16 @@ describe('CubeRebuildService', () => {
 		);
 	});
 
+	it('does not try to attach cube views that were dropped by migration 050', async () => {
+		await service.resumeCubeMaterializedViews();
+
+		expect(clickHouseService.execute).not.toHaveBeenCalled();
+	});
+
 	it('keeps going when a dropped cube view cannot be attached', async () => {
+		clickHouseService.query.mockResolvedValue([
+			{ table: 'sales_dsp_monthly_cube_v2_mv' },
+		]);
 		clickHouseService.execute.mockRejectedValueOnce(
 			new Error(
 				"Table music_analytics.sales_dsp_monthly_cube_v2_mv doesn't exist",

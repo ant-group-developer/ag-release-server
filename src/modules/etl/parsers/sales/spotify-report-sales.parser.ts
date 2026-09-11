@@ -207,11 +207,6 @@ export class SpotifyReportSalesParser extends BaseSalesParser {
 				this.normalizeParsedRows([parsed]);
 				buffer.push(parsed);
 				totalRows++;
-
-				if (buffer.length >= batchSize) {
-					await onBatch(buffer);
-					buffer = [];
-				}
 			} catch (err) {
 				skippedRows++;
 				if (warnCount < 3) {
@@ -220,6 +215,10 @@ export class SpotifyReportSalesParser extends BaseSalesParser {
 					);
 					warnCount++;
 				}
+			}
+			if (buffer.length >= batchSize) {
+				await onBatch(buffer);
+				buffer = [];
 			}
 		}
 

@@ -467,7 +467,7 @@ export function getRevenueTopSourceTypeCountQuery(
     SELECT uniq(s.import_source) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
-    WHERE t.is_deleted = 0
+    WHERE 1=1
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -488,7 +488,7 @@ export function getRevenueTopSourceTypeQuery(
       sum(s.total_quantity) AS quantity
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
-    WHERE t.is_deleted = 0
+    WHERE 1=1
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -508,7 +508,7 @@ export function getRevenueTopSourceTypeTotalQuery(
       sum(s.total_revenue_usd) AS total_rev
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
-    WHERE t.is_deleted = 0
+    WHERE 1=1
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}

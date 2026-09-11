@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import * as path from 'path';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { ReportSourceConfig } from '../configs';
+import {
+	readReportConfigExtensions,
+	validateReportConfig,
+} from '../configs/report-config.util';
 
 @Injectable()
 export class ReportDetectorService {
@@ -12,7 +16,7 @@ export class ReportDetectorService {
 	 * Checks both folder patterns and file name patterns.
 	 */
 	async detectConfig(filePath: string): Promise<ReportSourceConfig | null> {
-		const filename = path.basename(filePath);
+		const filename = path.posix.basename(filePath.replace(/\\/g, '/'));
 		const parts = filePath.replace(/\\/g, '/').split('/');
 
 		// Fetch active configs from ClickHouse ordered by priority (lowest number = highest priority)
@@ -21,6 +25,8 @@ export class ReportDetectorService {
 		);
 
 		const configs: ReportSourceConfig[] = rows.map((r) => ({
+			id: r.id,
+			...readReportConfigExtensions(r),
 			sourceCode: r.source_code,
 			sourceName: r.source_name,
 			reportType: r.report_type,
@@ -51,6 +57,7 @@ export class ReportDetectorService {
 			});
 
 			if (fileMatched) {
+				validateReportConfig(config);
 				return config;
 			}
 		}

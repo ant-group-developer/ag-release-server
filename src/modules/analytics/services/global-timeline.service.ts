@@ -1703,11 +1703,12 @@ export class TimelineAnalyticsService {
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { limit, offset, page, pageSize, isPaginated } =
 			this.getPaginationParams(query);
-		let { joinSql, filterSql, params } = this.buildRevenueFilters(
-			tenantId,
-			query,
-			true,
-		);
+		const {
+			joinSql,
+			filterSql: initialFilterSql,
+			params,
+		} = this.buildRevenueFilters(tenantId, query, Boolean(query.keyword));
+		let filterSql = initialFilterSql;
 		params.from = fromDate;
 		params.to = toDate;
 
