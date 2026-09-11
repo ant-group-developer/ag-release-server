@@ -1123,7 +1123,7 @@ export class TimelineAnalyticsService {
 				matchedLabelIds = ['__none__'];
 			}
 			filterSql +=
-				" AND coalesce(nullIf(o.label_id, ''), t.label_id) IN ({matchedLabelIds:Array(String)})";
+				" AND coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, '')) IN ({matchedLabelIds:Array(String)})";
 			params.matchedLabelIds = matchedLabelIds;
 		}
 
@@ -1188,7 +1188,7 @@ export class TimelineAnalyticsService {
 								joinSql,
 								filterSql,
 								{ ...params },
-								"AND coalesce(nullIf(o.label_id, ''), t.label_id) = {_labelId:String}",
+								"AND coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, '')) = {_labelId:String}",
 								{ _labelId: item.labelId },
 								true,
 							),
@@ -1255,7 +1255,7 @@ export class TimelineAnalyticsService {
 							filterSql,
 							{ ...params },
 							topLabelIds.length > 0
-								? "AND coalesce(nullIf(o.label_id, ''), t.label_id) NOT IN ({_topLabelIds:Array(String)})"
+								? "AND coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, '')) NOT IN ({_topLabelIds:Array(String)})"
 								: '',
 							topLabelIds.length > 0
 								? { _topLabelIds: topLabelIds }
@@ -1524,7 +1524,7 @@ export class TimelineAnalyticsService {
 				matchedTenantIds = ['__none__'];
 			}
 			filterSql +=
-				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) IN ({matchedTenantIds:Array(String)})";
+				" AND coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, '')) IN ({matchedTenantIds:Array(String)})";
 			params.matchedTenantIds = matchedTenantIds;
 		}
 
@@ -1585,7 +1585,7 @@ export class TimelineAnalyticsService {
 								joinSql,
 								filterSql,
 								{ ...params },
-								"AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) = {_tenantId:String}",
+								"AND coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, '')) = {_tenantId:String}",
 								{ _tenantId: item.tenantId },
 								true,
 							),
@@ -1652,7 +1652,7 @@ export class TimelineAnalyticsService {
 							filterSql,
 							{ ...params },
 							topTenantIds.length > 0
-								? "AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) NOT IN ({_topTenantIds:Array(String)})"
+								? "AND coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, '')) NOT IN ({_topTenantIds:Array(String)})"
 								: '',
 							topTenantIds.length > 0
 								? { _topTenantIds: topTenantIds }
@@ -1703,11 +1703,12 @@ export class TimelineAnalyticsService {
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { limit, offset, page, pageSize, isPaginated } =
 			this.getPaginationParams(query);
-		let { joinSql, filterSql, params } = this.buildRevenueFilters(
-			tenantId,
-			query,
-			true,
-		);
+		const {
+			joinSql,
+			filterSql: initialFilterSql,
+			params,
+		} = this.buildRevenueFilters(tenantId, query, Boolean(query.keyword));
+		let filterSql = initialFilterSql;
 		params.from = fromDate;
 		params.to = toDate;
 
@@ -1720,7 +1721,7 @@ export class TimelineAnalyticsService {
 				matchedTenantIds = ['__none__'];
 			}
 			filterSql +=
-				" AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) IN ({matchedTenantIds:Array(String)})";
+				" AND coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, '')) IN ({matchedTenantIds:Array(String)})";
 			params.matchedTenantIds = matchedTenantIds;
 		}
 

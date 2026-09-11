@@ -702,7 +702,7 @@ export class ExportRunner {
 		const filters: string[] = [
 			's.period >= toDate({from:String})',
 			's.period <= toDate({to:String})',
-			`(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`,
+			`(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`,
 		];
 
 		// tenant: tenantIds (batch) ưu tiên hơn tenantId (single) > current tenant > system all
@@ -716,17 +716,17 @@ export class ExportRunner {
 		}
 
 		if (resolvedTenantIds.length > 0) {
-			filters.push('t.is_deleted = 0');
+			filters.push("(t.isrc = '' OR t.is_deleted = 0)");
 			filters.push(
-				"coalesce(nullIf(o.tenant_id, ''), t.tenant_id) IN ({tenantIds:Array(String)})",
+				"coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, '')) IN ({tenantIds:Array(String)})",
 			);
 			params.tenantIds = resolvedTenantIds;
 		}
 
 		if (dto.labelId) {
-			filters.push('t.is_deleted = 0');
+			filters.push("(t.isrc = '' OR t.is_deleted = 0)");
 			filters.push(
-				"coalesce(nullIf(o.label_id, ''), t.label_id) = {labelId:String}",
+				"coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, '')) = {labelId:String}",
 			);
 			params.labelId = dto.labelId;
 		}
@@ -809,7 +809,7 @@ export class ExportRunner {
       LEFT JOIN (
         SELECT isrc, tenant_id, label_id, release_id, artist_ids, release_type, is_deleted, channel_id
         FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL
-      ) t ON s.isrc = t.isrc
+	  ) t ON s.isrc = t.isrc AND s.isrc NOT IN ('', 'N/A', 'NA')
       LEFT JOIN (
         SELECT id_dsps_report, pg_uuid, dsp_name
         FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL

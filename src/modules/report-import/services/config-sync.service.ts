@@ -2,6 +2,10 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClickHouseMigrationService } from '../../clickhouse/clickhouse-migration.service';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { ReportSourceConfigs } from '../configs';
+import {
+	validateReportConfig,
+	writeReportConfigExtensions,
+} from '../configs/report-config.util';
 
 @Injectable()
 export class ConfigSyncService implements OnModuleInit {
@@ -39,6 +43,7 @@ export class ConfigSyncService implements OnModuleInit {
 				.replace('T', ' ');
 
 			for (const c of ReportSourceConfigs) {
+				validateReportConfig(c);
 				const id = `${c.sourceCode}_${c.reportType}`;
 				const existing = await this.clickHouseService.query<any>(
 					`SELECT id FROM music_analytics.report_source_configs FINAL WHERE id = {id:String} AND is_active = 1 LIMIT 1`,
@@ -50,6 +55,7 @@ export class ConfigSyncService implements OnModuleInit {
 						`Config '${id}' not found in ClickHouse. Syncing from code definition...`,
 					);
 					const row = {
+						...writeReportConfigExtensions(c),
 						id,
 						source_code: c.sourceCode,
 						source_name: c.sourceName,

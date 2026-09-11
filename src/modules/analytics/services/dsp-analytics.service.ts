@@ -32,6 +32,7 @@ import {
 	buildOwnershipJoin,
 	getOwnershipLedgerFallbackPredicate,
 	getOwnershipTenantExpr,
+	getRevenueTenantExpr,
 } from '../utils/ownership-join.util';
 import { getTrendPeriodExprs } from '../utils/trend-period.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
@@ -201,12 +202,18 @@ export class DspAnalyticsService {
 		}
 
 		const ownershipPeriod = opts?.ownershipPeriod ?? 'trend';
-		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+		const trackJoin =
+			ownershipPeriod === 'revenue' ? 'LEFT JOIN' : 'INNER JOIN';
+		const joinSql = `${trackJoin} (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc${ownershipPeriod === 'revenue' ? " AND s.isrc NOT IN ('', 'N/A', 'NA')" : ''}
       ${buildOwnershipJoin(ownershipPeriod, opts?.factDateExpr)}`;
-		let filterSql = ` AND t.is_deleted = 0
+		let filterSql = ` AND (t.isrc = '' OR t.is_deleted = 0)
       AND ${getOwnershipLedgerFallbackPredicate()}`;
 		if (!isSystem) {
-			filterSql += ` AND ${getOwnershipTenantExpr()} = {tenantId:String}`;
+			const tenantExpr =
+				ownershipPeriod === 'revenue'
+					? getRevenueTenantExpr()
+					: getOwnershipTenantExpr();
+			filterSql += ` AND ${tenantExpr} = {tenantId:String}`;
 			params.tenantId = tenantId;
 		}
 		if (releaseType) {

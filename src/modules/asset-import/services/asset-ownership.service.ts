@@ -128,8 +128,15 @@ export class AssetOwnershipService {
 
 	async recordInitialOwnership(
 		manager: EntityManager,
-		input: Omit<TransferAssetOwnershipInput, 'assetImportItemId'> & {
+		input: {
+			releaseId: string;
+			tenantId: string;
+			labelId: string | null;
+			effectiveDate: string;
+			revenueEffectiveFrom: string;
 			assetImportItemId?: string | null;
+			actorId?: string | null;
+			notify?: boolean;
 		},
 	): Promise<void> {
 		this.assertDate(input.effectiveDate, 'effectiveDate');
@@ -155,7 +162,7 @@ export class AssetOwnershipService {
 				revenueEffectiveFrom,
 				revenueEffectiveTo: null,
 				assetImportItemId: input.assetImportItemId ?? null,
-				createdBy: input.actorId,
+				createdBy: input.actorId ?? null,
 			}),
 		);
 		await this.enqueueSync(manager, input.releaseId, input.notify ?? true);
@@ -174,8 +181,7 @@ export class AssetOwnershipService {
 			notify: boolean;
 		},
 	): Promise<
-		| 'skipped'
-		| { baselineCreated: boolean; labelCleared: boolean }
+		'skipped' | { baselineCreated: boolean; labelCleared: boolean }
 	> {
 		const { item } = args;
 		if (item.assetImportItemId) {
@@ -236,10 +242,7 @@ export class AssetOwnershipService {
 
 		const currentTenant = current.tenantId;
 		const currentLabel = current.labelId ?? null;
-		if (
-			currentTenant === args.tenantId &&
-			currentLabel === item.labelId
-		) {
+		if (currentTenant === args.tenantId && currentLabel === item.labelId) {
 			return 'skipped';
 		}
 
@@ -306,7 +309,9 @@ export class AssetOwnershipService {
 			`INSERT INTO clickhouse_sync_outbox (entity_name, entity_id, action, processed)
 			 VALUES ('asset_ownership_periods', $1, 'UPDATE', FALSE)
 			 ON CONFLICT (entity_name, entity_id) WHERE processed = FALSE
-			 DO UPDATE SET created_at = CURRENT_TIMESTAMP, action = EXCLUDED.action, error_message = NULL`,
+			 DO UPDATE SET created_at = CURRENT_TIMESTAMP,
+			   action = CASE WHEN EXCLUDED.action = 'DELETE' THEN 'DELETE' ELSE clickhouse_sync_outbox.action END,
+			   error_message = NULL`,
 			[releaseId],
 		);
 		if (notify) {

@@ -45,6 +45,7 @@ export interface ReportEntityImportContext {
 	jobId?: string;
 	dspType?: 'audio' | 'video';
 	dryRun?: boolean;
+	createdBy?: string;
 }
 
 @Injectable()
@@ -264,6 +265,7 @@ export class ReportEntityExtractorService {
 				importParserCode: context?.parserCode,
 				importFileName: context?.fileName,
 				importJobId: context?.jobId,
+				importedBy: context?.createdBy,
 			});
 		}
 

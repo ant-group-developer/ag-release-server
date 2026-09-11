@@ -105,7 +105,18 @@ function expectFullFilters(
 	revenue: boolean,
 ) {
 	for (const [predicate, key, value] of expectedFilters) {
-		expect(sql).toContain(predicate);
+		const expectedPredicate = revenue
+			? predicate
+					.replace(
+						"coalesce(nullIf(o.label_id, ''), t.label_id)",
+						"coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, ''))",
+					)
+					.replace(
+						"coalesce(nullIf(o.tenant_id, ''), t.tenant_id)",
+						"coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, ''))",
+					)
+			: predicate;
+		expect(sql).toContain(expectedPredicate);
 		expect(params[key]).toEqual(value);
 	}
 	expect(sql).toContain(
@@ -142,7 +153,18 @@ describe('entity chart filters', () => {
 			);
 			for (const [sql, params] of clickhouse.query.mock.calls) {
 				expectFullFilters(sql, params, method.includes('Revenue'));
-				expect(sql).toContain(entityPredicates[entityType]);
+				const entityPredicate = method.includes('Revenue')
+					? entityPredicates[entityType]
+							.replace(
+								"coalesce(nullIf(o.label_id, ''), t.label_id)",
+								"coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, ''))",
+							)
+							.replace(
+								"coalesce(nullIf(o.tenant_id, ''), t.tenant_id)",
+								"coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, ''))",
+							)
+					: entityPredicates[entityType];
+				expect(sql).toContain(entityPredicate);
 				expect(params.entityId).toBe('url-entity');
 				expect(params.from).toBe(
 					method.includes('Revenue') ? '2026-01-01' : dates.fromDate,
@@ -185,9 +207,18 @@ describe('entity chart filters', () => {
 				expect(sql).toContain('s.dsp_id = {dspReportId:String}');
 				expect(params.dspReportId).toBe(filters.dspReportId);
 			} else {
-				const [predicate, key] = expectedFilters.find(
+				const [rawPredicate, key] = expectedFilters.find(
 					([, , value]) => value === filters[field],
 				)!;
+				const predicate = rawPredicate
+					.replace(
+						"coalesce(nullIf(o.label_id, ''), t.label_id)",
+						"coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, ''))",
+					)
+					.replace(
+						"coalesce(nullIf(o.tenant_id, ''), t.tenant_id)",
+						"coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, ''))",
+					);
 				expect(sql).toContain(predicate);
 				expect(params[key]).toBe(filters[field]);
 			}

@@ -78,6 +78,7 @@ import { ReleaseExecutionStep3 } from './modules/release-executions3/entites/rel
 import { ReleaseExecution3 } from './modules/release-executions3/entites/release-execution3.entity';
 import { ReleaseExecution3Service } from './modules/release-executions3/services/release-execution3.service';
 
+import { AssetOwnershipModule } from '../asset-import/asset-ownership.module';
 import { PartnersApiModule } from '../partners-api/partners-api.module';
 import { ReleaseCaption } from '../release-caption/entities/release-caption.entity';
 import { ReleaseCaptionModule } from '../release-caption/release-caption.module';
@@ -177,6 +178,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		CiModule,
 
 		PartnersApiModule,
+		AssetOwnershipModule,
 
 		// ReleaseExecutions3Module,
 	],

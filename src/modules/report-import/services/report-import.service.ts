@@ -6,6 +6,7 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { createHash } from 'crypto';
 import * as path from 'path';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -17,6 +18,10 @@ import {
 } from '../../etl/interfaces';
 import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.service';
 import { Label } from '../../label/entities/label.entity';
+import {
+	ReportSourceConfig,
+	resolveReportImportSource,
+} from '../configs/report-source.interface';
 import { ReportDetectorService } from './report-detector.service';
 import { ReportImportQueueService } from './report-import-queue.service';
 
@@ -65,18 +70,35 @@ export class ReportImportService {
 			}
 		}
 
-		const matched: Array<{
-			path: string;
-			r2Key: string;
-			uploadUrl: string;
-			size: number;
-			sourceCode: string;
-			reportType: string;
-			parserCode: string;
-		}> = [];
+		const matched: Array<
+			ReportSourceConfig & {
+				path: string;
+				r2Key: string;
+				uploadUrl: string;
+				size: number;
+				sourceCode: string;
+				reportType: string;
+				parserCode: string;
+			}
+		> = [];
 
 		const invalid: Array<{ path: string; reason: string }> = [];
 		const jobId = uuidv4();
+		const basenames = new Set<string>();
+		for (const file of files) {
+			const name = path.posix
+				.basename(file.path.replace(/\\/g, '/'))
+				.toLowerCase();
+			if (!name || name === '.' || name === '..' || basenames.has(name))
+				throw new BadRequestException(
+					`Duplicate or invalid report filename: ${file.path}`,
+				);
+			if (!Number.isSafeInteger(file.size) || file.size <= 0)
+				throw new BadRequestException(
+					`Invalid file size: ${file.path}`,
+				);
+			basenames.add(name);
+		}
 
 		for (const f of files) {
 			if (allowedExtensions && allowedExtensions.length > 0) {
@@ -92,7 +114,16 @@ export class ReportImportService {
 				}
 			}
 
-			const config = await this.detectorService.detectConfig(f.path);
+			let config: ReportSourceConfig | null;
+			try {
+				config = await this.detectorService.detectConfig(f.path);
+			} catch (error) {
+				invalid.push({
+					path: f.path,
+					reason: `Invalid report configuration: ${(error as Error).message}`,
+				});
+				continue;
+			}
 			if (!config) {
 				invalid.push({
 					path: f.path,
@@ -102,7 +133,7 @@ export class ReportImportService {
 			}
 
 			// Generate a unique path for the file in R2 under the jobId folder
-			const filename = path.basename(f.path);
+			const filename = path.posix.basename(f.path.replace(/\\/g, '/'));
 			const r2Key = `reports/${jobId}/${filename}`;
 
 			try {
@@ -113,6 +144,11 @@ export class ReportImportService {
 				});
 
 				matched.push({
+					...config,
+					configHash: createHash('sha256')
+						.update(JSON.stringify(config))
+						.digest('hex'),
+					importSource: resolveReportImportSource(config),
 					path: f.path,
 					r2Key,
 					uploadUrl,
@@ -195,8 +231,11 @@ export class ReportImportService {
 			}
 
 			const files =
-				(job.params?.files as Array<{ r2Key: string; path: string }>) ||
-				[];
+				(job.params?.files as Array<{
+					r2Key: string;
+					path: string;
+					size?: number;
+				}>) || [];
 			if (files.length === 0) {
 				throw new BadRequestException(
 					'Không có file nào để import trong Job này.',
@@ -223,10 +262,17 @@ export class ReportImportService {
 				}
 
 				try {
-					await this.r2Service.findOne({
+					const object = await this.r2Service.findOne({
 						bucketName,
 						key: file.r2Key,
 					});
+					if (
+						typeof file.size === 'number' &&
+						object.contentLength !== file.size
+					)
+						throw new Error(
+							'Uploaded file size does not match pre-validation',
+						);
 				} catch (err) {
 					const fileName = path.basename(file.path);
 					this.logger.error(

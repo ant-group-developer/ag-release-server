@@ -283,11 +283,11 @@ export function getRevenueTopLabelCountQuery(
 	filterSql: string,
 ): string {
 	return `
-    SELECT uniq(coalesce(nullIf(o.label_id, ''), t.label_id)) AS total
+    SELECT uniq(coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, ''))) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
+      AND coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, '')) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -303,7 +303,7 @@ export function getRevenueTopLabelQuery(
 ): string {
 	return `
     SELECT
-      coalesce(nullIf(o.label_id, ''), t.label_id) AS labelId,
+      coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, '')) AS labelId,
       sum(s.total_revenue_usd) AS revenue_usd,
       sum(s.total_quantity) AS quantity,
       uniq(t.release_id) AS release_count,
@@ -311,7 +311,7 @@ export function getRevenueTopLabelQuery(
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
+      AND coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, '')) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -332,7 +332,7 @@ export function getRevenueTopLabelTotalQuery(
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
+      AND coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, '')) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -405,11 +405,11 @@ export function getRevenueTopTenantCountQuery(
 	filterSql: string,
 ): string {
 	return `
-    SELECT uniq(coalesce(nullIf(o.tenant_id, ''), t.tenant_id)) AS total
+    SELECT uniq(coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, ''))) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) != ''
+      AND coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, '')) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -425,13 +425,13 @@ export function getRevenueTopTenantQuery(
 ): string {
 	return `
     SELECT
-      coalesce(nullIf(o.tenant_id, ''), t.tenant_id) AS tenantId,
+      coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, '')) AS tenantId,
       sum(s.total_revenue_usd) AS revenue_usd,
       sum(s.total_quantity) AS quantity
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) != ''
+      AND coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, '')) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -452,7 +452,7 @@ export function getRevenueTopTenantTotalQuery(
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0
-      AND coalesce(nullIf(o.tenant_id, ''), t.tenant_id) != ''
+      AND coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, '')) != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -467,7 +467,7 @@ export function getRevenueTopSourceTypeCountQuery(
     SELECT uniq(s.import_source) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
-    WHERE t.is_deleted = 0
+    WHERE 1=1
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -488,7 +488,7 @@ export function getRevenueTopSourceTypeQuery(
       sum(s.total_quantity) AS quantity
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
-    WHERE t.is_deleted = 0
+    WHERE 1=1
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -508,7 +508,7 @@ export function getRevenueTopSourceTypeTotalQuery(
       sum(s.total_revenue_usd) AS total_rev
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
-    WHERE t.is_deleted = 0
+    WHERE 1=1
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}

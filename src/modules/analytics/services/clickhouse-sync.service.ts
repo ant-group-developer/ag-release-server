@@ -77,6 +77,7 @@ interface AssetOwnershipSyncRow extends Record<string, unknown> {
 	effective_to: string | null;
 	revenue_effective_from: string;
 	revenue_effective_to: string | null;
+	is_deleted: number;
 	updated_at: string;
 }
 
@@ -529,10 +530,26 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			)
 			.map((j) => j.entity_id);
 
+		// Job DELETE sinh ra tu PG trigger AFTER DELETE tren asset_ownership_periods
+		// (ban chay ca khi row bi xoa do FK CASCADE tu lenh xoa release). entity_id
+		// la release_id, khong phai PK cua row period.
+		const ownershipDeleteReleaseIds = jobs
+			.filter(
+				(j) =>
+					j.entity_name === 'asset_ownership_periods' &&
+					j.action === 'DELETE' &&
+					!!j.entity_id,
+			)
+			.map((j) => j.entity_id);
+
 		const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
 		if (ownershipReleaseIds.length > 0) {
 			await this.syncOwnershipForReleases(ownershipReleaseIds);
+		}
+
+		if (ownershipDeleteReleaseIds.length > 0) {
+			await this.tombstoneOwnershipForReleases(ownershipDeleteReleaseIds);
 		}
 
 		// 1a. Xu ly INSERT/UPDATE cho tracks
@@ -932,6 +949,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			revenue_effective_to: row.revenue_effective_to
 				? this.toClickHouseDate(row.revenue_effective_to)
 				: null,
+			is_deleted: 0,
 			updated_at: new Date().toISOString().slice(0, 23).replace('T', ' '),
 		}));
 		// Dedupe theo (isrc, window): mot ISRC co the xuat hien trong nhieu release
@@ -968,6 +986,56 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 		);
 	}
 
+	/**
+	 * Danh dau tombstone (is_deleted=1) cho moi ownership row cua cac release da bi
+	 * xoa o PG (qua FK CASCADE + trigger AFTER DELETE, xem migration
+	 * 1787900000000-OwnershipCascadeAndSyncTrigger). Khong the doc tu PG vi row da
+	 * bi xoa, nen doc truc tiep tu ClickHouse (noi van con du lieu sync truoc do,
+	 * bao gom ca isrc) va insert lai chinh cac row do voi is_deleted=1, updated_at
+	 * moi hon de ReplacingMergeTree collapse ve ban ghi tombstone.
+	 * Dung query() voi named param, tuyet doi khong dung execute() (khong co binding,
+	 * co nguy co SQL injection).
+	 */
+	private async tombstoneOwnershipForReleases(
+		releaseIds: string[],
+	): Promise<void> {
+		if (!releaseIds.length) return;
+		const existing = await this.clickHouseService.query<{
+			isrc: string;
+			release_id: string;
+			tenant_id: string;
+			label_id: string;
+			effective_from: string;
+			effective_to: string | null;
+			revenue_effective_from: string;
+			revenue_effective_to: string | null;
+		}>(
+			`SELECT isrc, release_id, tenant_id, label_id, effective_from, effective_to,
+			        revenue_effective_from, revenue_effective_to
+			 FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
+			 WHERE release_id IN ({releaseIds:Array(String)}) AND is_deleted = 0`,
+			{ releaseIds },
+		);
+		if (!existing.length) return;
+		const now = new Date().toISOString().slice(0, 23).replace('T', ' ');
+		const tombstones: AssetOwnershipSyncRow[] = existing.map((row) => ({
+			...row,
+			is_deleted: 1,
+			updated_at: now,
+		}));
+		await this.clickHouseService.insert(
+			CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC,
+			tombstones,
+		);
+	}
+
+	/**
+	 * Full rebuild ownership sync. An toan khong "hoi sinh" tombstone: chi chon
+	 * DISTINCT release_id con ton tai trong asset_ownership_periods (PG). Release
+	 * da bi xoa (va da tombstone o ClickHouse qua tombstoneOwnershipForReleases)
+	 * se khong con xuat hien trong ket qua nay, nen khong bao duoc re-sync ve
+	 * is_deleted=0.
+	 */
 	async performFullOwnershipSync(): Promise<void> {
 		let offset = 0;
 		let syncedReleaseCount = 0;

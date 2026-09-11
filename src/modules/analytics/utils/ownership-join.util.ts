@@ -39,6 +39,7 @@ function getDedupedOwnershipSubquery(ownershipPeriod: OwnershipPeriod): string {
 		    argMax(label_id, updated_at) AS label_id,
 		    argMax(release_id, updated_at) AS release_id
 		  FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
+		  WHERE is_deleted = 0
 		  GROUP BY isrc, revenue_effective_from, revenue_effective_to, effective_from, effective_to)`;
 	}
 	return `(SELECT
@@ -51,6 +52,7 @@ function getDedupedOwnershipSubquery(ownershipPeriod: OwnershipPeriod): string {
 		    argMax(label_id, updated_at) AS label_id,
 		    argMax(release_id, updated_at) AS release_id
 		  FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
+		  WHERE is_deleted = 0
 		  GROUP BY isrc, effective_from, effective_to, revenue_effective_from, revenue_effective_to)`;
 }
 
@@ -65,19 +67,26 @@ export function buildOwnershipJoin(
 	ownershipPeriod: OwnershipPeriod,
 	factDateExpr?: string,
 ): string {
-	const predicate = getOwnershipDatePredicate(
-		ownershipPeriod,
-		factDateExpr,
-	);
-	return `LEFT JOIN ${getDedupedOwnershipSubquery(ownershipPeriod)} AS o ON s.isrc = o.isrc AND ${predicate}`;
+	const predicate = getOwnershipDatePredicate(ownershipPeriod, factDateExpr);
+	return `LEFT JOIN ${getDedupedOwnershipSubquery(ownershipPeriod)} AS o ON s.isrc = o.isrc AND s.isrc NOT IN ('', 'N/A', 'NA') AND ${predicate}`;
 }
 
 export function getOwnershipTenantExpr(): string {
 	return "coalesce(nullIf(o.tenant_id, ''), t.tenant_id)";
 }
 
+/** Revenue-only attribution. Upload tenant is used only when no asset mapping exists. */
+export function getRevenueTenantExpr(): string {
+	return "coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, ''))";
+}
+
+/** Revenue-only label attribution, matching getRevenueTenantExpr precedence. */
+export function getRevenueLabelExpr(): string {
+	return "coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, ''))";
+}
+
 export function getOwnershipLedgerFallbackPredicate(): string {
-	return `(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL))`;
+	return `(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`;
 }
 
 export function buildPgTracksJoin(): string {

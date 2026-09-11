@@ -1,5 +1,6 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { Column, Entity, Index } from 'typeorm';
+import { Release } from 'src/modules/release/entities/release.entity';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 
 /** Immutable audit event. Periods are the query model; events are the ledger. */
 @Entity('asset_ownership_transfer_events')
@@ -7,6 +8,10 @@ import { Column, Entity, Index } from 'typeorm';
 export class AssetOwnershipTransferEvent extends BaseUUIDEntity {
 	@Column({ type: 'uuid' })
 	releaseId: string;
+
+	@ManyToOne(() => Release, { onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'release_id' })
+	release: Release;
 
 	@Column({ type: 'uuid', nullable: true })
 	fromTenantId: string | null;

@@ -205,11 +205,6 @@ export class WmgSalesParser extends BaseSalesParser {
 				buffer.push(parsed);
 				totalRows++;
 				if (dspName) uniqueDsps.add(dspName);
-
-				if (buffer.length >= batchSize) {
-					await onBatch(buffer);
-					buffer = []; // clear → GC reclaims memory
-				}
 			} catch (err) {
 				skippedRows++;
 				if (warnCount < 3) {
@@ -218,6 +213,11 @@ export class WmgSalesParser extends BaseSalesParser {
 					);
 					warnCount++;
 				}
+			}
+			// Storage errors must abort the import, not be treated as row errors.
+			if (buffer.length >= batchSize) {
+				await onBatch(buffer);
+				buffer = [];
 			}
 		}
 
