@@ -24,13 +24,13 @@ export class ScheduleService implements OnApplicationBootstrap {
 	) {}
 
 	onApplicationBootstrap() {
-		// if (process.env.APP_ROLE !== 'worker') {
-		// 	const jobs = this.schedulerRegistry.getCronJobs();
-		// 	for (const name of jobs.keys()) {
-		// 		this.schedulerRegistry.deleteCronJob(name); // Dừng và xóa
-		// 	}
-		// 	return;
-		// }
+		if (process.env.APP_ROLE !== 'worker') {
+			const jobs = this.schedulerRegistry.getCronJobs();
+			for (const name of jobs.keys()) {
+				this.schedulerRegistry.deleteCronJob(name); // Dừng và xóa
+			}
+			return;
+		}
 
 		this.reloadConfig();
 

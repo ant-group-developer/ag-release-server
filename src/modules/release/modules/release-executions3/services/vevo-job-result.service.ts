@@ -10,6 +10,8 @@ import {
 
 export type VevoJobResultSource = 'webhook' | 'polling';
 
+const VEVO_SUCCESS_RESUME_DELAY_MINUTES = 15;
+
 export interface ProcessVevoJobResultResponse {
 	matched: boolean;
 	terminal: boolean;
@@ -110,6 +112,61 @@ export class VevoJobResultService {
 			: job.result?.errors
 					?.map((item) => `${item.code}: ${item.message}`)
 					.join('; ') || 'CI Tool VEVO queue job failed';
+
+		if (success) {
+			const existingResumeAt =
+				resolvedWaitStep.metadata?.output?.resumeAt;
+			const parsedResumeAt = existingResumeAt
+				? new Date(existingResumeAt)
+				: null;
+			const resumeAt =
+				parsedResumeAt && !Number.isNaN(parsedResumeAt.getTime())
+					? parsedResumeAt
+					: new Date(
+							Date.now() +
+								VEVO_SUCCESS_RESUME_DELAY_MINUTES * 60 * 1000,
+						);
+
+			if (resumeAt.getTime() > Date.now()) {
+				resolvedWaitStep.metadata = {
+					...resolvedWaitStep.metadata,
+					scheduledAt: resumeAt.toISOString(),
+					output: {
+						...resolvedWaitStep.metadata?.output,
+						jobId: job.id,
+						state: job.state,
+						success: true,
+						error: null,
+						source,
+						...(source === 'webhook'
+							? { callback: job }
+							: { polledJob: job }),
+						receivedAt: new Date().toISOString(),
+						resumeAt: resumeAt.toISOString(),
+					},
+				};
+
+				resolvedWaitStep.status =
+					ReleaseExecutionStepStatus.WAITING_PARTNER;
+				resolvedWaitStep.completedAt = null;
+
+				await this.releaseExecutionStepRepo.save(resolvedWaitStep);
+
+				return {
+					matched: true,
+					terminal: true,
+					duplicate: false,
+					jobId: job.id,
+					submitStepId: submitStep.id,
+					waitStepId: resolvedWaitStep.id,
+					releaseExecutionId: submitStep.releaseExecutionId,
+					state: job.state,
+					status: ReleaseExecutionStepStatus.WAITING_PARTNER,
+					success: true,
+					error: null,
+				};
+			}
+		}
 
 		resolvedWaitStep.metadata = {
 			...resolvedWaitStep.metadata,

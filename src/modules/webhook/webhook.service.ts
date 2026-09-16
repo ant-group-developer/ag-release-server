@@ -4,6 +4,7 @@ import { ChannelService } from '../channel/services/channel.service';
 import { VevoService } from '../channel/services/vevo.service';
 import { LogModule } from '../log/entites/logs.entity';
 import { LogsService } from '../log/services/logs.services';
+import { ReleaseExecutionStepStatus } from '../release/modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../release/modules/release-executions3/services/release-execution3.service';
 import { VevoJobResultService } from '../release/modules/release-executions3/services/vevo-job-result.service';
 import { VideoService } from '../video/video.service';
@@ -93,7 +94,12 @@ export class WebhookService {
 			source: 'webhook',
 		});
 
-		if (result.terminal && !result.duplicate && result.releaseExecutionId) {
+		if (
+			result.terminal &&
+			!result.duplicate &&
+			result.releaseExecutionId &&
+			result.status !== ReleaseExecutionStepStatus.WAITING_PARTNER
+		) {
 			await this.releaseExecution3Service.resumeExecution(
 				result.releaseExecutionId,
 			);
