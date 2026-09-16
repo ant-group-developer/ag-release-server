@@ -2,6 +2,7 @@ export enum ReleaseStatus {
 	DRAFT = 'draft',
 	SUBMITTED = 'submitted',
 	PROCESSING = 'processing',
+	UNRELEASED = 'unreleased',
 	AWAITING_ACTION = 'awaiting_action', // bỏ
 	DISTRIBUTED = 'distributed',
 	PARTIAL_DONE = 'partial_done', // bỏ

@@ -1,27 +1,41 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import * as fs from 'fs';
+import * as os from 'os';
 import path from 'path';
 import {
 	CI_IMPORT_MAX_EMPTY_CHECKS,
 	DEFAULT_WAIT_MINUTES,
 } from 'src/common/constants/common.default.constants';
+import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
+import { Country } from 'src/modules/country/entities/country.entity';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
+import { CiToolService } from 'src/modules/partners-api/ci-tool/ci-tool.service';
+import {
+	BackStageVideoStatus,
+	QueueCiToolVevoReleasePayload,
+} from 'src/modules/partners-api/ci/interfaces/vevo-video.interface';
 import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.service';
+import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
+import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
+import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
+import { ReleaseTimeMode } from 'src/modules/release/enum/release.enum';
 import { ReleaseErrorType } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
 import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
 import { ReleaseReviewService } from 'src/modules/release/modules/release-reviews/services/release-review.service';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
+import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { VideoService } from 'src/modules/video/video.service';
 import { removeFolder } from 'src/utils/util';
-import { EntityManager, IsNull } from 'typeorm';
+import { EntityManager, In, IsNull } from 'typeorm';
 import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
@@ -32,6 +46,10 @@ import {
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
 import { CiDistributionJob3Service } from './ci-distribution-job3.service';
+import { VevoJobResultService } from './vevo-job-result.service';
+
+const VEVO_WEBHOOK_WAIT_MINUTES = 30;
+const VEVO_POLL_RETRY_MINUTES = 5;
 
 type StepTaskContext = {
 	step: ReleaseExecutionStep3;
@@ -40,6 +58,8 @@ type StepTaskContext = {
 
 @Injectable()
 export class ReleaseExecution3Worker {
+	private readonly logger = new Logger(ReleaseExecution3Worker.name);
+
 	constructor(
 		@InjectEntityManager()
 		private readonly manager: EntityManager,
@@ -58,6 +78,9 @@ export class ReleaseExecution3Worker {
 		private readonly ciImportService: CiImportService,
 		private readonly releaseErrorService: ReleaseErrorService,
 		private readonly releaseReviewService: ReleaseReviewService,
+		private readonly ciToolService: CiToolService,
+		private readonly vevoJobResultService: VevoJobResultService,
+		private readonly bucketService2: BucketService2,
 
 		// @Inject(forwardRef(() => CiDistributionJobService))
 		private readonly ciJobService: CiDistributionJob3Service,
@@ -140,6 +163,9 @@ export class ReleaseExecution3Worker {
 
 			case ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP:
 				return this.uploadMetadataToSftp(context);
+
+			case ReleaseExecutionStepType.SUBMIT_VEVO_VIDEO:
+				return this.submitVevoVideo(context);
 
 			case ReleaseExecutionStepType.SYNC_RESULT_TO_RELEASE:
 				return this.syncResultToRelease(context);
@@ -866,6 +892,83 @@ export class ReleaseExecution3Worker {
 	): Promise<ReleaseExecutionStepStatus> {
 		const { step } = context;
 		try {
+			const dspCode = step.metadata?.input?.dsp?.code?.toUpperCase();
+
+			// VEVO ưu tiên webhook; polling CI Tool khi quá thời gian chờ.
+			if (dspCode === 'VEVO') {
+				const scheduledAt = step.metadata?.scheduledAt;
+
+				if (!scheduledAt) {
+					step.metadata = {
+						...step.metadata,
+						scheduledAt: new Date(
+							Date.now() + VEVO_WEBHOOK_WAIT_MINUTES * 60 * 1000,
+						).toISOString(),
+					};
+
+					await this.manager.save(ReleaseExecutionStep3, step);
+
+					return ReleaseExecutionStepStatus.WAITING_PARTNER;
+				}
+
+				if (new Date(scheduledAt) > new Date()) {
+					return ReleaseExecutionStepStatus.WAITING_PARTNER;
+				}
+
+				const submitStep = await this.getSiblingStepByType(
+					step,
+					ReleaseExecutionStepType.SUBMIT_VEVO_VIDEO,
+				);
+				const jobId = submitStep?.metadata?.output?.jobId;
+
+				if (!jobId) {
+					throw new Error('Missing VEVO CI Tool jobId');
+				}
+
+				try {
+					const job =
+						await this.ciToolService.getVevoReleaseJob(jobId);
+					const result =
+						await this.vevoJobResultService.processJobResult({
+							job,
+							source: 'polling',
+							waitStep: step,
+						});
+
+					if (result.terminal && result.status) {
+						return result.status;
+					}
+				} catch (error) {
+					step.metadata = {
+						...step.metadata,
+						output: {
+							...step.metadata?.output,
+							jobId,
+							lastPollError:
+								error instanceof Error
+									? error.message
+									: String(error),
+						},
+					};
+				}
+
+				step.metadata = {
+					...step.metadata,
+					scheduledAt: new Date(
+						Date.now() + VEVO_POLL_RETRY_MINUTES * 60 * 1000,
+					).toISOString(),
+					output: {
+						...step.metadata?.output,
+						jobId,
+						lastPolledAt: new Date().toISOString(),
+					},
+				};
+
+				await this.manager.save(ReleaseExecutionStep3, step);
+
+				return ReleaseExecutionStepStatus.WAITING_PARTNER;
+			}
+
 			const scheduledAt = step.metadata?.scheduledAt;
 
 			// Đã từng set lịch → cron resume gọi vào đây → done, tiếp tục pipeline
@@ -1104,7 +1207,7 @@ export class ReleaseExecution3Worker {
 		);
 	}
 
-	private async uploadMetadataToSftp({
+	private async uploadGeneratedMetadataToSftp({
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
@@ -1173,6 +1276,162 @@ export class ReleaseExecution3Worker {
 		}
 	}
 
+	private async precheckAndUploadVevoVideo({
+		step,
+		releaseExecution,
+	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		let tempDir: string | undefined;
+		try {
+			const release = releaseExecution.metadata.input.releaseSnapshot;
+			const video = release.video;
+
+			if (!video) {
+				throw new Error('Release does not contain VEVO video metadata');
+			}
+
+			if (!video?.fileId) {
+				throw new Error('VEVO video file is missing');
+			}
+
+			if (!video.isrc) {
+				throw new Error('Missing ISRC for VEVO video');
+			}
+
+			const existing = await this.ciToolService.getVevoVideoStatus({
+				isrc: video.isrc,
+			});
+
+			if (existing.found && existing.status) {
+				step.metadata = {
+					...step.metadata,
+					output: {
+						...step.metadata?.output,
+						skippedUpload: true,
+						precheck: {
+							isrc: existing.isrc,
+							status: existing.status,
+							message: existing.message,
+						},
+						checkedAt: new Date().toISOString(),
+					},
+				};
+
+				await this.manager.save(ReleaseExecutionStep3, step);
+
+				return ReleaseExecutionStepStatus.SKIPPED;
+			}
+
+			// Chưa có release trên CI Tool.
+
+			const config =
+				await this.dspRoutingService.resolveFullDeliveryConfig('VEVO');
+
+			// video.fileId đã được validate ở phía trên.
+			const fileDb = await this.manager.findOne(FileEntity, {
+				where: {
+					id: video.fileId,
+				},
+			});
+
+			if (!fileDb) {
+				throw new Error(`VEVO video file not found: ${video.fileId}`);
+			}
+
+			const remoteFileName = path.basename(fileDb.fileName);
+
+			if (!remoteFileName) {
+				throw new Error('VEVO video original file name is empty');
+			}
+
+			const remoteFileExists = await this.sftpConnectService.fileExists({
+				sftp: config.sftp,
+				remoteDir: '',
+				fileName: remoteFileName,
+			});
+
+			if (remoteFileExists) {
+				step.metadata = {
+					...step.metadata,
+					output: {
+						...step.metadata?.output,
+						remoteFileName,
+						skippedUpload: false,
+						reusedRemoteFile: true,
+						checkedAt: new Date().toISOString(),
+					},
+				};
+
+				await this.manager.save(ReleaseExecutionStep3, step);
+
+				return ReleaseExecutionStepStatus.DONE;
+			}
+
+			tempDir = await fs.promises.mkdtemp(
+				path.join(os.tmpdir(), 'vevo-video-upload-'),
+			);
+
+			const localUploadPath = path.join(tempDir, remoteFileName);
+
+			await this.bucketService2.streamFileToPath({
+				fileId: video.fileId,
+				destPath: localUploadPath,
+				onProgress: (percent) => {
+					this.logger.log(
+						`Downloading VEVO video from R2: ${percent}% - ${remoteFileName}`,
+					);
+				},
+			});
+
+			await this.sftpConnectService.uploadFile({
+				sftp: config.sftp,
+				localFile: localUploadPath,
+				remoteDir: '',
+			});
+
+			step.metadata = {
+				...step.metadata,
+				output: {
+					...step.metadata?.output,
+					remoteFileName,
+					skippedUpload: false,
+					reusedRemoteFile: false,
+					uploadedAt: new Date().toISOString(),
+				},
+			};
+
+			await this.manager.save(ReleaseExecutionStep3, step);
+
+			return ReleaseExecutionStepStatus.DONE;
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : String(error);
+
+			this.logService.error({
+				message: `[UPLOAD_METADATA_TO_SFTP][VEVO] ${message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
+			});
+
+			return ReleaseExecutionStepStatus.FAILED;
+		} finally {
+			if (tempDir) {
+				await removeFolder(tempDir);
+			}
+		}
+	}
+
+	private async uploadMetadataToSftp(
+		context: StepTaskContext,
+	): Promise<ReleaseExecutionStepStatus> {
+		const dsp = context.step.metadata?.input?.dsp;
+
+		if (dsp?.code?.trim().toUpperCase() === 'VEVO') {
+			return this.precheckAndUploadVevoVideo(context);
+		}
+
+		return this.uploadGeneratedMetadataToSftp(context);
+	}
+
 	private async syncResultToRelease({
 		step,
 		releaseExecution,
@@ -1220,88 +1479,123 @@ export class ReleaseExecution3Worker {
 				throw new Error('Missing dsp from step or parent step');
 			}
 
+			// if (dsp.code?.toUpperCase() === 'VEVO') {
+			// 	const metadataStep = await this.getSiblingStepByType(
+			// 		step,
+			// 		ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
+			// 	);
+			// 	const batchId = metadataStep?.metadata?.output?.batchId;
+			// 	const releaseReference =
+			// 		metadataStep?.metadata?.output?.releaseReference;
+
+			// 	if (!batchId) {
+			// 		throw new Error(
+			// 			'Missing batchId from CREATE_METADATA_ON_SERVER step',
+			// 		);
+			// 	}
+			// 	if (!releaseReference) {
+			// 		throw new Error('Missing ISRC for VEVO response');
+			// 	}
+
+			// 	const config =
+			// 		await this.dspRoutingService.resolveFullDeliveryConfig(
+			// 			dsp.code,
+			// 		);
+
+			// 	const response = await this.sftpConnectService.getVevoResponse({
+			// 		sftp: config.sftp,
+			// 		batchId,
+			// 		releaseReference,
+			// 	});
+
+			// 	if (!response) {
+			// 		throw new Error(
+			// 			`VEVO response not found in batch ${batchId}`,
+			// 		);
+			// 	}
+
+			// 	if (response.status === 'failure') {
+			// 		step.metadata = {
+			// 			...step.metadata,
+			// 			output: {
+			// 				...step.metadata?.output,
+			// 				vevoResponseStatus: response.status,
+			// 				vevoResponseKey: response.key,
+			// 				vevoResponse: response.content,
+			// 			},
+			// 		};
+
+			// 		await this.manager.save(ReleaseExecutionStep3, step);
+
+			// 		this.logService.error({
+			// 			message: `[SYNC_DATA_PARTNER] VEVO failed: ${this.getVevoResponseMessage(response.content)}`,
+			// 			releaseExecutionId: releaseExecution.id,
+			// 			releaseExecutionStepId: step.id,
+			// 			data: {
+			// 				vevoResponseKey: response.key,
+			// 				vevoResponse: response.content,
+			// 			},
+			// 		});
+
+			// 		return ReleaseExecutionStepStatus.FAILED;
+			// 	}
+
+			// 	step.metadata = {
+			// 		...step.metadata,
+			// 		output: {
+			// 			...step.metadata?.output,
+			// 			vevoResponseStatus: response.status,
+			// 			vevoResponseKey: response.key,
+			// 			vevoResponse: response.content,
+			// 		},
+			// 	};
+
+			// 	this.logService.success({
+			// 		message: `[SYNC_DATA_PARTNER] VEVO succeeded: ${this.getVevoResponseMessage(response.content)}`,
+			// 		releaseExecutionId: releaseExecution.id,
+			// 		releaseExecutionStepId: step.id,
+			// 	});
+
+			// 	await this.manager.save(ReleaseExecutionStep3, step);
+			// }
+
 			if (dsp.code?.toUpperCase() === 'VEVO') {
-				const metadataStep = await this.getSiblingStepByType(
-					step,
-					ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
-				);
-				const batchId = metadataStep?.metadata?.output?.batchId;
-				const releaseReference =
-					metadataStep?.metadata?.output?.releaseReference;
+				const video =
+					releaseExecution.metadata.input.releaseSnapshot.video;
 
-				if (!batchId) {
-					throw new Error(
-						'Missing batchId from CREATE_METADATA_ON_SERVER step',
-					);
-				}
-				if (!releaseReference) {
-					throw new Error('Missing ISRC for VEVO response');
+				if (!video?.isrc) {
+					throw new Error('Missing ISRC for VEVO status sync');
 				}
 
-				const config =
-					await this.dspRoutingService.resolveFullDeliveryConfig(
-						dsp.code,
-					);
-
-				const response = await this.sftpConnectService.getVevoResponse({
-					sftp: config.sftp,
-					batchId,
-					releaseReference,
+				const response = await this.ciToolService.getVevoVideoStatus({
+					isrc: video.isrc,
 				});
 
-				if (!response) {
-					throw new Error(
-						`VEVO response not found in batch ${batchId}`,
-					);
-				}
-
-				if (response.status === 'failure') {
-					step.metadata = {
-						...step.metadata,
-						output: {
-							...step.metadata?.output,
-							vevoResponseStatus: response.status,
-							vevoResponseKey: response.key,
-							vevoResponse: response.content,
-						},
-					};
-
-					await this.manager.save(ReleaseExecutionStep3, step);
-
-					this.logService.error({
-						message: `[SYNC_DATA_PARTNER] VEVO failed: ${this.getVevoResponseMessage(response.content)}`,
-						releaseExecutionId: releaseExecution.id,
-						releaseExecutionStepId: step.id,
-						data: {
-							vevoResponseKey: response.key,
-							vevoResponse: response.content,
-						},
-					});
-
-					return ReleaseExecutionStepStatus.FAILED;
-				}
+				const deliveryStatus = response.found
+					? this.mapVevoStatus(response.status)
+					: ReleaseDspStatus.ISSUES;
 
 				step.metadata = {
 					...step.metadata,
 					output: {
 						...step.metadata?.output,
-						vevoResponseStatus: response.status,
-						vevoResponseKey: response.key,
-						vevoResponse: response.content,
+						isrc: response.isrc,
+						dspCode: 'VEVO',
+						partnerStatus: response.status,
+						deliveryStatus,
+						partnerMessage: response.message,
+						checkedAt: new Date().toISOString(),
 					},
 				};
-
-				this.logService.success({
-					message: `[SYNC_DATA_PARTNER] VEVO succeeded: ${this.getVevoResponseMessage(response.content)}`,
-					releaseExecutionId: releaseExecution.id,
-					releaseExecutionStepId: step.id,
-				});
 
 				await this.manager.save(ReleaseExecutionStep3, step);
 			}
 
 			this.logService.success({
-				message: `[SYNC_DATA_PARTNER] DSP ${dsp.name} -> DISTRIBUTED`,
+				message:
+					dsp.code?.toUpperCase() === 'VEVO'
+						? `[SYNC_DATA_PARTNER] DSP ${dsp.name} -> ${step.metadata?.output?.deliveryStatus}`
+						: `[SYNC_DATA_PARTNER] DSP ${dsp.name} -> DISTRIBUTED`,
 				releaseExecutionId: releaseExecution.id,
 				releaseExecutionStepId: step.id,
 			});
@@ -1539,5 +1833,401 @@ export class ReleaseExecution3Worker {
 				status: ReleaseDspStatus.ISSUES,
 			};
 		});
+	}
+
+	private async submitVevoVideo({
+		step,
+		releaseExecution,
+	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		try {
+			const release = releaseExecution.metadata.input.releaseSnapshot;
+			const video = release.video;
+
+			if (!video?.isrc) {
+				throw new Error('Missing ISRC for VEVO submit');
+			}
+
+			// Retry: request đã được CI Tool nhận thì không gửi lại.
+			if (step.metadata?.output?.jobId) {
+				return ReleaseExecutionStepStatus.DONE;
+			}
+
+			const uploadStep = await this.getSiblingStepByType(
+				step,
+				ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP,
+			);
+
+			if (!uploadStep) {
+				throw new Error('VEVO upload step not found');
+			}
+
+			const uploadOutput = uploadStep.metadata?.output;
+
+			const remoteFileName = uploadStep.metadata?.output?.remoteFileName;
+
+			const skippedUpload =
+				uploadStep.metadata?.output?.skippedUpload === true;
+			const submitMode = skippedUpload ? 'update' : 'create';
+
+			const videoFileName = skippedUpload
+				? video.videoFile?.fileName
+				: uploadOutput?.remoteFileName;
+
+			const coverArt =
+				release.releaseCoverArts?.find((c) => c.type === 'original') ??
+				release.releaseCoverArts?.[0];
+
+			let thumbnailFileId =
+				coverArt?.fileId ?? release.coverArtThumbnails?.original;
+
+			if (!thumbnailFileId && release.id) {
+				const dbCover = await this.manager.findOne(ReleaseCoverArt, {
+					where: { releaseId: release.id },
+					order: { createdAt: 'ASC' },
+				});
+				thumbnailFileId = dbCover?.fileId;
+			}
+
+			if (!thumbnailFileId) {
+				throw new Error('Release does not contain a VEVO thumbnail');
+			}
+
+			if (!skippedUpload && !remoteFileName) {
+				throw new Error('Missing remoteFileName from VEVO upload step');
+			}
+
+			let thumbnailKey = coverArt?.file?.key;
+			if (!thumbnailKey) {
+				const thumbnailFile = await this.manager.findOne(FileEntity, {
+					where: {
+						id: thumbnailFileId,
+					},
+				});
+				thumbnailKey = thumbnailFile?.key;
+			}
+
+			if (!thumbnailKey) {
+				throw new Error(
+					`Thumbnail file not found or missing key: ${thumbnailFileId}`,
+				);
+			}
+
+			if (!videoFileName) {
+				throw new Error(
+					skippedUpload
+						? 'Missing video.videoFile.fileName for skipped VEVO upload'
+						: 'Missing remoteFileName from VEVO upload step',
+				);
+			}
+
+			const payload = await this.buildVevoSubmitPayload({
+				releaseExecution,
+				videoFileName,
+				thumbnailKey,
+			});
+
+			// Persist the exact outbound request before calling CI Tool so it is
+			// still available for inspection when the request fails (for example 422).
+			step.metadata = {
+				...step.metadata,
+				request: {
+					mode: skippedUpload ? 'update' : 'create',
+					payload,
+					requestedAt: new Date().toISOString(),
+				},
+			};
+
+			await this.manager.save(ReleaseExecutionStep3, step);
+
+			const result = skippedUpload
+				? await this.ciToolService.queueUpdateVevoRelease(payload)
+				: await this.ciToolService.queueFullVevoRelease(payload);
+
+			step.metadata = {
+				...step.metadata,
+				output: {
+					...step.metadata?.output,
+					jobId: result.jobId,
+					state: result.state,
+					waiting: result.waiting,
+					submittedAt: new Date().toISOString(),
+				},
+			};
+
+			await this.manager.save(ReleaseExecutionStep3, step);
+
+			this.logService.success({
+				message: `[SUBMIT_VEVO_VIDEO] Queued VEVO release with jobId: ${result.jobId}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
+				data: {
+					jobId: result.jobId,
+					submitMode,
+				},
+			});
+
+			return ReleaseExecutionStepStatus.DONE;
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : String(error);
+
+			this.logService.error({
+				message: `[SUBMIT_VEVO_VIDEO] ${message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
+			});
+
+			return ReleaseExecutionStepStatus.FAILED;
+		}
+	}
+
+	private async buildVevoSubmitPayload({
+		releaseExecution,
+		videoFileName,
+		thumbnailKey,
+	}: {
+		releaseExecution: ReleaseExecution3;
+		videoFileName: string;
+		thumbnailKey: string;
+	}): Promise<QueueCiToolVevoReleasePayload> {
+		const release = releaseExecution.metadata.input.releaseSnapshot;
+		const video = release.video;
+
+		if (!video?.isrc) {
+			throw new Error('Missing ISRC for VEVO submit');
+		}
+
+		// 1. Primary Artists (từ release.releaseArtists)
+		const primaryArtists = (release.releaseArtists ?? [])
+			.map((ra) => ra.artist?.name?.trim())
+			.filter((name): name is string => !!name);
+
+		// 2. Featured Artists (từ release.releaseContributors có vai trò FEATURED_ARTIST)
+		const featuredArtists = (release.releaseContributors ?? [])
+			.filter(
+				(rc) =>
+					rc.artistRole?.code === 'FEATURED_ARTIST' ||
+					rc.artistRole?.name === 'Featured Artist',
+			)
+			.map((rc) => rc.artist?.name?.trim())
+			.filter((name): name is string => !!name);
+
+		// 3. Genres (primaryGenre & subGenre của release)
+		const genres = [
+			release.primaryGenre?.name,
+			release.subGenre?.name,
+		].filter((name): name is string => !!name?.trim());
+
+		// 4. Language (từ release.releaseLanguage.audioLanguage)
+		const language =
+			release.releaseLanguage?.audioLanguage?.name?.trim() ?? '';
+
+		// 5. Territories & Monetization
+		const monetizeWorldwide = true;
+		const blockedTerritories =
+			await this.resolveBlockedTerritoryCodes(release);
+		const repertoireOwner =
+			video.copyrightOwner?.trim() ||
+			video.labelEntity?.name?.trim() ||
+			video.label?.trim() ||
+			release.label?.name?.trim() ||
+			'';
+
+		return {
+			title: release.title?.trim() ?? '',
+			primaryArtists,
+			featuredArtists,
+			genres,
+			language,
+			explicit: video.explicit ? 'Yes' : 'No',
+			containsAiContent: this.mapVevoAiContent(video.aiContent),
+			isrc: video.isrc.trim(),
+			contentProvider: video.contentProvider?.trim() ?? '',
+			label: repertoireOwner,
+			repertoireOwner,
+			channel: video.channel?.name?.trim() ?? '',
+			description: video.description?.trim() ?? '',
+			keywords: video.keywords ?? [],
+			madeForKids: this.mapVevoMadeForKids(video.madeForKids),
+			visibility: this.mapVevoVisibility(video.visibility),
+			videoFile: videoFileName,
+			thumbnailKey,
+			startTime: this.formatVevoDateTime(
+				release.releaseDate,
+				release.releaseTime,
+				release.releaseTimeMode === ReleaseTimeMode.SPECIFIC_TIMEZONE
+					? release.timeZone
+					: undefined,
+			),
+			endTime:
+				release.releaseTimeMode === ReleaseTimeMode.SPECIFIC_TIMEZONE &&
+				release.timeZone
+					? this.formatVevoDateTime(
+							release.releaseEndDate,
+							release.releaseTime,
+							release.timeZone,
+						)
+					: '',
+			monetizeWorldwide,
+			blockedTerritories,
+		};
+	}
+
+	private mapVevoAiContent(value: string | null | undefined): string {
+		switch (value) {
+			case 'ALL':
+				return 'All';
+			case 'PARTLY':
+				return 'Partly';
+			case 'NONE':
+				return 'None';
+			case 'UNDETERMINED':
+			default:
+				return 'Undetermined';
+		}
+	}
+
+	private mapVevoMadeForKids(value: string | null | undefined): string {
+		switch (value) {
+			case 'YES':
+				return 'Yes';
+			case 'NO':
+				return 'No';
+			case 'CHANNEL_DEFAULT':
+			default:
+				return 'Channel Default';
+		}
+	}
+
+	private mapVevoVisibility(value: string | null | undefined): string {
+		switch (value) {
+			case 'UNLISTED_ON_YOUTUBE':
+				return 'Unlisted on Youtube';
+
+			case 'UNLISTED_ON_VEVO':
+				return 'Unlisted on Vevo';
+
+			case 'UNLISTED_ON_YOUTUBE_VEVO':
+				return 'Unlisted on Youtube/Vevo';
+
+			case 'DEFAULT':
+			default:
+				return 'Default';
+		}
+	}
+
+	private formatVevoDateTime(
+		date: Date | string | null | undefined,
+		time: string | null | undefined,
+		timeZone: Timezone | null | undefined,
+	): string {
+		if (!date) return '';
+
+		let dateStr = '';
+		if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+			dateStr = date.slice(0, 10);
+		} else {
+			const d = new Date(date);
+			if (isNaN(d.getTime())) return '';
+			const pad = (n: number) => String(n).padStart(2, '0');
+			dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+		}
+
+		let timeStr = '00:00:00';
+		if (time) {
+			const trimmed = time.trim();
+			if (/^\d{2}:\d{2}:\d{2}$/.test(trimmed)) {
+				timeStr = trimmed;
+			} else if (/^\d{2}:\d{2}$/.test(trimmed)) {
+				timeStr = `${trimmed}:00`;
+			}
+		}
+
+		const offset = timeZone?.utc?.trim();
+		if (offset && /^[+-]\d{2}:\d{2}$/.test(offset)) {
+			return `${dateStr}T${timeStr}${offset}`;
+		}
+
+		return `${dateStr}T${timeStr}`;
+	}
+
+	// private resolveMonetizeWorldwide(release: Release): boolean {
+	// 	const territory = release.releaseTerritory;
+	// 	if (!territory || territory.distributeWorldwide) {
+	// 		return true;
+	// 	}
+	// 	if (
+	// 		territory.distributionType ===
+	// 		DistributionType.DISTRIBUTE_EVERYWHERE_EXCEPT
+	// 	) {
+	// 		return true;
+	// 	}
+	// 	return false;
+	// }
+
+	private async resolveBlockedTerritoryCodes(
+		release: Release,
+	): Promise<string[]> {
+		const territory = release.releaseTerritory;
+		if (!territory || territory.distributeWorldwide) {
+			return [];
+		}
+
+		const selectedIds = territory.selectedCountries ?? [];
+		if (selectedIds.length === 0) {
+			return [];
+		}
+
+		if (
+			territory.distributionType ===
+			DistributionType.DISTRIBUTE_EVERYWHERE_EXCEPT
+		) {
+			const countries = await this.manager.find(Country, {
+				where: { id: In(selectedIds) },
+				select: { iso2: true },
+			});
+			return countries.map((c) => c.iso2).filter(Boolean);
+		}
+
+		if (
+			territory.distributionType === DistributionType.DISTRIBUTE_ONLY_IN
+		) {
+			const allCountries = await this.manager.find(Country, {
+				select: { id: true, iso2: true },
+			});
+			const allowedSet = new Set(selectedIds);
+			return allCountries
+				.filter((c) => !allowedSet.has(c.id))
+				.map((c) => c.iso2)
+				.filter(Boolean);
+		}
+
+		return [];
+	}
+
+	private mapVevoStatus(
+		status: BackStageVideoStatus | null,
+	): ReleaseDspStatus {
+		switch (status) {
+			case BackStageVideoStatus.ACTIVE:
+				return ReleaseDspStatus.DISTRIBUTED;
+
+			case BackStageVideoStatus.UNRELEASED:
+				return ReleaseDspStatus.UNRELEASED;
+
+			case BackStageVideoStatus.PROCESSING:
+			case BackStageVideoStatus.IN_REVIEW:
+				return ReleaseDspStatus.PROCESSING;
+
+			case BackStageVideoStatus.EXPIRED:
+			case BackStageVideoStatus.DELETED:
+				return ReleaseDspStatus.TAKEN_DOWN;
+
+			case BackStageVideoStatus.NEEDS_ATTENTION:
+			case BackStageVideoStatus.INACTIVE:
+			case BackStageVideoStatus.UNKNOWN:
+			default:
+				return ReleaseDspStatus.ISSUES;
+		}
 	}
 }

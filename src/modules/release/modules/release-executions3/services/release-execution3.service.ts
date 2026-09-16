@@ -91,6 +91,10 @@ export class ReleaseExecution3Service {
 		}
 	}
 
+	async resumeExecution(releaseExecutionId: string): Promise<void> {
+		await this.queueService.queueRunPipeline(releaseExecutionId);
+	}
+
 	// main
 	async startProcessing(id: string): Promise<void> {
 		const execution = await this.queryService.findOne(id);

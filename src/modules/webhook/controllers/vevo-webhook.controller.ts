@@ -19,8 +19,10 @@ import {
 	CreateVevoChannelDto,
 	VevoChannelCallbackDto,
 } from '../../channel/dto/vevo.dto';
+import { VevoQueueWebhookDto } from '../dto/vevo-queue-webhook.dto';
 import { VevoVideoNotificationDto } from '../dto/vevo-video-notification.dto';
 import { VevoCallbackApiKeyGuard } from '../guards/vevo-callback-api-key.guard';
+import { VevoQueueWebhookSecretGuard } from '../guards/vevo-queue-webhook-secret.guard';
 import { WebhookService } from '../webhook.service';
 
 @ApiTags('Vevo')
@@ -75,6 +77,30 @@ export class VevoWebhookController {
 			await this.webhookService.handleVevoVideoNotificationCallback(
 				payload,
 			);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@PublicRoute()
+	@Post('callback/queue')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(VevoQueueWebhookSecretGuard)
+	@ApiOperation({
+		summary: 'Receive VEVO queue job callback from CI Tool',
+	})
+	@ApiHeader({
+		name: 'x-vevo-secret',
+		required: true,
+		description: 'Shared secret between CI Tool and release server',
+	})
+	@ApiBody({ type: VevoQueueWebhookDto })
+	@ApiResponse({
+		status: 200,
+		description: 'VEVO queue callback received',
+	})
+	async handleVevoQueueCallback(@Body() payload: VevoQueueWebhookDto) {
+		const result =
+			await this.webhookService.handleVevoQueueCallback(payload);
+
 		return new ResponseSuccess({ data: result });
 	}
 }
