@@ -183,39 +183,73 @@ export class ReleaseExecution3Builder {
 				break;
 			}
 
-			case ReleaseExecutionStepType.PROCESS_DIRECT_CHILD:
-				stepResult.push(
-					{
-						type: ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
-						order: 1,
-						metadata: { input: { dsp: STEP.metadata?.input?.dsp } },
-					},
-					{
-						type: ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP,
-						order: 2,
-						metadata: { input: { dsp: STEP.metadata?.input?.dsp } },
-					},
-					{
-						type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
-						order: 3,
-						metadata: {
-							input: {
-								dsp: STEP.metadata?.input?.dsp,
-								waitMinutes: DEFAULT_WAIT_MINUTES,
+			case ReleaseExecutionStepType.PROCESS_DIRECT_CHILD: {
+				const dsp: Dsp | undefined = STEP.metadata?.input?.dsp;
+				const isVevo = dsp?.code?.trim().toUpperCase() === 'VEVO';
+
+				if (isVevo) {
+					stepResult.push(
+						{
+							type: ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP,
+							order: 1,
+							metadata: { input: { dsp } },
+						},
+						{
+							type: ReleaseExecutionStepType.SUBMIT_VEVO_VIDEO,
+							order: 2,
+							metadata: { input: { dsp } },
+						},
+						{
+							type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
+							order: 3,
+							metadata: { input: { dsp } },
+						},
+						{
+							type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
+							order: 4,
+							metadata: { input: { dsp } },
+						},
+					);
+					break;
+				} else {
+					stepResult.push(
+						{
+							type: ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
+							order: 1,
+							metadata: {
+								input: { dsp: STEP.metadata?.input?.dsp },
 							},
 						},
-					},
-					{
-						type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
-						order: 4,
-						metadata: {
-							input: {
-								dsp: STEP.metadata?.input?.dsp,
+						{
+							type: ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP,
+							order: 2,
+							metadata: {
+								input: { dsp: STEP.metadata?.input?.dsp },
 							},
 						},
-					},
-				);
-				break;
+						{
+							type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
+							order: 3,
+							metadata: {
+								input: {
+									dsp: STEP.metadata?.input?.dsp,
+									waitMinutes: DEFAULT_WAIT_MINUTES,
+								},
+							},
+						},
+						{
+							type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
+							order: 4,
+							metadata: {
+								input: {
+									dsp: STEP.metadata?.input?.dsp,
+								},
+							},
+						},
+					);
+					break;
+				}
+			}
 
 			case ReleaseExecutionStepType.PROCESS_AGG: {
 				stepResult.push({

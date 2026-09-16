@@ -8,6 +8,7 @@ import { UserReq } from 'src/common/interface/common.interface';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { MultipartUploadConfig } from 'src/modules/app-config/interfaces/app-config.type';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
+import { Transform } from 'stream';
 import { pipeline } from 'stream/promises';
 import { DataSource } from 'typeorm';
 import { FolderBucketMap } from '../constants/bucket.constant';
@@ -848,9 +849,11 @@ export class BucketService2 {
 	async streamFileToPath({
 		fileId,
 		destPath,
+		onProgress,
 	}: {
 		fileId: string;
 		destPath: string;
+		onProgress?: (percent: number) => void;
 	}): Promise<FileEntity> {
 		const fileDb = await this.bucketFileService.findOne(fileId);
 
@@ -860,7 +863,36 @@ export class BucketService2 {
 		});
 
 		const writeStream = fs.createWriteStream(destPath);
-		await pipeline(stream, writeStream);
+		const totalBytes = Number(fileDb.fileSize) || 0;
+		let downloadedBytes = 0;
+		let lastReportedPercent = -1;
+
+		const progressStream = new Transform({
+			transform(chunk, _encoding, callback) {
+				downloadedBytes += chunk.length;
+
+				if (totalBytes > 0) {
+					const percent = Math.min(
+						100,
+						Math.floor((downloadedBytes / totalBytes) * 100),
+					);
+					const reportPercent = Math.floor(percent / 5) * 5;
+
+					if (reportPercent > lastReportedPercent) {
+						lastReportedPercent = reportPercent;
+						onProgress?.(reportPercent);
+					}
+				}
+
+				callback(null, chunk);
+			},
+		});
+
+		await pipeline(stream, progressStream, writeStream);
+
+		if (lastReportedPercent < 100) {
+			onProgress?.(100);
+		}
 
 		return fileDb;
 	}

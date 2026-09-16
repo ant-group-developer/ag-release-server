@@ -97,6 +97,7 @@ import { ReleaseExecution3CronJobService } from './modules/release-executions3/s
 import { ReleaseExecutionStepEngine } from './modules/release-executions3/services/release-execution3.engine';
 import { ReleaseExecution3QueryService } from './modules/release-executions3/services/release-execution3.query.service';
 import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
+import { VevoJobResultService } from './modules/release-executions3/services/vevo-job-result.service';
 
 import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3/entites/release-execution3.queue.entity';
 import { ReleaseExecution3WorkerTest } from './modules/release-executions3/services/release-execution3-test.worker';
@@ -220,6 +221,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseExecution3Queue,
 		ReleaseExecution3Consumer,
 		ReleaseExecution3Worker,
+		VevoJobResultService,
 		CiDistributionJob3Service,
 		ReleaseExecution3WorkerTest,
 	],
@@ -233,6 +235,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseExecution3CronJobService,
 		ReleaseExecution3Service,
 		ReleaseExecution3ResultService,
+		VevoJobResultService,
 		ReleaseDspDeliveryService,
 	],
 })

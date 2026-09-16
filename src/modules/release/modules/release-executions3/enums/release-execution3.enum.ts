@@ -49,6 +49,9 @@ export enum ReleaseExecutionStepType {
 	// WAIT_PARTNER_PROCESS = 'WAIT_PARTNER_PROCESS',
 	SYNC_DATA_PARTNER = 'SYNC_DATA_PARTNER',
 
+	// === Vevo ===
+	SUBMIT_VEVO_VIDEO = 'SUBMIT_VEVO_VIDEO',
+
 	// === CI Aggregator ===
 	PROCESS_AGG = 'PROCESS_AGG',
 	PROCESS_AGG_CI = 'PROCESS_AGG_CI',
