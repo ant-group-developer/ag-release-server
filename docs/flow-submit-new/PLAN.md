@@ -103,6 +103,7 @@ Mỗi phase phải:
 
 ## Tài liệu phase
 
+- [REVIEW-GUIDE.md](REVIEW-GUIDE.md)
 - [00-architecture-decisions.md](00-architecture-decisions.md)
 - [01-foundation-module-schema.md](01-foundation-module-schema.md)
 - [02-domain-state-machine.md](02-domain-state-machine.md)
