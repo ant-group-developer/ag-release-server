@@ -40,4 +40,18 @@ export class DistributionV2ConfigService {
 			2_000,
 		);
 	}
+
+	getPackageLeaseMs(): number {
+		return this.config.get<number>(
+			'DISTRIBUTION_V2_PACKAGE_LEASE_MS',
+			15 * 60 * 1000,
+		);
+	}
+
+	getPackageRetentionMs(): number {
+		return this.config.get<number>(
+			'DISTRIBUTION_V2_PACKAGE_RETENTION_MS',
+			30 * 24 * 60 * 60 * 1000,
+		);
+	}
 }

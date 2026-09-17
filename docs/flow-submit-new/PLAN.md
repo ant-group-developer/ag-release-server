@@ -69,7 +69,7 @@ Không thay đổi logic, queue, cron, bảng dữ liệu hoặc endpoint của:
 | 02 | Domain state machine | ✅ Code hoàn tất; domain test/build/lint xanh |
 | 03 | Submit, snapshot, review | 🟡 Code hoàn tất; chờ chạy migration 1789100000000 |
 | 04 | UPC/ISRC provisioning | 🟡 Code hoàn tất; chờ migration và generator contract rollout |
-| 05 | Package build/storage | ⬜ Chưa triển khai |
+| 05 | Package build/storage | 🟡 Code hoàn tất; chờ nghiệm thu shared volume/worker |
 | 06 | Direct DSP SFTP | ⬜ Chưa triển khai |
 | 07 | CI import/QA | ⬜ Chưa triển khai |
 | 08 | Batch export CI/State51 | ⬜ Chưa triển khai |

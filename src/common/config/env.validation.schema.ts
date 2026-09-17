@@ -124,6 +124,16 @@ export const envValidationSchema = Joi.object({
 		.min(250)
 		.max(60000)
 		.default(2000),
+	DISTRIBUTION_V2_PACKAGE_LEASE_MS: Joi.number()
+		.integer()
+		.min(60_000)
+		.max(86_400_000)
+		.default(900_000),
+	DISTRIBUTION_V2_PACKAGE_RETENTION_MS: Joi.number()
+		.integer()
+		.min(0)
+		.max(31_536_000_000)
+		.default(2_592_000_000),
 
 	// Cloudflare SaaS + OAuth (custom domain feature).
 	CF_API_TOKEN: Joi.string().allow('').optional(),
