@@ -65,8 +65,8 @@ Không thay đổi logic, queue, cron, bảng dữ liệu hoặc endpoint của:
 | Phase | Nội dung | Trạng thái |
 |---|---|---|
 | 00 | Architecture decisions | ✅ Tài liệu |
-| 01 | Module, worker, schema | ⬜ Chưa triển khai |
-| 02 | Domain state machine | ⬜ Chưa triển khai |
+| 01 | Module, worker, schema | 🟡 Code hoàn tất; chờ apply migration/integration DB |
+| 02 | Domain state machine | ✅ Code hoàn tất; domain test/build/lint xanh |
 | 03 | Submit, snapshot, review | ⬜ Chưa triển khai |
 | 04 | UPC/ISRC provisioning | ⬜ Chưa triển khai |
 | 05 | Package build/storage | ⬜ Chưa triển khai |
@@ -115,4 +115,3 @@ Mỗi phase phải:
 - [09-status-sync-retry-takedown.md](09-status-sync-retry-takedown.md)
 - [10-read-model-observability.md](10-read-model-observability.md)
 - [11-rollout-cutover.md](11-rollout-cutover.md)
-

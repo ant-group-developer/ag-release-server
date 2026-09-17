@@ -111,3 +111,22 @@ PENDING → PROCESSING(request)
 
 Domain test chạy không cần database/Redis/external service.
 
+## Trạng thái triển khai
+
+Đã triển khai trong `src/modules/distribution-v2/domain/`:
+
+- `Distribution` aggregate và reducer thuần.
+- `ChannelDelivery` và reducer trạng thái channel.
+- `DistributionPolicy`, `RetryPolicy` và domain error.
+- Domain event contract với event id deterministic.
+- Idempotency ở aggregate và channel qua `lastCommandId`.
+- `WAITING_EXTERNAL` bắt buộc `waitReason` và `scheduledAt` hợp lệ.
+- `RESUBMIT` tạo lại snapshot/channel state từ `ACTION_REQUIRED`.
+
+Test:
+
+```text
+13 domain/foundation tests passed
+npm run build passed
+eslint src/modules/distribution-v2/domain passed
+```
