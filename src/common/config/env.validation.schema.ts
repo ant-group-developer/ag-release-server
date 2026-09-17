@@ -101,6 +101,20 @@ export const envValidationSchema = Joi.object({
 	REDIS_PORT: Joi.number().default(6379),
 	REDIS_PASSWORD: Joi.string().allow('').default(''),
 
+	// Distribution-v2 (disabled by default; worker/API use isolated schema and queues)
+	DISTRIBUTION_V2_ENABLED: Joi.boolean().default(false),
+	DISTRIBUTION_V2_QUEUE_PREFIX: Joi.string()
+		.default('distribution-v2')
+		.pattern(/^[a-z0-9][a-z0-9.-]*$/),
+	DISTRIBUTION_V2_PACKAGE_SHARED_ROOT: Joi.string().default(
+		'/var/lib/ag-release/distribution-v2',
+	),
+	DISTRIBUTION_V2_WORKER_CONCURRENCY: Joi.number()
+		.integer()
+		.min(1)
+		.max(100)
+		.default(4),
+
 	// Cloudflare SaaS + OAuth (custom domain feature).
 	CF_API_TOKEN: Joi.string().allow('').optional(),
 	CF_ZONE_ID: Joi.string().allow('').optional(),
