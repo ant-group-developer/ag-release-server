@@ -1431,6 +1431,20 @@ export class ReleaseService {
 			return ReleaseStatus.PROCESSING;
 		}
 
+		const hasUnreleased = statuses.includes(ReleaseDspStatus.UNRELEASED);
+
+		const allUnreleased = statuses.every(
+			(status) => status === ReleaseDspStatus.UNRELEASED,
+		);
+
+		if (allUnreleased) {
+			return ReleaseStatus.UNRELEASED;
+		}
+
+		if (hasUnreleased) {
+			return ReleaseStatus.PROCESSING;
+		}
+
 		const hasDistributed = statuses.includes(ReleaseDspStatus.DISTRIBUTED);
 		const hasTakenDown = statuses.includes(ReleaseDspStatus.TAKEN_DOWN);
 		const hasIssues = statuses.includes(ReleaseDspStatus.ISSUES);

@@ -1,8 +1,13 @@
 // services/release-dsp-delivery.service.ts
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { TenantDspAgreementService } from 'src/modules/dsp/services/dsp-tenant.service';
+import { CiToolService } from 'src/modules/partners-api/ci-tool/ci-tool.service';
+import { BackStageVideoStatus } from 'src/modules/partners-api/ci/interfaces/vevo-video.interface';
 import {
 	CiDspStatus,
 	CiExportService,
@@ -18,11 +23,15 @@ import {
 import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
 import { Release } from '../../entities/release.entity';
 import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
+import { ReleaseStatus, ReleaseTimeMode } from '../../enum/release.enum';
 import { TakedownEligibilityResult } from '../../interfaces/takedown.interface';
 import { ReleaseService } from '../release.service';
 import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
 
 type SyncStatusSkipReason = 'STALE_DESIRE';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 @Injectable()
 export class ReleaseDspDeliveryService {
@@ -46,6 +55,7 @@ export class ReleaseDspDeliveryService {
 		private readonly releaseService: ReleaseService,
 
 		private readonly ciExportService: CiExportService,
+		private readonly ciToolService: CiToolService,
 	) {}
 	// ==================== Delivery orchestration ====================
 
@@ -828,6 +838,97 @@ export class ReleaseDspDeliveryService {
 		};
 	}
 
+	async syncStatusFromVevo(releaseId: string) {
+		const result = await this.getVevoDeliveryStatus(releaseId);
+
+		await this.updateDeliveryStatus({
+			releaseIds: [releaseId],
+			items: [
+				{
+					dspCode: 'VEVO',
+					status: result.deliveryStatus,
+				},
+			],
+			stampLastEnqueuedAt: false,
+		});
+
+		this.logger.log(
+			`[syncStatusFromVevo] releaseId=${releaseId}, ` +
+				`isrc=${result.isrc}, ` +
+				`partnerStatus=${result.partnerStatus ?? 'not_found'}, ` +
+				`deliveryStatus=${result.deliveryStatus}`,
+		);
+
+		return result;
+	}
+
+	async getVevoDeliveryStatus(releaseId: string) {
+		const release = await this.releaseRepo.findOne({
+			where: {
+				id: releaseId,
+			},
+			relations: ['video'],
+		});
+
+		if (!release) {
+			throw new Error(`Release not found: ${releaseId}`);
+		}
+
+		if (release.type !== 'video') {
+			throw new Error(`Release is not video: ${releaseId}`);
+		}
+
+		const isrc = release.video?.isrc?.trim();
+
+		if (!isrc) {
+			throw new Error(`Missing ISRC for VEVO release: ${releaseId}`);
+		}
+
+		const response = await this.ciToolService.getVevoVideoStatus({
+			isrc,
+		});
+
+		const deliveryStatus = response.found
+			? this.mapVevoStatusToReleaseDspStatus(response.status)
+			: ReleaseDspStatus.ISSUES;
+
+		return {
+			releaseId,
+			isrc,
+			found: response.found,
+			partnerStatus: response.status,
+			deliveryStatus,
+			message: response.message,
+			checkedAt: new Date().toISOString(),
+		};
+	}
+
+	private mapVevoStatusToReleaseDspStatus(
+		status: BackStageVideoStatus | null,
+	): ReleaseDspStatus {
+		switch (status) {
+			case BackStageVideoStatus.ACTIVE:
+				return ReleaseDspStatus.DISTRIBUTED;
+
+			case BackStageVideoStatus.UNRELEASED:
+				return ReleaseDspStatus.UNRELEASED;
+
+			case BackStageVideoStatus.PROCESSING:
+			case BackStageVideoStatus.IN_REVIEW:
+				return ReleaseDspStatus.PROCESSING;
+
+			case BackStageVideoStatus.EXPIRED:
+			case BackStageVideoStatus.DELETED:
+				return ReleaseDspStatus.TAKEN_DOWN;
+
+			case BackStageVideoStatus.NEEDS_ATTENTION:
+			case BackStageVideoStatus.INACTIVE:
+			case BackStageVideoStatus.UNKNOWN:
+			default:
+				return ReleaseDspStatus.ISSUES;
+		}
+	}
+
 	private resolveCiSyncSkipReason(input: {
 		ciStatus: CiDspStatus;
 		lastEnqueuedAt: Date | null;
@@ -850,5 +951,61 @@ export class ReleaseDspDeliveryService {
 		}
 
 		return null;
+	}
+
+	async syncDueUnreleasedStatuses() {
+		const now = dayjs();
+		const today = now.format('YYYY-MM-DD');
+
+		const releases = await this.releaseRepo
+			.createQueryBuilder('release')
+			.leftJoinAndSelect('release.timeZone', 'timeZone')
+			.where('release.status = :status', {
+				status: ReleaseStatus.UNRELEASED,
+			})
+			.andWhere('release.releaseDate IS NOT NULL')
+			.andWhere('release.releaseDate <= :today', {
+				today,
+			})
+			.orderBy('release.updatedAt', 'ASC')
+			.take(100)
+			.getMany();
+
+		for (const release of releases) {
+			const releaseDate = dayjs(release.releaseDate).format('YYYY-MM-DD');
+			let releaseAt: dayjs.Dayjs;
+
+			if (
+				release.releaseTimeMode === ReleaseTimeMode.SPECIFIC_TIMEZONE &&
+				release.releaseTime &&
+				release.timeZone?.zone
+			) {
+				const utcOffset = release.timeZone.utc.replace('UTC', '');
+
+				releaseAt = dayjs(
+					`${releaseDate}T${release.releaseTime}${utcOffset}`,
+				);
+			} else {
+				releaseAt = dayjs(`${releaseDate}T00:00:00`);
+			}
+
+			if (!releaseAt.isValid() || now.isBefore(releaseAt)) {
+				continue;
+			}
+
+			try {
+				if (release.type === 'video') {
+					await this.syncStatusFromVevo(release.id);
+				} else {
+					await this.syncStatusFromCi(release.id);
+				}
+			} catch (error) {
+				this.logger.error(
+					`[UNRELEASED_STATUS_SYNC] releaseId=${release.id}: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				);
+			}
+		}
 	}
 }

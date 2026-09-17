@@ -17,6 +17,7 @@ const RELEASE_DSP_STATUS_PRIORITY: Record<ReleaseDspStatus, number> = {
 	[ReleaseDspStatus.DISTRIBUTED]: 1,
 	[ReleaseDspStatus.TAKEN_DOWN]: 1,
 	[ReleaseDspStatus.ISSUES]: 1,
+	[ReleaseDspStatus.UNRELEASED]: 1,
 	[ReleaseDspStatus.PROCESSING]: 2,
 	[ReleaseDspStatus.NEVER_DISTRIBUTED]: 3,
 	[ReleaseDspStatus.DRAFT]: 4,

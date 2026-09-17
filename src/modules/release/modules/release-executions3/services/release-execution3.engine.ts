@@ -396,6 +396,26 @@ export class ReleaseExecutionStepEngine {
 				: null;
 		}
 
+		if (
+			step.type === ReleaseExecutionStepType.PROCESS_DIRECT_CHILD &&
+			step.metadata?.input?.dsp?.code?.toUpperCase() === 'VEVO'
+		) {
+			const syncStep = step.childSteps?.find(
+				(child) =>
+					child.type === ReleaseExecutionStepType.SYNC_DATA_PARTNER,
+			);
+
+			const deliveryStatus = syncStep?.metadata?.output?.deliveryStatus;
+
+			if (
+				Object.values(ReleaseDspStatus).includes(
+					deliveryStatus as ReleaseDspStatus,
+				)
+			) {
+				return deliveryStatus as ReleaseDspStatus;
+			}
+		}
+
 		// Delivery step hoàn tất thành công thì DSP được xem là đã phân phối.
 		if (stepStatus === ReleaseExecutionStepStatus.DONE) {
 			return executionType === ExecutionType.TAKEDOWN

@@ -8,6 +8,7 @@ import { AppConfigService } from '../app-config/app-config.service';
 import { DatabaseBackupService } from '../database/services/database.backup.service';
 import { DspReportService } from '../dsp-report/services/dsp-report.service';
 import { ReleaseExecution3CronJobService } from '../release/modules/release-executions3/services/release-execution3.cron-job.service';
+import { ReleaseDspDeliveryService } from '../release/services/release-dsp-services/release-dsp-delivery.service';
 
 @Injectable()
 export class ScheduleService implements OnApplicationBootstrap {
@@ -21,6 +22,7 @@ export class ScheduleService implements OnApplicationBootstrap {
 
 		private readonly releaseExecution3CronJobService: ReleaseExecution3CronJobService,
 		private readonly dspReportService: DspReportService,
+		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 	) {}
 
 	onApplicationBootstrap() {
@@ -178,6 +180,21 @@ export class ScheduleService implements OnApplicationBootstrap {
 			this.logger.error(
 				`[CRON] refreshDspReportStats failed: ${(err as Error).message}`,
 				(err as Error).stack,
+			);
+		}
+	}
+
+	@Cron('*/1 * * * *') // tạm thời mỗi 5 phút để test
+	// @Cron('0 * * * *') // mỗi giờ, vào phút 0
+	async syncDueUnreleasedStatuses() {
+		try {
+			await this.releaseDspDeliveryService.syncDueUnreleasedStatuses();
+		} catch (error) {
+			this.logger.error(
+				`[CRON] Sync due unreleased statuses failed: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+				error instanceof Error ? error.stack : undefined,
 			);
 		}
 	}
