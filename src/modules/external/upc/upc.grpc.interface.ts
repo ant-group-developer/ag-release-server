@@ -353,6 +353,16 @@ export class GetUpcRequest {
 	@IsOptional()
 	@IsString()
 	description?: string;
+
+	/** Additive idempotency context used by distribution-v2. */
+	@IsOptional()
+	@IsString()
+	requestId?: string;
+
+	/** Additive source context used by distribution-v2. */
+	@IsOptional()
+	@IsString()
+	releaseId?: string;
 }
 
 export interface GetUpcResponse {

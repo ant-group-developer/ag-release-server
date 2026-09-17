@@ -14,6 +14,7 @@ export type DistributionV2EventType =
 	| 'distribution.review_rejected'
 	| 'distribution.resubmitted'
 	| 'distribution.ids_provisioned'
+	| 'distribution.source_identifiers_synced'
 	| 'distribution.package_built'
 	| 'distribution.retry_requested'
 	| 'distribution.completed'

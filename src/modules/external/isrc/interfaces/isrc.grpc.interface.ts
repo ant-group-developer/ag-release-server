@@ -62,6 +62,10 @@ export interface CreateIsrc {
 	duration: number;
 	isAdded: boolean;
 	prefixIsrcId: string;
+	/** Additive idempotency context used by distribution-v2. */
+	requestId?: string;
+	/** Additive source context used by distribution-v2. */
+	trackId?: string;
 }
 
 export interface CreateIsrcResponse {

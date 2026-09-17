@@ -68,7 +68,7 @@ Không thay đổi logic, queue, cron, bảng dữ liệu hoặc endpoint của:
 | 01 | Module, worker, schema | 🟡 Migration đã apply; integration DB test còn pending |
 | 02 | Domain state machine | ✅ Code hoàn tất; domain test/build/lint xanh |
 | 03 | Submit, snapshot, review | 🟡 Code hoàn tất; chờ chạy migration 1789100000000 |
-| 04 | UPC/ISRC provisioning | ⬜ Chưa triển khai |
+| 04 | UPC/ISRC provisioning | 🟡 Code hoàn tất; chờ migration và generator contract rollout |
 | 05 | Package build/storage | ⬜ Chưa triển khai |
 | 06 | Direct DSP SFTP | ⬜ Chưa triển khai |
 | 07 | CI import/QA | ⬜ Chưa triển khai |

@@ -22,7 +22,9 @@ export const DISTRIBUTION_V2_QUEUE_NAMES = [
 export type DistributionV2QueueName =
 	(typeof DISTRIBUTION_V2_QUEUE_NAMES)[number];
 
-function connectionOptions(redis: Redis): ConnectionOptions {
+export function distributionV2ConnectionOptions(
+	redis: Redis,
+): ConnectionOptions {
 	const options = redis.options;
 	return {
 		host: options.host,
@@ -42,7 +44,7 @@ export class DistributionV2QueueService implements OnModuleDestroy {
 		@InjectRedis() redis: Redis,
 		private readonly config: DistributionV2ConfigService,
 	) {
-		this.connection = connectionOptions(redis);
+		this.connection = distributionV2ConnectionOptions(redis);
 	}
 
 	getQueue(name: DistributionV2QueueName): Queue {

@@ -26,4 +26,18 @@ export class DistributionV2ConfigService {
 	getWorkerConcurrency(): number {
 		return this.config.get<number>('DISTRIBUTION_V2_WORKER_CONCURRENCY', 4);
 	}
+
+	getGeneratorRequestTimeoutMs(): number {
+		return this.config.get<number>(
+			'DISTRIBUTION_V2_GENERATOR_REQUEST_TIMEOUT_MS',
+			30_000,
+		);
+	}
+
+	getOutboxPollIntervalMs(): number {
+		return this.config.get<number>(
+			'DISTRIBUTION_V2_OUTBOX_POLL_INTERVAL_MS',
+			2_000,
+		);
+	}
 }
