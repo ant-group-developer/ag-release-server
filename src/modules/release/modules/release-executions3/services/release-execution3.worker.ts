@@ -15,10 +15,7 @@ import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-c
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { CiToolService } from 'src/modules/partners-api/ci-tool/ci-tool.service';
-import {
-	BackStageVideoStatus,
-	QueueCiToolVevoReleasePayload,
-} from 'src/modules/partners-api/ci/interfaces/vevo-video.interface';
+import { QueueCiToolVevoReleasePayload } from 'src/modules/partners-api/ci/interfaces/vevo-video.interface';
 import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.service';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
@@ -29,6 +26,7 @@ import { ReleaseErrorType } from 'src/modules/release/modules/release-errors/ent
 import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
 import { ReleaseReviewService } from 'src/modules/release/modules/release-reviews/services/release-review.service';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
+import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
@@ -81,6 +79,7 @@ export class ReleaseExecution3Worker {
 		private readonly ciToolService: CiToolService,
 		private readonly vevoJobResultService: VevoJobResultService,
 		private readonly bucketService2: BucketService2,
+		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 
 		// @Inject(forwardRef(() => CiDistributionJobService))
 		private readonly ciJobService: CiDistributionJob3Service,
@@ -1560,31 +1559,21 @@ export class ReleaseExecution3Worker {
 			// }
 
 			if (dsp.code?.toUpperCase() === 'VEVO') {
-				const video =
-					releaseExecution.metadata.input.releaseSnapshot.video;
-
-				if (!video?.isrc) {
-					throw new Error('Missing ISRC for VEVO status sync');
-				}
-
-				const response = await this.ciToolService.getVevoVideoStatus({
-					isrc: video.isrc,
-				});
-
-				const deliveryStatus = response.found
-					? this.mapVevoStatus(response.status)
-					: ReleaseDspStatus.ISSUES;
+				const result =
+					await this.releaseDspDeliveryService.getVevoDeliveryStatus(
+						releaseExecution.releaseId,
+					);
 
 				step.metadata = {
 					...step.metadata,
 					output: {
 						...step.metadata?.output,
-						isrc: response.isrc,
+						isrc: result.isrc,
 						dspCode: 'VEVO',
-						partnerStatus: response.status,
-						deliveryStatus,
-						partnerMessage: response.message,
-						checkedAt: new Date().toISOString(),
+						partnerStatus: result.partnerStatus,
+						deliveryStatus: result.deliveryStatus,
+						partnerMessage: result.message,
+						checkedAt: result.checkedAt,
 					},
 				};
 
@@ -2203,31 +2192,5 @@ export class ReleaseExecution3Worker {
 		}
 
 		return [];
-	}
-
-	private mapVevoStatus(
-		status: BackStageVideoStatus | null,
-	): ReleaseDspStatus {
-		switch (status) {
-			case BackStageVideoStatus.ACTIVE:
-				return ReleaseDspStatus.DISTRIBUTED;
-
-			case BackStageVideoStatus.UNRELEASED:
-				return ReleaseDspStatus.UNRELEASED;
-
-			case BackStageVideoStatus.PROCESSING:
-			case BackStageVideoStatus.IN_REVIEW:
-				return ReleaseDspStatus.PROCESSING;
-
-			case BackStageVideoStatus.EXPIRED:
-			case BackStageVideoStatus.DELETED:
-				return ReleaseDspStatus.TAKEN_DOWN;
-
-			case BackStageVideoStatus.NEEDS_ATTENTION:
-			case BackStageVideoStatus.INACTIVE:
-			case BackStageVideoStatus.UNKNOWN:
-			default:
-				return ReleaseDspStatus.ISSUES;
-		}
 	}
 }
