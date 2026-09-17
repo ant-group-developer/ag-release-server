@@ -4,7 +4,11 @@ import { ChannelService } from '../channel/services/channel.service';
 import { VevoService } from '../channel/services/vevo.service';
 import { LogModule } from '../log/entites/logs.entity';
 import { LogsService } from '../log/services/logs.services';
+import { ReleaseExecutionStepStatus } from '../release/modules/release-executions3/enums/release-execution3.enum';
+import { ReleaseExecution3Service } from '../release/modules/release-executions3/services/release-execution3.service';
+import { VevoJobResultService } from '../release/modules/release-executions3/services/vevo-job-result.service';
 import { VideoService } from '../video/video.service';
+import { VevoQueueWebhookDto } from './dto/vevo-queue-webhook.dto';
 import {
 	VevoVideoNotificationDto,
 	VevoVideoNotificationStage,
@@ -17,6 +21,8 @@ export class WebhookService {
 		private readonly vevoService: VevoService,
 		private readonly videoService: VideoService,
 		private readonly logsService: LogsService,
+		private readonly releaseExecution3Service: ReleaseExecution3Service,
+		private readonly vevoJobResultService: VevoJobResultService,
 	) {}
 
 	createVevoChannel(channelName: string) {
@@ -79,5 +85,50 @@ export class WebhookService {
 		});
 
 		return result;
+	}
+
+	async handleVevoQueueCallback(payload: VevoQueueWebhookDto) {
+		const jobId = payload.id;
+		const result = await this.vevoJobResultService.processJobResult({
+			job: payload,
+			source: 'webhook',
+		});
+
+		if (
+			result.terminal &&
+			!result.duplicate &&
+			result.releaseExecutionId &&
+			result.status !== ReleaseExecutionStepStatus.WAITING_PARTNER
+		) {
+			await this.releaseExecution3Service.resumeExecution(
+				result.releaseExecutionId,
+			);
+		}
+
+		this.logsService.log({
+			module: LogModule.VEVO_WEBHOOK,
+			message: result.success
+				? `[QUEUE_COMPLETED] VEVO job succeeded: ${jobId}`
+				: result.matched
+					? `[QUEUE_FAILED] VEVO job failed: ${jobId}`
+					: `[QUEUE_UNMATCHED] VEVO queue job not found: ${jobId}`,
+			releaseExecutionId: result.releaseExecutionId,
+			releaseExecutionStepId: result.waitStepId,
+			data: {
+				jobId,
+				state: payload.state,
+				success: result.success,
+				error: result.error,
+				reason: result.reason,
+				errors: payload.result?.errors ?? [],
+				warnings: payload.result?.warnings ?? [],
+			},
+		});
+
+		return {
+			received: true,
+			...result,
+			processed: result.terminal && !result.duplicate,
+		};
 	}
 }

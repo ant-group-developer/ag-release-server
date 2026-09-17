@@ -2,6 +2,7 @@
 import {
 	DeleteObjectCommand,
 	GetObjectCommand,
+	HeadObjectCommand,
 	ListObjectsV2Command,
 	PutObjectCommand,
 	S3Client,
@@ -357,6 +358,60 @@ export class SftpConnectService {
 	// 		await client.end();
 	// 	}
 	// }
+
+	async fileExists({
+		sftp,
+		remoteDir,
+		fileName,
+	}: {
+		sftp: SftpMetadata;
+		remoteDir: string;
+		fileName: string;
+	}): Promise<boolean> {
+		const safeFileName = path.basename(fileName);
+
+		if (sftp.type === StorageType.S3) {
+			if (!sftp.bucket) {
+				throw new Error('Missing S3 bucket');
+			}
+
+			const s3 = this.createS3Client(sftp);
+			const key = this.buildS3Key(sftp.path, remoteDir, safeFileName);
+
+			try {
+				await s3.send(
+					new HeadObjectCommand({
+						Bucket: sftp.bucket,
+						Key: key,
+					}),
+				);
+
+				return true;
+			} catch (error: any) {
+				if (
+					error?.$metadata?.httpStatusCode === 404 ||
+					error?.name === 'NotFound' ||
+					error?.name === 'NoSuchKey'
+				) {
+					return false;
+				}
+
+				throw error;
+			}
+		}
+
+		const client = this.createClient();
+
+		try {
+			await client.connect(this.getConnectConfig(sftp));
+
+			const remotePath = path.posix.join(remoteDir, safeFileName);
+
+			return (await client.exists(remotePath)) !== false;
+		} finally {
+			await client.end();
+		}
+	}
 
 	async uploadFile({
 		sftp,
