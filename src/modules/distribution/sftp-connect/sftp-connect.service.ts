@@ -363,10 +363,12 @@ export class SftpConnectService {
 		sftp,
 		remoteDir,
 		fileName,
+		treatForbiddenAsMissing = false,
 	}: {
 		sftp: SftpMetadata;
 		remoteDir: string;
 		fileName: string;
+		treatForbiddenAsMissing?: boolean;
 	}): Promise<boolean> {
 		const safeFileName = path.basename(fileName);
 
@@ -396,20 +398,62 @@ export class SftpConnectService {
 					return false;
 				}
 
+				if (
+					treatForbiddenAsMissing &&
+					error?.$metadata?.httpStatusCode === 403
+				) {
+					this.logger.warn(
+						`[S3 fileExists] HeadObject returned 403; treating as missing for the opted-in caller: bucket=${sftp.bucket}, key=${key}, requestId=${error?.$metadata?.requestId}`,
+					);
+
+					return false;
+				}
+
+				this.logger.error(
+					`[S3 fileExists] HeadObject failed: bucket=${sftp.bucket}, key=${key}, endpoint=${sftp.endpoint ?? 'AWS_DEFAULT'}, message=${error?.message}, name=${error?.name}, code=${error?.code}, status=${error?.$metadata?.httpStatusCode}, requestId=${error?.$metadata?.requestId}`,
+					error?.stack,
+				);
+
 				throw error;
 			}
 		}
 
 		const client = this.createClient();
+		const remotePath = path.posix.join(remoteDir, safeFileName);
 
 		try {
+			this.logger.log(
+				`[SFTP fileExists] Connecting to check remote path: ${remotePath}`,
+			);
 			await client.connect(this.getConnectConfig(sftp));
 
-			const remotePath = path.posix.join(remoteDir, safeFileName);
+			try {
+				const result = await client.exists(remotePath);
+				this.logger.log(
+					`[SFTP fileExists] Check completed: path=${remotePath}, result=${String(result)}`,
+				);
 
-			return (await client.exists(remotePath)) !== false;
+				return result !== false;
+			} catch (error: any) {
+				this.logger.error(
+					`[SFTP fileExists] Check failed: path=${remotePath}, message=${error?.message}, code=${error?.code}, name=${error?.name}`,
+					error?.stack,
+				);
+				throw error;
+			}
 		} finally {
-			await client.end();
+			try {
+				await client.end();
+				this.logger.log(
+					`[SFTP fileExists] Connection closed: ${remotePath}`,
+				);
+			} catch (error: any) {
+				this.logger.error(
+					`[SFTP fileExists] Close connection failed: path=${remotePath}, message=${error?.message}, code=${error?.code}, name=${error?.name}`,
+					error?.stack,
+				);
+				throw error;
+			}
 		}
 	}
 

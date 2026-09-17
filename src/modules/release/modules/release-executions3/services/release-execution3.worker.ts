@@ -1292,19 +1292,34 @@ export class ReleaseExecution3Worker {
 				throw new Error('VEVO video file is missing');
 			}
 
-			if (!video.isrc) {
+			const generatedIsrcs = await this.getGeneratedIsrcs(
+				releaseExecution.id,
+			);
+
+			const videoIsrc =
+				video.isrc?.trim() ||
+				generatedIsrcs.videoById.get(video.id)?.trim();
+
+			if (!videoIsrc) {
 				throw new Error('Missing ISRC for VEVO video');
 			}
 
+			this.logger.log(
+				`[UPLOAD_METADATA_TO_SFTP][VEVO] Checking CI Tool status for ISRC: ${videoIsrc}`,
+			);
 			const existing = await this.ciToolService.getVevoVideoStatus({
-				isrc: video.isrc,
+				isrc: videoIsrc,
 			});
+			this.logger.log(
+				`[UPLOAD_METADATA_TO_SFTP][VEVO] CI Tool check completed: found=${existing.found}, status=${existing.status ?? 'N/A'}`,
+			);
 
 			if (existing.found && existing.status) {
 				step.metadata = {
 					...step.metadata,
 					output: {
 						...step.metadata?.output,
+						isrc: videoIsrc,
 						skippedUpload: true,
 						precheck: {
 							isrc: existing.isrc,
@@ -1324,6 +1339,9 @@ export class ReleaseExecution3Worker {
 
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig('VEVO');
+			this.logger.log(
+				`[UPLOAD_METADATA_TO_SFTP][VEVO] Delivery config resolved: storageType=${config.sftp.type}, path=${config.sftp.path ?? ''}`,
+			);
 
 			// video.fileId đã được validate ở phía trên.
 			const fileDb = await this.manager.findOne(FileEntity, {
@@ -1342,17 +1360,25 @@ export class ReleaseExecution3Worker {
 				throw new Error('VEVO video original file name is empty');
 			}
 
+			this.logger.log(
+				`[UPLOAD_METADATA_TO_SFTP][VEVO] Checking remote video file: ${remoteFileName}`,
+			);
 			const remoteFileExists = await this.sftpConnectService.fileExists({
 				sftp: config.sftp,
 				remoteDir: '',
 				fileName: remoteFileName,
+				treatForbiddenAsMissing: true,
 			});
+			this.logger.log(
+				`[UPLOAD_METADATA_TO_SFTP][VEVO] Remote video check completed: file=${remoteFileName}, exists=${remoteFileExists}`,
+			);
 
 			if (remoteFileExists) {
 				step.metadata = {
 					...step.metadata,
 					output: {
 						...step.metadata?.output,
+						isrc: videoIsrc,
 						remoteFileName,
 						skippedUpload: false,
 						reusedRemoteFile: true,
@@ -1391,6 +1417,7 @@ export class ReleaseExecution3Worker {
 				...step.metadata,
 				output: {
 					...step.metadata?.output,
+					isrc: videoIsrc,
 					remoteFileName,
 					skippedUpload: false,
 					reusedRemoteFile: false,
@@ -1832,10 +1859,6 @@ export class ReleaseExecution3Worker {
 			const release = releaseExecution.metadata.input.releaseSnapshot;
 			const video = release.video;
 
-			if (!video?.isrc) {
-				throw new Error('Missing ISRC for VEVO submit');
-			}
-
 			// Retry: request đã được CI Tool nhận thì không gửi lại.
 			if (step.metadata?.output?.jobId) {
 				return ReleaseExecutionStepStatus.DONE;
@@ -1852,6 +1875,20 @@ export class ReleaseExecution3Worker {
 
 			const uploadOutput = uploadStep.metadata?.output;
 
+			let videoIsrc = uploadOutput?.isrc?.trim() || video?.isrc?.trim();
+
+			if (!videoIsrc && video?.id) {
+				const generatedIsrcs = await this.getGeneratedIsrcs(
+					releaseExecution.id,
+				);
+
+				videoIsrc = generatedIsrcs.videoById.get(video.id)?.trim();
+			}
+
+			if (!videoIsrc) {
+				throw new Error('Missing ISRC for VEVO submit');
+			}
+
 			const remoteFileName = uploadStep.metadata?.output?.remoteFileName;
 
 			const skippedUpload =
@@ -1859,7 +1896,7 @@ export class ReleaseExecution3Worker {
 			const submitMode = skippedUpload ? 'update' : 'create';
 
 			const videoFileName = skippedUpload
-				? video.videoFile?.fileName
+				? video?.videoFile?.fileName
 				: uploadOutput?.remoteFileName;
 
 			const coverArt =
@@ -1913,6 +1950,7 @@ export class ReleaseExecution3Worker {
 				releaseExecution,
 				videoFileName,
 				thumbnailKey,
+				videoIsrc,
 			});
 
 			// Persist the exact outbound request before calling CI Tool so it is
@@ -1974,16 +2012,18 @@ export class ReleaseExecution3Worker {
 		releaseExecution,
 		videoFileName,
 		thumbnailKey,
+		videoIsrc,
 	}: {
 		releaseExecution: ReleaseExecution3;
 		videoFileName: string;
 		thumbnailKey: string;
+		videoIsrc: string;
 	}): Promise<QueueCiToolVevoReleasePayload> {
 		const release = releaseExecution.metadata.input.releaseSnapshot;
 		const video = release.video;
 
-		if (!video?.isrc) {
-			throw new Error('Missing ISRC for VEVO submit');
+		if (!video) {
+			throw new Error('Missing video for VEVO submit');
 		}
 
 		// 1. Primary Artists (từ release.releaseArtists)
@@ -2030,7 +2070,7 @@ export class ReleaseExecution3Worker {
 			language,
 			explicit: video.explicit ? 'Yes' : 'No',
 			containsAiContent: this.mapVevoAiContent(video.aiContent),
-			isrc: video.isrc.trim(),
+			isrc: videoIsrc,
 			contentProvider: video.contentProvider?.trim() ?? '',
 			label: repertoireOwner,
 			repertoireOwner,
