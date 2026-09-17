@@ -53,6 +53,14 @@ export class ChannelDeliveryV2 {
 	@Column({ name: 'retry_count', type: 'int', default: 0 })
 	retryCount!: number;
 
+	@Column({
+		name: 'last_command_id',
+		type: 'varchar',
+		length: 180,
+		nullable: true,
+	})
+	lastCommandId!: string | null;
+
 	@Column({ name: 'previous_live', type: 'boolean', default: false })
 	previousLive!: boolean;
 

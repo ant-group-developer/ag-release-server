@@ -16,6 +16,7 @@ import { IssueV2 } from './entities/issue-v2.entity';
 import { OutboxEventV2 } from './entities/outbox-event-v2.entity';
 import { ReleaseSnapshotV2 } from './entities/release-snapshot-v2.entity';
 import { StepRunV2 } from './entities/step-run-v2.entity';
+import { SubmitIdempotencyV2 } from './entities/submit-idempotency-v2.entity';
 import { DistributionV2QueueService } from './infrastructure/queue/distribution-v2.queue.service';
 
 const DISTRIBUTION_V2_ENTITIES = [
@@ -30,6 +31,7 @@ const DISTRIBUTION_V2_ENTITIES = [
 	ExportBatchMemberV2,
 	IssueV2,
 	DistributionSummaryV2,
+	SubmitIdempotencyV2,
 ];
 
 @Module({

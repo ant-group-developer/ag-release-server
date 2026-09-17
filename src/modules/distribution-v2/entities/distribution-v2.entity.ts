@@ -43,6 +43,14 @@ export class DistributionV2 {
 	@Column({ type: 'int', default: 0 })
 	version!: number;
 
+	@Column({
+		name: 'last_command_id',
+		type: 'varchar',
+		length: 180,
+		nullable: true,
+	})
+	lastCommandId!: string | null;
+
 	@Column({ name: 'resubmitted_from_id', type: 'uuid', nullable: true })
 	resubmittedFromId!: string | null;
 

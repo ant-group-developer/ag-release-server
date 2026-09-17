@@ -65,9 +65,9 @@ Không thay đổi logic, queue, cron, bảng dữ liệu hoặc endpoint của:
 | Phase | Nội dung | Trạng thái |
 |---|---|---|
 | 00 | Architecture decisions | ✅ Tài liệu |
-| 01 | Module, worker, schema | 🟡 Code hoàn tất; chờ apply migration/integration DB |
+| 01 | Module, worker, schema | 🟡 Migration đã apply; integration DB test còn pending |
 | 02 | Domain state machine | ✅ Code hoàn tất; domain test/build/lint xanh |
-| 03 | Submit, snapshot, review | ⬜ Chưa triển khai |
+| 03 | Submit, snapshot, review | 🟡 Code hoàn tất; chờ chạy migration 1789100000000 |
 | 04 | UPC/ISRC provisioning | ⬜ Chưa triển khai |
 | 05 | Package build/storage | ⬜ Chưa triển khai |
 | 06 | Direct DSP SFTP | ⬜ Chưa triển khai |

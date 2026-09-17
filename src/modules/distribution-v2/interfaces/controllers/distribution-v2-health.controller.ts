@@ -16,4 +16,3 @@ export class DistributionV2HealthController {
 		};
 	}
 }
-

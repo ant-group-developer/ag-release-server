@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DistributionV2SubmitService } from './application/distribution-v2-submit.service';
+import { DISTRIBUTION_V2_RELEASE_READ_PORT } from './application/distribution-v2-submit.types';
 import { DistributionV2ConfigService } from './config/distribution-v2.config.service';
 import { ChannelDeliveryV2 } from './entities/channel-delivery-v2.entity';
 import { DistributionEventV2 } from './entities/distribution-event-v2.entity';
@@ -12,7 +14,10 @@ import { IssueV2 } from './entities/issue-v2.entity';
 import { OutboxEventV2 } from './entities/outbox-event-v2.entity';
 import { ReleaseSnapshotV2 } from './entities/release-snapshot-v2.entity';
 import { StepRunV2 } from './entities/step-run-v2.entity';
+import { SubmitIdempotencyV2 } from './entities/submit-idempotency-v2.entity';
+import { ReleaseV2ReadAdapter } from './infrastructure/release/release-v2-read.adapter';
 import { DistributionV2HealthController } from './interfaces/controllers/distribution-v2-health.controller';
+import { DistributionV2SubmitController } from './interfaces/controllers/distribution-v2-submit.controller';
 
 const DISTRIBUTION_V2_ENTITIES = [
 	DistributionV2,
@@ -26,13 +31,28 @@ const DISTRIBUTION_V2_ENTITIES = [
 	ExportBatchMemberV2,
 	IssueV2,
 	DistributionSummaryV2,
+	SubmitIdempotencyV2,
 ];
 
 @Module({
 	imports: [TypeOrmModule.forFeature(DISTRIBUTION_V2_ENTITIES)],
-	controllers: [DistributionV2HealthController],
-	providers: [DistributionV2ConfigService],
-	exports: [DistributionV2ConfigService, TypeOrmModule],
+	controllers: [
+		DistributionV2HealthController,
+		DistributionV2SubmitController,
+	],
+	providers: [
+		DistributionV2ConfigService,
+		DistributionV2SubmitService,
+		ReleaseV2ReadAdapter,
+		{
+			provide: DISTRIBUTION_V2_RELEASE_READ_PORT,
+			useExisting: ReleaseV2ReadAdapter,
+		},
+	],
+	exports: [
+		DistributionV2ConfigService,
+		DistributionV2SubmitService,
+		TypeOrmModule,
+	],
 })
 export class DistributionV2ApiModule {}
-
