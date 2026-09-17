@@ -157,6 +157,10 @@ export function reduceChannelDelivery(
 				currentStage: command.stage ?? state.currentStage,
 				waitReason: command.reason,
 				scheduledAt: command.scheduledAt,
+				externalRefs: {
+					...(state.externalRefs ?? {}),
+					...(command.externalRefs ?? {}),
+				},
 			});
 			return {
 				state: next,
@@ -164,6 +168,7 @@ export function reduceChannelDelivery(
 					reason: command.reason,
 					scheduledAt: command.scheduledAt,
 					stage: next.currentStage,
+					externalRefs: next.externalRefs,
 				}),
 			};
 		}

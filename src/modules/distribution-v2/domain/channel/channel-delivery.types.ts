@@ -48,6 +48,7 @@ export type ChannelDeliveryCommand =
 			readonly reason: DistributionV2WaitReason;
 			readonly scheduledAt: string;
 			readonly stage?: string;
+			readonly externalRefs?: Readonly<Record<string, unknown>>;
 	  }
 	| {
 			readonly type: 'WAIT_BATCH';

@@ -23,9 +23,13 @@ import { Distribution, DistributionV2Status } from '../../domain';
 import { ChannelDeliveryV2 } from '../../entities/channel-delivery-v2.entity';
 import { DistributionEventV2 } from '../../entities/distribution-event-v2.entity';
 import { DistributionV2 } from '../../entities/distribution-v2.entity';
+import { OutboxEventV2 } from '../../entities/outbox-event-v2.entity';
 import { ReleaseSnapshotV2 } from '../../entities/release-snapshot-v2.entity';
 import { StepRunV2 } from '../../entities/step-run-v2.entity';
-import { DistributionV2StepStatus } from '../../enums/distribution-v2.enum';
+import {
+	DistributionV2ChannelRoute,
+	DistributionV2StepStatus,
+} from '../../enums/distribution-v2.enum';
 import { distributionV2ConnectionOptions } from '../queue/distribution-v2.queue.service';
 
 interface StepContext {
@@ -322,6 +326,51 @@ export class DistributionV2BuildPackageWorker
 							occurredAt: new Date(event.occurredAt),
 						}),
 					);
+				}
+				const outboxRepo = manager.getRepository(OutboxEventV2);
+				for (const channel of channels) {
+					if (channel.route !== DistributionV2ChannelRoute.DIRECT) {
+						continue;
+					}
+					const idempotencyKey = [
+						'distribution-v2',
+						'sftp-upload',
+						distributionId,
+						channel.id,
+						artifact.attemptNo,
+					].join(':');
+					await outboxRepo
+						.createQueryBuilder()
+						.insert()
+						.values({
+							distributionId,
+							queueName: 'sftp-upload',
+							payload: {
+								distributionId,
+								channelId: channel.id,
+								stepId,
+								packageStepId: stepId,
+								attemptId: stepId,
+								packageUri: artifact.packageUri,
+								externalId:
+									artifact.externalIds[channel.id] ?? null,
+								attemptNo: artifact.attemptNo,
+								correlationId: distribution.correlationId,
+								idempotencyKey,
+								command: 'UPLOAD_DIRECT_SFTP',
+								commandId: `${idempotencyKey}:command`,
+								occurredAt,
+							},
+							jobId: `${distributionId}:sftp-upload:${channel.id}:${artifact.attemptNo}`,
+							availableAt: new Date(),
+							leaseUntil: null,
+							attempts: 0,
+							lastError: null,
+							lastAttemptedAt: null,
+							dispatchedAt: null,
+						})
+						.orIgnore()
+						.execute();
 				}
 			}
 			step.status = DistributionV2StepStatus.DONE;

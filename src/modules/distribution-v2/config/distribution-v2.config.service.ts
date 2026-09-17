@@ -54,4 +54,33 @@ export class DistributionV2ConfigService {
 			30 * 24 * 60 * 60 * 1000,
 		);
 	}
+
+	getSftpPerHostConcurrency(): number {
+		return this.config.get<number>(
+			'DISTRIBUTION_V2_SFTP_PER_HOST_CONCURRENCY',
+			2,
+		);
+	}
+
+	getSftpRateLimitMs(): number {
+		return this.config.get<number>('DISTRIBUTION_V2_SFTP_RATE_LIMIT_MS', 0);
+	}
+
+	getSftpTimeoutMs(): number {
+		return this.config.get<number>(
+			'DISTRIBUTION_V2_SFTP_TIMEOUT_MS',
+			5 * 60 * 1000,
+		);
+	}
+
+	getSftpMaxAttempts(): number {
+		return this.config.get<number>('DISTRIBUTION_V2_SFTP_MAX_ATTEMPTS', 3);
+	}
+
+	getPartnerTimeoutMs(): number {
+		return this.config.get<number>(
+			'DISTRIBUTION_V2_PARTNER_TIMEOUT_MS',
+			5 * 24 * 60 * 60 * 1000,
+		);
+	}
 }

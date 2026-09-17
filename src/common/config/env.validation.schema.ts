@@ -134,6 +134,31 @@ export const envValidationSchema = Joi.object({
 		.min(0)
 		.max(31_536_000_000)
 		.default(2_592_000_000),
+	DISTRIBUTION_V2_SFTP_PER_HOST_CONCURRENCY: Joi.number()
+		.integer()
+		.min(1)
+		.max(20)
+		.default(2),
+	DISTRIBUTION_V2_SFTP_RATE_LIMIT_MS: Joi.number()
+		.integer()
+		.min(0)
+		.max(60_000)
+		.default(0),
+	DISTRIBUTION_V2_SFTP_TIMEOUT_MS: Joi.number()
+		.integer()
+		.min(1_000)
+		.max(3_600_000)
+		.default(300_000),
+	DISTRIBUTION_V2_SFTP_MAX_ATTEMPTS: Joi.number()
+		.integer()
+		.min(1)
+		.max(10)
+		.default(3),
+	DISTRIBUTION_V2_PARTNER_TIMEOUT_MS: Joi.number()
+		.integer()
+		.min(60_000)
+		.max(31_536_000_000)
+		.default(432_000_000),
 
 	// Cloudflare SaaS + OAuth (custom domain feature).
 	CF_API_TOKEN: Joi.string().allow('').optional(),

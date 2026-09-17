@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { envValidationSchema } from 'src/common/config/env.validation.schema';
+import { DspRoutingConfig } from 'src/modules/distribution/dsp-routing/entities/dsp-routing-config.entity';
 import { AppConfigModule } from '../app-config/app-config.module';
 import { BucketModule2 } from '../bucket2/bucket2.module';
 import { Cache2Module } from '../cache2/cache2.module';
@@ -15,6 +16,11 @@ import {
 	DISTRIBUTION_V2_PACKAGE_BUILDER,
 	DISTRIBUTION_V2_PACKAGE_STORE,
 } from './application/ports/package-builder.port';
+import {
+	DISTRIBUTION_V2_SFTP_CLIENT_FACTORY,
+	DISTRIBUTION_V2_SFTP_CONFIG_RESOLVER,
+	DISTRIBUTION_V2_SFTP_TRANSPORT,
+} from './application/ports/sftp-delivery.port';
 import { DistributionV2ConfigService } from './config/distribution-v2.config.service';
 import { ChannelDeliveryV2 } from './entities/channel-delivery-v2.entity';
 import { DistributionEventV2 } from './entities/distribution-event-v2.entity';
@@ -35,8 +41,14 @@ import { DistributionV2PackageBuilder } from './infrastructure/package/distribut
 import { DistributionV2PackageStore } from './infrastructure/package/distribution-v2-package.store';
 import { DistributionV2QueueService } from './infrastructure/queue/distribution-v2.queue.service';
 import { DistributionV2OutboxRelay } from './infrastructure/relay/distribution-v2-outbox.relay';
+import { DistributionV2SftpConfigResolverImpl } from './infrastructure/sftp/distribution-v2-sftp-config.resolver';
+import {
+	DistributionV2SftpClientFactoryImpl,
+	DistributionV2SftpTransportImpl,
+} from './infrastructure/sftp/distribution-v2-sftp.transport';
 import { DistributionV2BuildPackageWorker } from './infrastructure/worker/distribution-v2-build-package.worker';
 import { DistributionV2ProvisionIdWorker } from './infrastructure/worker/distribution-v2-provision-id.worker';
+import { DistributionV2SftpUploadWorker } from './infrastructure/worker/distribution-v2-sftp-upload.worker';
 
 const DISTRIBUTION_V2_ENTITIES = [
 	DistributionV2,
@@ -52,6 +64,7 @@ const DISTRIBUTION_V2_ENTITIES = [
 	DistributionSummaryV2,
 	SubmitIdempotencyV2,
 	IdentifierAssignmentV2,
+	DspRoutingConfig,
 ];
 
 @Module({
@@ -78,6 +91,10 @@ const DISTRIBUTION_V2_ENTITIES = [
 		DistributionV2PackageAssetReader,
 		DistributionV2PackageBuilder,
 		DistributionV2BuildPackageWorker,
+		DistributionV2SftpConfigResolverImpl,
+		DistributionV2SftpClientFactoryImpl,
+		DistributionV2SftpTransportImpl,
+		DistributionV2SftpUploadWorker,
 		DistributionV2OutboxRelay,
 		{
 			provide: DISTRIBUTION_V2_IDENTIFIER_PROVISIONER,
@@ -94,6 +111,18 @@ const DISTRIBUTION_V2_ENTITIES = [
 		{
 			provide: DISTRIBUTION_V2_PACKAGE_BUILDER,
 			useExisting: DistributionV2PackageBuilder,
+		},
+		{
+			provide: DISTRIBUTION_V2_SFTP_CONFIG_RESOLVER,
+			useExisting: DistributionV2SftpConfigResolverImpl,
+		},
+		{
+			provide: DISTRIBUTION_V2_SFTP_CLIENT_FACTORY,
+			useExisting: DistributionV2SftpClientFactoryImpl,
+		},
+		{
+			provide: DISTRIBUTION_V2_SFTP_TRANSPORT,
+			useExisting: DistributionV2SftpTransportImpl,
 		},
 	],
 	exports: [

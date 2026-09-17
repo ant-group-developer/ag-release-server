@@ -2,26 +2,34 @@
 
 ## Mục tiêu
 
-Upload direct DSP song song, có giới hạn theo host và retry độc lập.
+Upload các direct DSP song song, có bulkhead theo host, timeout, retry hữu hạn
+và không phát completion marker trước các file nội dung.
 
-## Queue
+## Queue và payload
 
 ```text
 distribution-v2.sftp-upload
 ```
 
-Payload:
+Payload được tạo trong cùng transaction với `PACKAGE_BUILT`:
 
 ```json
 {
   "distributionId": "uuid",
-  "attemptId": "uuid",
-  "channelId": "uuid",
   "stepId": "uuid",
+  "channelId": "uuid",
+  "attemptId": "uuid",
+  "packageStepId": "uuid",
+  "packageUri": "distributionId/1",
+  "externalId": "spotify-distributionId",
+  "attemptNo": 1,
   "correlationId": "uuid",
-  "idempotencyKey": "string"
+  "idempotencyKey": "distribution-v2:sftp-upload:...",
+  "command": "UPLOAD_DIRECT_SFTP"
 }
 ```
+
+Chỉ channel có `route = DIRECT` được enqueue. CI/State51 channel để phase sau.
 
 ## Thứ tự upload
 
@@ -29,36 +37,75 @@ Payload:
 remote directory
 → metadata/XML
 → resources
-→ completion marker cuối cùng
+→ BatchComplete.xml
 ```
 
-Marker:
-
-- Spotify: `BatchComplete.xml`.
-- CI: `{externalId}.done`.
+Transport đọc file từ shared package root, kiểm tra size/SHA-256 trước khi
+upload. Nếu remote file đã tồn tại cùng size thì đánh dấu `reused`; nếu thiếu
+hoặc sai size thì upload lại cùng remote path. Completion marker luôn là file
+cuối cùng trong thứ tự.
 
 ## Reliability
 
-- `maxAttempts = 3` mặc định.
-- Exponential backoff.
-- Timeout mỗi file/connection.
-- Bulkhead và rate limit theo SFTP host.
-- Upload receipt lưu remote path/checksum.
+- Mỗi host có semaphore bulkhead (`DISTRIBUTION_V2_SFTP_PER_HOST_CONCURRENCY`).
+- Có rate limit giữa các job cùng host.
+- Connection, mkdir, stat và put đều có timeout.
+- BullMQ retry tối đa 3 lần mặc định; step lưu từng attempt/lỗi.
+- Crash/requeue an toàn vì remote path deterministic và upload có reconcile.
+- Receipt lưu remote path, size, checksum và cờ `reused` trong
+  `channel_deliveries.external_refs` và `step_runs.output`.
 
-Hết retry:
+## State transition
+
+Upload bắt đầu:
+
+```text
+PENDING → PROCESSING(SFTP_UPLOAD)
+```
+
+Upload thành công:
+
+```text
+PROCESSING
+→ WAITING_EXTERNAL(waitReason=PARTNER, scheduledAt=now+partnerTimeout)
+```
+
+Phase 09 sẽ poll trạng thái DSP và chuyển tiếp `LIVE` hoặc `ISSUES`.
+
+Sau lần retry cuối:
 
 ```text
 channel = ISSUES
-issue = SFTP_UPLOAD_FAILED
+issue.code = SFTP_UPLOAD_FAILED
 ```
 
-DSP khác tiếp tục chạy.
+Các channel khác của distribution vẫn tiếp tục độc lập.
+
+## Cấu hình
+
+```text
+DISTRIBUTION_V2_SFTP_PER_HOST_CONCURRENCY=2
+DISTRIBUTION_V2_SFTP_RATE_LIMIT_MS=0
+DISTRIBUTION_V2_SFTP_TIMEOUT_MS=300000
+DISTRIBUTION_V2_SFTP_MAX_ATTEMPTS=3
+DISTRIBUTION_V2_PARTNER_TIMEOUT_MS=432000000
+```
+
+Resolver đọc direct routing từ `dsp_routing_configs` và giải mã password/private
+key qua cơ chế hiện tại. Không import consumer/cron legacy vào worker v2.
+
+## Không làm
+
+- Không upload CI/State51 trong phase này.
+- Không gọi SFTP trong HTTP request.
+- Không thay đổi `distribution-orchestration` hoặc queue legacy.
+- Không đánh dấu channel `LIVE` chỉ vì upload thành công; cần status sync ở phase 09.
 
 ## Test/acceptance
 
 - Marker luôn upload cuối.
 - Retry không upload marker sớm.
-- Một host lỗi không làm nghẽn queue khác.
-- Duplicate job không tạo upload trùng.
-- Crash/requeue vẫn reconcile remote state.
-
+- Duplicate job dùng lại remote file cùng size.
+- Sai checksum local làm job fail trước khi upload file đó.
+- Một host lỗi không chặn host khác nhờ bulkhead.
+- Một DSP lỗi không chặn channel khác.
