@@ -49,6 +49,17 @@ export interface QueueCiToolVevoReleasePayload {
 	endTime: string;
 	monetizeWorldwide: boolean;
 	blockedTerritories: string[];
+	upc?: string | null;
+	audioIsrc?: string | null;
+	videoVersion?: string | null;
+	partnerCustomId1?: string | null;
+	partnerCustomId2?: string | null;
+	composers?: string[] | null;
+	editors?: string[] | null;
+	producers?: string[] | null;
+	directors?: string[] | null;
+	copyright?: string | null;
+	copyrightYear?: number | null;
 }
 
 export interface QueueCiToolVevoReleaseResponse {

@@ -7,6 +7,7 @@ import {
 	CI_IMPORT_MAX_EMPTY_CHECKS,
 	DEFAULT_WAIT_MINUTES,
 } from 'src/common/constants/common.default.constants';
+import { ArtistRoleCode } from 'src/modules/artist-role/enum/artist-role.enum';
 import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { Country } from 'src/modules/country/entities/country.entity';
@@ -24,7 +25,6 @@ import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
-import { ReleaseTimeMode } from 'src/modules/release/enum/release.enum';
 import { ReleaseErrorType } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
 import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
 import { ReleaseReviewService } from 'src/modules/release/modules/release-reviews/services/release-review.service';
@@ -2034,15 +2034,23 @@ export class ReleaseExecution3Worker {
 			.map((ra) => ra.artist?.name?.trim())
 			.filter((name): name is string => !!name);
 
-		// 2. Featured Artists (từ release.releaseContributors có vai trò FEATURED_ARTIST)
-		const featuredArtists = (release.releaseContributors ?? [])
-			.filter(
-				(rc) =>
-					rc.artistRole?.code === 'FEATURED_ARTIST' ||
-					rc.artistRole?.name === 'Featured Artist',
-			)
-			.map((rc) => rc.artist?.name?.trim())
-			.filter((name): name is string => !!name);
+		const contributorsByRole = (roleCode: ArtistRoleCode) =>
+			(release.releaseContributors ?? [])
+				.filter(
+					(rc) =>
+						rc.artistRole?.code?.trim().toLowerCase() ===
+						roleCode.toLowerCase(),
+				)
+				.map((rc) => rc.artist?.name?.trim())
+				.filter((name): name is string => !!name);
+
+		const featuredArtists = contributorsByRole(
+			ArtistRoleCode.FEATURED_ARTIST,
+		);
+		const editor = contributorsByRole(ArtistRoleCode.EDITOR);
+		const producer = contributorsByRole(ArtistRoleCode.PRODUCER);
+		const composer = contributorsByRole(ArtistRoleCode.COMPOSER);
+		const director = contributorsByRole(ArtistRoleCode.DIRECTOR);
 
 		// 3. Genres (primaryGenre & subGenre của release)
 		const genres = [
@@ -2058,12 +2066,7 @@ export class ReleaseExecution3Worker {
 		const monetizeWorldwide = true;
 		const blockedTerritories =
 			await this.resolveBlockedTerritoryCodes(release);
-		const repertoireOwner =
-			video.copyrightOwner?.trim() ||
-			video.labelEntity?.name?.trim() ||
-			video.label?.trim() ||
-			release.label?.name?.trim() ||
-			'';
+		const repertoireOwner = video.labelEntity?.name?.trim() ?? '';
 
 		return {
 			title: release.title?.trim() ?? '',
@@ -2087,21 +2090,26 @@ export class ReleaseExecution3Worker {
 			startTime: this.formatVevoDateTime(
 				release.releaseDate,
 				release.releaseTime,
-				release.releaseTimeMode === ReleaseTimeMode.SPECIFIC_TIMEZONE
-					? release.timeZone
-					: undefined,
+				release.timeZone,
 			),
-			endTime:
-				release.releaseTimeMode === ReleaseTimeMode.SPECIFIC_TIMEZONE &&
-				release.timeZone
-					? this.formatVevoDateTime(
-							release.releaseEndDate,
-							release.releaseTime,
-							release.timeZone,
-						)
-					: '',
+			endTime: release.releaseEndDate
+				? this.formatVevoDateTime(
+						release.releaseEndDate,
+						release.releaseTime,
+						release.timeZone,
+					)
+				: '',
 			monetizeWorldwide,
 			blockedTerritories,
+			videoVersion: release?.version,
+			partnerCustomId1: video.partnerCustomId1,
+			partnerCustomId2: video.partnerCustomId2,
+			composers: composer,
+			editors: editor,
+			producers: producer,
+			directors: director,
+			copyright: release?.cLineOwner,
+			copyrightYear: release?.cLineYear,
 		};
 	}
 
@@ -2175,27 +2183,13 @@ export class ReleaseExecution3Worker {
 			}
 		}
 
-		const offset = timeZone?.utc?.trim();
+		const offset = timeZone?.utc?.trim().replace(/^UTC\s*/i, '');
 		if (offset && /^[+-]\d{2}:\d{2}$/.test(offset)) {
 			return `${dateStr}T${timeStr}${offset}`;
 		}
 
 		return `${dateStr}T${timeStr}`;
 	}
-
-	// private resolveMonetizeWorldwide(release: Release): boolean {
-	// 	const territory = release.releaseTerritory;
-	// 	if (!territory || territory.distributeWorldwide) {
-	// 		return true;
-	// 	}
-	// 	if (
-	// 		territory.distributionType ===
-	// 		DistributionType.DISTRIBUTE_EVERYWHERE_EXCEPT
-	// 	) {
-	// 		return true;
-	// 	}
-	// 	return false;
-	// }
 
 	private async resolveBlockedTerritoryCodes(
 		release: Release,

@@ -10,7 +10,7 @@ import {
 
 export type VevoJobResultSource = 'webhook' | 'polling';
 
-const VEVO_SUCCESS_RESUME_DELAY_MINUTES = 15;
+const VEVO_SUCCESS_RESUME_DELAY_MINUTES = 20;
 
 export interface ProcessVevoJobResultResponse {
 	matched: boolean;
