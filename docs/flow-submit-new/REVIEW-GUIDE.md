@@ -1,6 +1,6 @@
-# Distribution-v2 — tài liệu review và kiểm tra Phase 01–06
+# Distribution-v2 — tài liệu review và kiểm tra Phase 01–07
 
-> Cập nhật: 17/09/2026
+> Cập nhật: 18/09/2026
 
 ## 1. Mục đích
 
@@ -18,6 +18,7 @@ Phase 03 — Submit/snapshot/review
 Phase 04 — UPC/ISRC provisioning
 Phase 05 — Package build/shared storage
 Phase 06 — Direct DSP SFTP delivery
+Phase 07 — CI import/QA
 ```
 
 Tài liệu không thay thế các phase spec. Mỗi phase spec vẫn là nguồn chi tiết
@@ -35,7 +36,7 @@ chính; file này là checklist và hướng dẫn review xuyên suốt.
 | UPC/ISRC idempotent provisioning | Đã có |
 | Package deterministic/shared volume | Đã có |
 | Direct SFTP worker | Đã có |
-| CI import/QA | Chưa làm — Phase 07 |
+| CI import/QA | Đã có code — chờ nghiệm thu import/QA sandbox |
 | Batch CI/State51 | Chưa làm — Phase 08 |
 | Status sync/retry/takedown | Chưa làm — Phase 09 |
 | Read model/metrics | Chưa làm — Phase 10 |
@@ -337,6 +338,45 @@ Kiểm tra thêm:
 - Bulkhead được tách theo host.
 - Lỗi sau attempt cuối tạo `SFTP_UPLOAD_FAILED`.
 - Channel khác không bị dừng khi một host lỗi.
+
+### Bước 9 — Kiểm tra Phase 07 CI import/QA
+
+Đọc:
+
+```text
+docs/flow-submit-new/07-ci-import-qa.md
+src/modules/distribution-v2/application/ports/ci-import-qa.port.ts
+src/modules/distribution-v2/application/distribution-v2-ci.service.ts
+src/modules/distribution-v2/infrastructure/ci/distribution-v2-ci.adapter.ts
+src/modules/distribution-v2/infrastructure/ci/distribution-v2-ci.normalizer.ts
+src/modules/distribution-v2/infrastructure/worker/distribution-v2-ci-import-check.worker.ts
+src/modules/distribution-v2/infrastructure/worker/distribution-v2-ci-qa-check.worker.ts
+```
+
+Contract v2 dùng lại các service CI hiện có:
+
+```text
+CiImportService.getImports()
+CiService.getReleases()
+CiReleaseService.getQaFlagsV2()
+```
+
+Các điểm cần xác nhận:
+
+- Một `(distributionId, aggregatorCode)` chỉ tạo một ingest group.
+- `external_operations.idempotency_key` ổn định cho import và QA.
+- Import pending tạo delayed outbox poll, không giữ worker.
+- Import response lưu raw payload, batch id, file status, warning/error,
+  poll count và checked time.
+- Import problem, timeout hoặc API failure tạo issue `CI_IMPORT_*`.
+- QA đọc hết pagination; chỉ blocker có `is_blocker=true` và
+  `closed_date IS NULL` mới chặn.
+- Nhiều CI/State51 channel cùng aggregator chỉ chạy import/QA một lần.
+- QA sạch chuyển channel sang `WAITING_BATCH` để Phase 08 tiếp tục.
+
+Phase 07 nhận signal sau khi CI package upload hoàn tất. Phần CI SFTP upload
+cụ thể vẫn là integration point của orchestration/upload worker, không được gọi
+trong HTTP submit.
 
 ---
 

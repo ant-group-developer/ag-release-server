@@ -83,4 +83,19 @@ export class DistributionV2ConfigService {
 			5 * 24 * 60 * 60 * 1000,
 		);
 	}
+
+	getCiPollIntervalMs(): number {
+		return this.config.get<number>(
+			'DISTRIBUTION_V2_CI_POLL_INTERVAL_MS',
+			60_000,
+		);
+	}
+
+	getCiMaxPolls(): number {
+		return this.config.get<number>('DISTRIBUTION_V2_CI_MAX_POLLS', 120);
+	}
+
+	getCiPageSize(): number {
+		return this.config.get<number>('DISTRIBUTION_V2_CI_PAGE_SIZE', 200);
+	}
 }

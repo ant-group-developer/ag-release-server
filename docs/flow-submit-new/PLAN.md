@@ -71,7 +71,7 @@ Không thay đổi logic, queue, cron, bảng dữ liệu hoặc endpoint của:
 | 04 | UPC/ISRC provisioning | 🟡 Code hoàn tất; chờ migration và generator contract rollout |
 | 05 | Package build/storage | 🟡 Code hoàn tất; chờ nghiệm thu shared volume/worker |
 | 06 | Direct DSP SFTP | 🟡 Code hoàn tất; chờ nghiệm thu SFTP sandbox |
-| 07 | CI import/QA | ⬜ Chưa triển khai |
+| 07 | CI import/QA | 🟡 Code hoàn tất; chờ nghiệm thu import/QA sandbox |
 | 08 | Batch export CI/State51 | ⬜ Chưa triển khai |
 | 09 | Status sync/retry/takedown | ⬜ Chưa triển khai |
 | 10 | Read model/observability | ⬜ Chưa triển khai |
