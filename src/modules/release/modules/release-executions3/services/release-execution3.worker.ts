@@ -1366,12 +1366,12 @@ export class ReleaseExecution3Worker {
 			this.logger.log(
 				`[UPLOAD_METADATA_TO_SFTP][VEVO] Checking remote video file: ${remoteFileName}`,
 			);
-			const remoteFileExists = await this.sftpConnectService.fileExists({
-				sftp: config.sftp,
-				remoteDir: '',
-				fileName: remoteFileName,
-				treatForbiddenAsMissing: true,
-			});
+			const remoteFileExists =
+				await this.sftpConnectService.vevoFileExists({
+					sftp: config.sftp,
+					remoteDir: '',
+					fileName: remoteFileName,
+				});
 			this.logger.log(
 				`[UPLOAD_METADATA_TO_SFTP][VEVO] Remote video check completed: file=${remoteFileName}, exists=${remoteFileExists}`,
 			);
@@ -2034,15 +2034,17 @@ export class ReleaseExecution3Worker {
 			.map((ra) => ra.artist?.name?.trim())
 			.filter((name): name is string => !!name);
 
-		const contributorsByRole = (roleCode: ArtistRoleCode) =>
-			(release.releaseContributors ?? [])
+		const contributorsByRole = (roleCode: ArtistRoleCode) => {
+			const expectedRole = String(roleCode).toLowerCase();
+			return (release.releaseContributors ?? [])
 				.filter(
 					(rc) =>
 						rc.artistRole?.code?.trim().toLowerCase() ===
-						roleCode.toLowerCase(),
+						expectedRole,
 				)
 				.map((rc) => rc.artist?.name?.trim())
 				.filter((name): name is string => !!name);
+		};
 
 		const featuredArtists = contributorsByRole(
 			ArtistRoleCode.FEATURED_ARTIST,
@@ -2060,7 +2062,7 @@ export class ReleaseExecution3Worker {
 
 		// 4. Language (từ release.releaseLanguage.audioLanguage)
 		const language =
-			release.releaseLanguage?.audioLanguage?.name?.trim() ?? '';
+			release.releaseLanguage?.audioLanguage?.name?.trim() ?? null;
 
 		// 5. Territories & Monetization
 		const monetizeWorldwide = true;
@@ -2081,7 +2083,7 @@ export class ReleaseExecution3Worker {
 			label: repertoireOwner,
 			repertoireOwner,
 			channel: video.channel?.name?.trim() ?? '',
-			description: video.description?.trim() ?? '',
+			description: video.description?.trim() ?? null,
 			keywords: video.keywords ?? [],
 			madeForKids: this.mapVevoMadeForKids(video.madeForKids),
 			visibility: this.mapVevoVisibility(video.visibility),
@@ -2098,7 +2100,7 @@ export class ReleaseExecution3Worker {
 						release.releaseTime,
 						release.timeZone,
 					)
-				: '',
+				: null,
 			monetizeWorldwide,
 			blockedTerritories,
 			videoVersion: release?.version,
