@@ -15,7 +15,10 @@ import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-c
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { CiToolService } from 'src/modules/partners-api/ci-tool/ci-tool.service';
-import { QueueCiToolVevoReleasePayload } from 'src/modules/partners-api/ci/interfaces/vevo-video.interface';
+import {
+	QueueCiToolVevoReleasePayload,
+	VevoContentProvider,
+} from 'src/modules/partners-api/ci/interfaces/vevo-video.interface';
 import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.service';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
@@ -2071,7 +2074,7 @@ export class ReleaseExecution3Worker {
 			explicit: video.explicit ? 'Yes' : 'No',
 			containsAiContent: this.mapVevoAiContent(video.aiContent),
 			isrc: videoIsrc,
-			contentProvider: video.contentProvider?.trim() ?? '',
+			contentProvider: VevoContentProvider.ANT_MUSIC_LLC,
 			label: repertoireOwner,
 			repertoireOwner,
 			channel: video.channel?.name?.trim() ?? '',
