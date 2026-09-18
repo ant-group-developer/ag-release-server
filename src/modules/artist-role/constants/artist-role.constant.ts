@@ -1,15 +1,25 @@
-export const mainArtistRole = { name: 'Main Artist', code: 'MAIN_ARTIST' };
+import { ArtistRoleCode } from '../enum/artist-role.enum';
+
+export const mainArtistRole = {
+	name: 'Main Artist',
+	code: ArtistRoleCode.MAIN_ARTIST,
+};
 export const dataInitArtistRole: { name: string; code: string }[] = [
-	{ name: 'Main Artist', code: 'MAIN_ARTIST' },
-	{ name: 'Singer', code: 'SINGER' },
-	{ name: 'Composer', code: 'COMPOSER' },
-	{ name: 'Lyricist', code: 'LYRICIST' },
-	{ name: 'Producer', code: 'PRODUCER' },
-	{ name: 'Arranger', code: 'ARRANGER' },
-	{ name: 'Featured Artist', code: 'FEATURED_ARTIST' },
-	{ name: 'Conductor', code: 'CONDUCTOR' },
-	{ name: 'Instrumentalist', code: 'INSTRUMENTALIST' },
-	{ name: 'Background Vocalist', code: 'BACKGROUND_VOCALIST' },
+	{ name: 'Main Artist', code: ArtistRoleCode.MAIN_ARTIST },
+	{ name: 'Singer', code: ArtistRoleCode.SINGER },
+	{ name: 'Composer', code: ArtistRoleCode.COMPOSER },
+	{ name: 'Lyricist', code: ArtistRoleCode.LYRICIST },
+	{ name: 'Producer', code: ArtistRoleCode.PRODUCER },
+	{ name: 'Arranger', code: ArtistRoleCode.ARRANGER },
+	{ name: 'Featured Artist', code: ArtistRoleCode.FEATURED_ARTIST },
+	{ name: 'Conductor', code: ArtistRoleCode.CONDUCTOR },
+	{ name: 'Instrumentalist', code: ArtistRoleCode.INSTRUMENTALIST },
+	{
+		name: 'Background Vocalist',
+		code: ArtistRoleCode.BACKGROUND_VOCALIST,
+	},
+	{ name: 'Editor', code: ArtistRoleCode.EDITOR },
+	{ name: 'Director', code: ArtistRoleCode.DIRECTOR },
 ];
 
 export const ArtistRoleMessageCodeSuccess = {
