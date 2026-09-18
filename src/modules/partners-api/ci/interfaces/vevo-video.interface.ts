@@ -10,6 +10,10 @@ export enum BackStageVideoStatus {
 	UNKNOWN = 'Unknown',
 }
 
+export enum VevoContentProvider {
+	ANT_MUSIC_LLC = 'ANT MUSIC LLC',
+}
+
 export interface SearchCiToolVevoReleaseInput {
 	isrc: string;
 }
@@ -31,7 +35,7 @@ export interface QueueCiToolVevoReleasePayload {
 	explicit: string;
 	containsAiContent: string;
 	isrc: string;
-	contentProvider: string;
+	contentProvider: VevoContentProvider;
 	label: string;
 	repertoireOwner: string;
 	channel: string;
