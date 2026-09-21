@@ -31,7 +31,7 @@ export interface QueueCiToolVevoReleasePayload {
 	primaryArtists: string[];
 	featuredArtists: string[];
 	genres: string[];
-	language: string;
+	language: string | null;
 	explicit: string;
 	containsAiContent: string;
 	isrc: string;
@@ -39,16 +39,27 @@ export interface QueueCiToolVevoReleasePayload {
 	label: string;
 	repertoireOwner: string;
 	channel: string;
-	description: string;
+	description: string | null;
 	keywords: string[];
 	madeForKids: string;
 	visibility: string;
 	videoFile: string;
 	thumbnailKey: string;
 	startTime: string;
-	endTime: string;
+	endTime: string | null;
 	monetizeWorldwide: boolean;
 	blockedTerritories: string[];
+	upc?: string | null;
+	audioIsrc?: string | null;
+	videoVersion?: string | null;
+	partnerCustomId1?: string | null;
+	partnerCustomId2?: string | null;
+	composers?: string[] | null;
+	editors?: string[] | null;
+	producers?: string[] | null;
+	directors?: string[] | null;
+	copyright?: string | null;
+	copyrightYear?: number | null;
 }
 
 export interface QueueCiToolVevoReleaseResponse {
