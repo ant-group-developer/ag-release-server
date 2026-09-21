@@ -205,6 +205,13 @@ export class ReleaseService {
 		});
 	}
 
+	async getStatusCounts(
+		query: QueryGetListReleaseDto,
+		user: UserFromRequest,
+	): Promise<Record<ReleaseStatus, number>> {
+		return this.releaseQueryService.getStatusCounts(query, user);
+	}
+
 	async getListSimple(
 		query: QueryGetListReleaseDto,
 	): Promise<PageDto<Release>> {
