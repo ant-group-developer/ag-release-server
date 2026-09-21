@@ -359,16 +359,68 @@ export class SftpConnectService {
 	// 	}
 	// }
 
-	async fileExists({
+	async vevoFileExists({
 		sftp,
 		remoteDir,
 		fileName,
-		treatForbiddenAsMissing = false,
 	}: {
 		sftp: SftpMetadata;
 		remoteDir: string;
 		fileName: string;
-		treatForbiddenAsMissing?: boolean;
+	}): Promise<boolean> {
+		if (sftp.type !== StorageType.S3) {
+			throw new Error('VEVO file lookup requires S3 storage');
+		}
+
+		if (!sftp.bucket) {
+			throw new Error('Missing S3 bucket');
+		}
+
+		const safeFileName = path.basename(fileName);
+		const key = this.buildS3Key(sftp.path, remoteDir, safeFileName);
+		const s3 = this.createS3Client(sftp);
+		let continuationToken: string | undefined;
+
+		do {
+			const response = await s3.send(
+				new ListObjectsV2Command({
+					Bucket: sftp.bucket,
+					Prefix: key,
+					MaxKeys: 50,
+					ContinuationToken: continuationToken,
+				}),
+			);
+
+			const exists =
+				response.Contents?.some((item) => item.Key === key) ?? false;
+
+			if (exists) {
+				this.logger.log(
+					`[VEVO S3 fileExists] File found: bucket=${sftp.bucket}, key=${key}`,
+				);
+				return true;
+			}
+
+			continuationToken = response.IsTruncated
+				? response.NextContinuationToken
+				: undefined;
+		} while (continuationToken);
+
+		this.logger.log(
+			`[VEVO S3 fileExists] File not found: bucket=${sftp.bucket}, key=${key}`,
+		);
+
+		return false;
+	}
+
+	async fileExists({
+		sftp,
+		remoteDir,
+		fileName,
+	}: {
+		sftp: SftpMetadata;
+		remoteDir: string;
+		fileName: string;
 	}): Promise<boolean> {
 		const safeFileName = path.basename(fileName);
 
@@ -395,17 +447,6 @@ export class SftpConnectService {
 					error?.name === 'NotFound' ||
 					error?.name === 'NoSuchKey'
 				) {
-					return false;
-				}
-
-				if (
-					treatForbiddenAsMissing &&
-					error?.$metadata?.httpStatusCode === 403
-				) {
-					this.logger.warn(
-						`[S3 fileExists] HeadObject returned 403; treating as missing for the opted-in caller: bucket=${sftp.bucket}, key=${key}, requestId=${error?.$metadata?.requestId}`,
-					);
-
 					return false;
 				}
 

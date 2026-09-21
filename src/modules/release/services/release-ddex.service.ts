@@ -47,6 +47,24 @@ interface CoverImageInfo {
 	extension: string;
 }
 
+type ArtistNameSource = {
+	name?: string | null;
+	artistProfiles?: Array<{
+		name?: string | null;
+		dsp?: { code?: string | null } | null;
+	}> | null;
+};
+
+export const resolveDdexArtistName = (
+	artist?: ArtistNameSource | null,
+): string => {
+	const spotifyProfileName = artist?.artistProfiles
+		?.find((profile) => profile.dsp?.code === String(DspCode.SPOTIFY))
+		?.name?.trim();
+
+	return spotifyProfileName || artist?.name?.trim() || '';
+};
+
 @Injectable()
 export class ReleaseDdexService {
 	private readonly logger = new Logger(ReleaseDdexService.name);
@@ -910,12 +928,7 @@ export class ReleaseDdexService {
 				catalogNumber: release.catalogId ?? undefined,
 
 				artists: release.releaseArtists.map((ra) => ({
-					name:
-						ra.artist?.artistProfiles?.find(
-							(p) => p.dsp?.code === String(DspCode.SPOTIFY),
-						)?.name ??
-						ra.artist?.name ??
-						'',
+					name: resolveDdexArtistName(ra.artist),
 					role: 'MainArtist',
 					spotifyId: ra.artist?.spotifyId,
 					appleMusicId: ra.artist?.appleMusicId,
@@ -1017,22 +1030,12 @@ export class ReleaseDdexService {
 					),
 
 					artists: track.trackArtists.map((ta) => ({
-						name:
-							ta.artist?.artistProfiles?.find(
-								(p) => p.dsp?.code === String(DspCode.SPOTIFY),
-							)?.name ??
-							ta.artist?.name ??
-							'',
+						name: resolveDdexArtistName(ta.artist),
 						role: 'MainArtist',
 					})),
 
 					contributors: track.trackContributors?.map((c) => ({
-						name:
-							c.artist?.artistProfiles?.find(
-								(p) => p.dsp?.code === String(DspCode.SPOTIFY),
-							)?.name ??
-							c.artist?.name ??
-							'',
+						name: resolveDdexArtistName(c.artist),
 						role: c.artistRole?.code ?? '',
 					})),
 
