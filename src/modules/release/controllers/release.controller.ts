@@ -92,6 +92,27 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({
+		summary: 'Count releases by status using the release list filters',
+	})
+	@ApiBody({ type: QueryGetListReleaseDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
+	@Post('status-counts')
+	async getStatusCounts(
+		@Body() query: QueryGetListReleaseDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<Record<string, number>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+		const result = await this.releaseService.getStatusCounts(
+			query,
+			req.user!,
+		);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@ApiOperation({ summary: 'Get release list data for CI export' })
 	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Get('list-data-export-ci')

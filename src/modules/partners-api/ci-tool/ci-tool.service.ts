@@ -159,22 +159,43 @@ export class CiToolService {
 	async searchVevoRelease(
 		input: SearchCiToolVevoReleaseInput,
 	): Promise<SearchCiToolVevoReleaseResponse> {
-		const { data } = await firstValueFrom(
-			this.httpService.post<SearchCiToolVevoReleaseResponse>(
-				`${process.env.CI_TOOL_URL}/api/vevo/releases/search`,
-				{
-					isrc: input.isrc,
-				},
-				{
-					headers: {
-						'x-api-key': process.env.CI_TOOL_API_KEY,
-						'Content-Type': 'application/json',
+		try {
+			const { data } = await firstValueFrom(
+				this.httpService.post<SearchCiToolVevoReleaseResponse>(
+					`${process.env.CI_TOOL_URL}/api/vevo/releases/search`,
+					{
+						isrc: input.isrc,
 					},
-				},
-			),
-		);
+					{
+						headers: {
+							'x-api-key': process.env.CI_TOOL_API_KEY,
+							'Content-Type': 'application/json',
+						},
+					},
+				),
+			);
 
-		return data;
+			return data;
+		} catch (error: any) {
+			const responseData = error.response?.data;
+			console.error(
+				'[CiToolService] searchVevoRelease error response:',
+				JSON.stringify(responseData, null, 2),
+			);
+
+			if (responseData) {
+				const details =
+					typeof responseData === 'object'
+						? JSON.stringify(responseData)
+						: String(responseData);
+
+				throw new Error(
+					`CI Tool VEVO search error (status ${error.response?.status}): ${details}`,
+				);
+			}
+
+			throw error;
+		}
 	}
 
 	async getVevoVideoStatus(

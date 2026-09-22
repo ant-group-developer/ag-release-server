@@ -196,6 +196,43 @@ export class ReleaseQueryService {
 		};
 	}
 
+	async getStatusCounts(
+		query: QueryGetListReleaseDto,
+		user: UserFromRequest,
+	): Promise<Record<ReleaseStatus, number>> {
+		const qb = this.releaseRepo.createQueryBuilder(this.mainAlias);
+		const { itemsToJoin } = this.filterByQuery2({
+			qb,
+			query,
+			user,
+			applyStatus: false,
+			applyOrderAndPaging: false,
+		});
+
+		if (itemsToJoin.includes('release.ciData')) {
+			qb.leftJoin('release.ciData', 'releaseCiData');
+		}
+		if (itemsToJoin.includes('release.releaseArtists')) {
+			qb.leftJoin('release.releaseArtists', 'releaseArtist');
+		}
+		if (itemsToJoin.includes('release.video')) {
+			qb.leftJoin('release.video', 'video');
+		}
+
+		const rawResults = await qb
+			.select('release.status', 'status')
+			.addSelect('COUNT(DISTINCT release.id)', 'count')
+			.groupBy('release.status')
+			.getRawMany<{ status: ReleaseStatus; count: string }>();
+		const counts = Object.fromEntries(
+			Object.values(ReleaseStatus).map((status) => [status, 0]),
+		) as Record<ReleaseStatus, number>;
+		for (const { status, count } of rawResults) {
+			if (status in counts) counts[status] = Number(count);
+		}
+		return counts;
+	}
+
 	private countDspsLiveSubQuery(subQuery: SelectQueryBuilder<any>) {
 		return subQuery
 			.select('COUNT(release_dsp_delivery_live_sub.id)')
@@ -979,10 +1016,14 @@ export class ReleaseQueryService {
 		qb,
 		query,
 		user,
+		applyStatus = true,
+		applyOrderAndPaging = true,
 	}: {
 		qb: SelectQueryBuilder<Release>;
 		query: QueryGetListReleaseDto;
 		user: UserFromRequest;
+		applyStatus?: boolean;
+		applyOrderAndPaging?: boolean;
 	}) {
 		const {
 			keyword,
@@ -1257,7 +1298,7 @@ export class ReleaseQueryService {
 			});
 		}
 
-		if (status?.length) {
+		if (applyStatus && status?.length) {
 			qb.andWhere('release.status IN (:...status)', {
 				status,
 			});
@@ -1334,15 +1375,20 @@ export class ReleaseQueryService {
 			});
 		}
 
-		if (fieldOrder === FieldOrderRelease.DSPS_LIVE) {
+		if (applyOrderAndPaging && fieldOrder === FieldOrderRelease.DSPS_LIVE) {
 			qb.orderBy('dsps_live_count', orderBy);
-		} else if (VirtualColumnReleaseArr.includes(fieldOrder)) {
+		} else if (
+			applyOrderAndPaging &&
+			VirtualColumnReleaseArr.includes(fieldOrder)
+		) {
 			qb.orderBy(`${fieldOrder}`, orderBy);
-		} else {
+		} else if (applyOrderAndPaging) {
 			qb.orderBy(`release.${fieldOrder}`, orderBy);
 		}
 
-		qb.skip(skip).take(pageSize);
+		if (applyOrderAndPaging) {
+			qb.skip(skip).take(pageSize);
+		}
 
 		return { itemsToJoin };
 	}
