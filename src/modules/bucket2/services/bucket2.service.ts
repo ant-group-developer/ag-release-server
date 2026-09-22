@@ -34,6 +34,7 @@ import {
 	IListUploadedPartsResponse,
 	IMultipartUploadResult,
 	IResCreateBucket,
+	OpenFileStreamResult,
 } from '../interfaces/bucket.interface';
 import { BucketFileService2 } from './bucket-file2.service';
 import { BucketR2Service } from './bucket-r2.service';
@@ -895,6 +896,33 @@ export class BucketService2 {
 		}
 
 		return fileDb;
+	}
+
+	async openFileStream(
+		fileId: string,
+		range?: string,
+	): Promise<OpenFileStreamResult> {
+		const file = await this.bucketFileService.findOne(fileId);
+
+		try {
+			const stream = await this.bucketR2Service.getObjectStream({
+				bucketName: file.bucket,
+				key: file.key,
+				range,
+			});
+
+			return {
+				file,
+				stream,
+			};
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : String(error);
+
+			throw new Error(
+				`Failed to open R2 stream for file ${fileId}: ${message}`,
+			);
+		}
 	}
 
 	// update

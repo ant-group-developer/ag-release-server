@@ -1,7 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import * as fs from 'fs';
-import * as os from 'os';
 import path from 'path';
 import {
 	CI_IMPORT_MAX_EMPTY_CHECKS,
@@ -36,6 +35,7 @@ import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { VideoService } from 'src/modules/video/video.service';
 import { removeFolder } from 'src/utils/util';
+import { Readable } from 'stream';
 import { EntityManager, In, IsNull } from 'typeorm';
 import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
@@ -1282,7 +1282,7 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
-		let tempDir: string | undefined;
+		// let tempDir: string | undefined;
 		try {
 			const release = releaseExecution.metadata.input.releaseSnapshot;
 			const video = release.video;
@@ -1394,27 +1394,128 @@ export class ReleaseExecution3Worker {
 				return ReleaseExecutionStepStatus.DONE;
 			}
 
-			tempDir = await fs.promises.mkdtemp(
-				path.join(os.tmpdir(), 'vevo-video-upload-'),
-			);
+			// tempDir = await fs.promises.mkdtemp(
+			// 	path.join(os.tmpdir(), 'vevo-video-upload-'),
+			// );
 
-			const localUploadPath = path.join(tempDir, remoteFileName);
+			// const localUploadPath = path.join(tempDir, remoteFileName);
 
-			await this.bucketService2.streamFileToPath({
-				fileId: video.fileId,
-				destPath: localUploadPath,
-				onProgress: (percent) => {
-					this.logger.log(
-						`Downloading VEVO video from R2: ${percent}% - ${remoteFileName}`,
+			// await this.bucketService2.streamFileToPath({
+			// 	fileId: video.fileId,
+			// 	destPath: localUploadPath,
+			// 	onProgress: (percent) => {
+			// 		this.logger.log(
+			// 			`Downloading VEVO video from R2: ${percent}% - ${remoteFileName}`,
+			// 		);
+			// 	},
+			// });
+
+			// await this.sftpConnectService.uploadFile({
+			// 	sftp: config.sftp,
+			// 	localFile: localUploadPath,
+			// 	remoteDir: '',
+			// });
+
+			const contentLength = Number(fileDb.fileSize);
+
+			if (!Number.isFinite(contentLength) || contentLength < 0) {
+				throw new Error(
+					`Invalid VEVO video file size: ${fileDb.fileSize}`,
+				);
+			}
+
+			const partSize = 20 * 1024 * 1024; // 20 MB mỗi chunk
+			const bucketService = this.bucketService2;
+
+			// Async Generator: Cứ khi S3 cần part mới thì mới gọi R2 lấy đúng 20 MB rồi đóng kết nối ngay
+			async function* makeOnDemandR2Stream() {
+				let offset = 0;
+				while (offset < contentLength) {
+					const end = Math.min(
+						offset + partSize - 1,
+						contentLength - 1,
 					);
-				},
-			});
+					if (!video || !video.fileId) {
+						throw new Error('VEVO video file is missing');
+					}
+					const { stream: chunkStream } =
+						await bucketService.openFileStream(
+							video.fileId,
+							`bytes=${offset}-${end}`,
+						);
+					try {
+						for await (const chunk of chunkStream) {
+							yield chunk;
+						}
+					} finally {
+						if (!chunkStream.destroyed) {
+							chunkStream.destroy();
+						}
+					}
+					offset = end + 1;
+				}
+			}
 
-			await this.sftpConnectService.uploadFile({
-				sftp: config.sftp,
-				localFile: localUploadPath,
-				remoteDir: '',
-			});
+			// Tạo Readable Stream từ generator
+			const input = Readable.from(makeOnDemandR2Stream());
+
+			let lastLoggedStep = -1;
+			let lastLogTime = Date.now();
+			let lastLoadedBytes = 0;
+
+			try {
+				await this.sftpConnectService.uploadStreamToS3({
+					storage: config.sftp,
+					input,
+					remoteDir: '',
+					fileName: remoteFileName,
+					contentLength,
+					queueSize: 2,
+					partSize,
+					onProgress: ({ loaded, total, percent }) => {
+						if (percent <= lastLoggedStep) {
+							return;
+						}
+						lastLoggedStep = percent;
+
+						const now = Date.now();
+						const timeDeltaSec = (now - lastLogTime) / 1000;
+						const bytesDelta = loaded - lastLoadedBytes;
+
+						// Tốc độ upload tức thời (MB/s)
+						const speedMBs =
+							timeDeltaSec > 0
+								? (
+										bytesDelta /
+										(1024 * 1024) /
+										timeDeltaSec
+									).toFixed(2)
+								: '0.00';
+
+						lastLogTime = now;
+						lastLoadedBytes = loaded;
+
+						const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+						const totalMB = (total / (1024 * 1024)).toFixed(1);
+
+						this.logger.log(
+							`[UPLOAD_METADATA_TO_SFTP][VEVO] ` +
+								`Uploading video to S3: ${percent}% ` +
+								`(${loadedMB}/${totalMB} MB) ` +
+								`@ ${speedMBs} MB/s - ` +
+								remoteFileName,
+						);
+					},
+				});
+			} catch (error) {
+				const message =
+					error instanceof Error ? error.message : String(error);
+				throw new Error(`VEVO_S3_STREAM_UPLOAD_FAILED: ${message}`);
+			} finally {
+				if (!input.destroyed) {
+					input.destroy();
+				}
+			}
 
 			step.metadata = {
 				...step.metadata,
@@ -1442,11 +1543,12 @@ export class ReleaseExecution3Worker {
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
-		} finally {
-			if (tempDir) {
-				await removeFolder(tempDir);
-			}
 		}
+		// finally {
+		// 	if (tempDir) {
+		// 		await removeFolder(tempDir);
+		// 	}
+		// }
 	}
 
 	private async uploadMetadataToSftp(

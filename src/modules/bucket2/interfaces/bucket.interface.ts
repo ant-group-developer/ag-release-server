@@ -1,3 +1,6 @@
+import { Readable } from 'stream';
+import { FileEntity } from '../entities/bucket.file.entity';
+
 export interface IResCreateBucket {
 	fileId: string;
 	urlUpload: string;
@@ -60,3 +63,8 @@ export interface IListUploadedPartsResponse {
 		size: number;
 	}>;
 }
+
+export type OpenFileStreamResult = {
+	file: FileEntity;
+	stream: Readable;
+};
