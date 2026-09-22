@@ -20,6 +20,10 @@ import {
 	SftpMetadata,
 	StorageType,
 } from '../sftp-configs/type/sftp-config.type';
+import {
+	UploadStreamToS3Input,
+	UploadStreamToS3Result,
+} from './interface/sftp-connect.interface';
 
 @Injectable()
 export class SftpConnectService {
@@ -562,6 +566,146 @@ export class SftpConnectService {
 			await this.uploadFileWithTimeout(client, localFile, remotePath);
 		} finally {
 			await client.end();
+		}
+	}
+
+	async uploadStreamToS3({
+		storage,
+		input,
+		remoteDir,
+		fileName,
+		contentLength,
+		queueSize = 2,
+		partSize = 10 * 1024 * 1024,
+		signal,
+		onProgress,
+	}: UploadStreamToS3Input): Promise<UploadStreamToS3Result> {
+		if (storage.type !== StorageType.S3) {
+			throw new Error('uploadStreamToS3 requires S3 storage');
+		}
+
+		if (!storage.bucket) {
+			throw new Error('Missing S3 bucket');
+		}
+
+		const safeFileName = path.basename(fileName);
+
+		if (!safeFileName || safeFileName === '.' || safeFileName === '/') {
+			throw new Error('Invalid S3 file name');
+		}
+
+		if (!Number.isFinite(contentLength) || contentLength < 0) {
+			throw new Error(`Invalid S3 content length: ${contentLength}`);
+		}
+
+		if (!Number.isInteger(queueSize) || queueSize < 1) {
+			throw new Error(`Invalid S3 multipart queue size: ${queueSize}`);
+		}
+
+		const minimumPartSize = 5 * 1024 * 1024;
+
+		if (!Number.isInteger(partSize) || partSize < minimumPartSize) {
+			throw new Error(
+				`S3 multipart part size must be at least ${minimumPartSize} bytes`,
+			);
+		}
+
+		if (signal?.aborted) {
+			throw new Error('S3 stream upload was aborted before starting');
+		}
+
+		const client = this.createS3Client(storage);
+		const key = this.buildS3Key(storage.path, remoteDir, safeFileName);
+
+		const upload = new Upload({
+			client,
+			params: {
+				Bucket: storage.bucket,
+				Key: key,
+				Body: input,
+				ContentLength: contentLength,
+			},
+			queueSize,
+			partSize,
+			leavePartsOnError: false,
+		});
+
+		let lastReportedPercent = -1;
+
+		upload.on('httpUploadProgress', (progress) => {
+			const loaded = progress.loaded ?? 0;
+
+			const percent =
+				contentLength === 0
+					? 100
+					: Math.min(100, Math.floor((loaded / contentLength) * 100));
+
+			if (percent === lastReportedPercent) {
+				return;
+			}
+
+			lastReportedPercent = percent;
+
+			try {
+				onProgress?.({
+					loaded,
+					total: contentLength,
+					percent,
+				});
+			} catch (error) {
+				this.logger.warn(
+					`S3 upload progress callback failed: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				);
+			}
+		});
+
+		const handleAbort = () => {
+			const abortError = new Error(
+				`S3 stream upload aborted: ${safeFileName}`,
+			);
+
+			if (!input.destroyed) {
+				input.destroy(abortError);
+			}
+
+			void upload.abort().catch((error) => {
+				this.logger.warn(
+					`Failed to abort S3 multipart upload: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				);
+			});
+		};
+
+		signal?.addEventListener('abort', handleAbort, {
+			once: true,
+		});
+
+		try {
+			const result = await upload.done();
+
+			if (lastReportedPercent < 100) {
+				onProgress?.({
+					loaded: contentLength,
+					total: contentLength,
+					percent: 100,
+				});
+			}
+
+			return {
+				bucket: storage.bucket,
+				key,
+				eTag: result.ETag,
+				versionId: result.VersionId,
+			};
+		} finally {
+			signal?.removeEventListener('abort', handleAbort);
+
+			if (!input.destroyed) {
+				input.destroy();
+			}
 		}
 	}
 

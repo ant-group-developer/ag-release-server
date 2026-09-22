@@ -306,14 +306,17 @@ export class BucketR2Service {
 	async getObjectStream({
 		bucketName,
 		key,
+		range,
 	}: {
 		bucketName: string;
 		key: string;
+		range?: string;
 	}): Promise<Readable> {
 		const result = await this.client.send(
 			new GetObjectCommand({
 				Bucket: bucketName,
 				Key: key,
+				Range: range,
 			}),
 		);
 
