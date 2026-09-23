@@ -17,6 +17,7 @@ import {
 	ErrorApprovalStatus,
 	ErrorSubmissionStatus,
 	ReleaseError,
+	ReleaseErrorType,
 } from '../entities/release-error.entity';
 
 @Injectable()
@@ -29,21 +30,49 @@ export class ReleaseErrorService {
 		private readonly releaseReviewService: ReleaseReviewService,
 	) {}
 
-	// nếu dùng cho nhiều release id thì phải sửa lại
 	async bulkCreateErrors(data: CreateReleaseErrorDto[], userId?: string) {
-		const releaseReview =
-			await this.releaseReviewService.findLatestByReleaseIdOrCreate({
-				data: { releaseId: data[0].releaseId },
-			});
+		if (!data.length) {
+			return [];
+		}
 
 		const entities = this.repo.create(
 			data.map((item) => ({
 				...item,
 				reviewerId: userId,
-				releaseReviewId: releaseReview.id,
 			})),
 		);
+
 		return this.repo.save(entities);
+	}
+
+	async createManualReviewError({
+		releaseId,
+		releaseExecutionId,
+		releaseReviewId,
+		stepId,
+		message,
+		reviewerId,
+	}: {
+		releaseId: string;
+		releaseExecutionId: string;
+		releaseReviewId: string;
+		stepId?: string | null;
+		message: string;
+		reviewerId: string;
+	}) {
+		const entity = this.repo.create({
+			releaseId,
+			releaseExecutionId,
+			releaseReviewId,
+			stepId,
+			type: ReleaseErrorType.ADMIN_CREATE,
+			message,
+			submissionStatus: ErrorSubmissionStatus.OPEN,
+			approvalStatus: ErrorApprovalStatus.PENDING,
+			reviewerId,
+		});
+
+		return this.repo.save(entity);
 	}
 
 	async bulkUpdateErrors(data: UpdateReleaseErrorDto[], userId: string) {

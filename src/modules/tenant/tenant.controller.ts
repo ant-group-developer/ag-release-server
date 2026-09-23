@@ -183,6 +183,7 @@ export class TenantController {
 			if (!userPerms.has(Permission.WORKSPACE.UPDATE_CONFIG)) {
 				delete payload.maxLabels;
 				delete payload.tenantTierId;
+				delete payload.requiresManualReview;
 			}
 		}
 

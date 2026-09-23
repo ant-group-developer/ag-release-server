@@ -28,6 +28,11 @@ export class ReleaseExecution3Builder {
 		releaseExecution: ReleaseExecution3;
 	}) {
 		const { releaseSnapshot } = releaseExecution.metadata.input;
+
+		const requiresManualReview =
+			releaseExecution.metadata.input.reviewPolicy
+				?.requiresManualReview === true;
+
 		const stepResult: Partial<ReleaseExecutionStep3>[] = [];
 
 		switch (STEP?.type) {
@@ -187,49 +192,62 @@ export class ReleaseExecution3Builder {
 				const dsp: Dsp | undefined = STEP.metadata?.input?.dsp;
 				const isVevo = dsp?.code?.trim().toUpperCase() === 'VEVO';
 
+				let order = 1;
+
 				if (isVevo) {
 					stepResult.push(
 						{
 							type: ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP,
-							order: 1,
+							order: order++,
 							metadata: { input: { dsp } },
 						},
 						{
 							type: ReleaseExecutionStepType.SUBMIT_VEVO_VIDEO,
-							order: 2,
+							order: order++,
 							metadata: { input: { dsp } },
 						},
 						{
 							type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
-							order: 3,
+							order: order++,
 							metadata: { input: { dsp } },
 						},
 						{
 							type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
-							order: 4,
+							order: order++,
 							metadata: { input: { dsp } },
 						},
 					);
 					break;
 				} else {
+					if (requiresManualReview) {
+						stepResult.push({
+							type: ReleaseExecutionStepType.REVIEW_RELEASE,
+							order: order++,
+							metadata: {
+								input: {
+									dspCode: dsp?.code,
+								},
+							},
+						});
+					}
 					stepResult.push(
 						{
 							type: ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
-							order: 1,
+							order: order++,
 							metadata: {
 								input: { dsp: STEP.metadata?.input?.dsp },
 							},
 						},
 						{
 							type: ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP,
-							order: 2,
+							order: order++,
 							metadata: {
 								input: { dsp: STEP.metadata?.input?.dsp },
 							},
 						},
 						{
 							type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
-							order: 3,
+							order: order++,
 							metadata: {
 								input: {
 									dsp: STEP.metadata?.input?.dsp,
@@ -239,7 +257,7 @@ export class ReleaseExecution3Builder {
 						},
 						{
 							type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
-							order: 4,
+							order: order++,
 							metadata: {
 								input: {
 									dsp: STEP.metadata?.input?.dsp,
@@ -293,6 +311,13 @@ export class ReleaseExecution3Builder {
 									dspAggregator?.ci?.primaryDsp ?? null,
 							},
 						},
+					});
+				}
+
+				if (requiresManualReview) {
+					stepResult.push({
+						type: ReleaseExecutionStepType.REVIEW_RELEASE,
+						order: order++,
 					});
 				}
 

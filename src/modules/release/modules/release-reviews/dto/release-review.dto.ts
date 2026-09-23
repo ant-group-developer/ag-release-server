@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	ArrayNotEmpty,
 	IsArray,
 	IsEnum,
 	IsIn,
@@ -128,4 +129,16 @@ export class GetListReleaseReviewsDto extends BaseQueryDto2 {
 	@IsOptional()
 	@IsEnum(OrderDirection)
 	orderBy: OrderDirection = OrderDirection.DESC;
+}
+
+export class BulkUpdateReleaseReviewDecisionDto extends UpdateReleaseReviewDecisionDto {
+	@ApiProperty({
+		type: [String],
+		format: 'uuid',
+		description: 'Danh sách release cần approve hoặc reject',
+	})
+	@IsArray()
+	@ArrayNotEmpty()
+	@IsUUID('4', { each: true })
+	releaseIds: string[];
 }

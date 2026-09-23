@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { Repository } from 'typeorm';
+import { Tenant } from 'src/modules/tenant/tenant.entity';
+import { EntityManager, Repository } from 'typeorm';
 import { ReleaseExecution3 } from '../../entites/release-execution3.entity';
 import {
 	ReleaseExecution3RunPipelineQueue,
@@ -23,6 +24,8 @@ export class ReleaseExecution3Queue {
 
 		// @Inject(forwardRef(() => ReleaseExecution3Service))
 		// private readonly executionService: ReleaseExecution3Service,
+		@InjectEntityManager()
+		private readonly manager: EntityManager,
 	) {}
 
 	async queueExecution(body: {
@@ -31,6 +34,13 @@ export class ReleaseExecution3Queue {
 		type: ExecutionType;
 		creatorId?: string | null;
 	}) {
+		const tenant = await this.manager.findOne(Tenant, {
+			where: { id: body.release.tenantId },
+		});
+
+		if (!tenant) {
+			throw new Error(`Tenant not found: ${body.release.tenantId}`);
+		}
 		// const execution =
 		await this.executionRepo.save(
 			this.executionRepo.create({
@@ -43,6 +53,11 @@ export class ReleaseExecution3Queue {
 					input: {
 						releaseSnapshot: body.release,
 						dspCodes: body.dspCodes,
+						reviewPolicy: {
+							tenantId: tenant.id,
+							requiresManualReview:
+								tenant.requiresManualReview === true,
+						},
 					},
 				},
 				creatorId: body.creatorId ?? null,

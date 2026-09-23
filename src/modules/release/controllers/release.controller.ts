@@ -51,7 +51,10 @@ import {
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
-import { UpdateReleaseReviewDecisionDto } from '../modules/release-reviews/dto/release-review.dto';
+import {
+	BulkUpdateReleaseReviewDecisionDto,
+	UpdateReleaseReviewDecisionDto,
+} from '../modules/release-reviews/dto/release-review.dto';
 import { ReleaseService } from '../services/release.service';
 
 @ApiTags('Releases')
@@ -531,6 +534,23 @@ export class ReleaseController {
 	) {
 		const result = await this.releaseService.updateReleaseReview(
 			id,
+			body,
+			userId,
+		);
+
+		return new ResponseSuccess({ data: result });
+	}
+
+	@ApiOperation({ summary: 'Bulk update release review decisions' })
+	@ApiBody({ type: BulkUpdateReleaseReviewDecisionDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
+	@Post('release-review/bulk')
+	async updateReleaseReviews(
+		@Body() body: BulkUpdateReleaseReviewDecisionDto,
+		@UserId() userId: string,
+	) {
+		const result = await this.releaseService.updateReleaseReviews(
+			body.releaseIds,
 			body,
 			userId,
 		);
