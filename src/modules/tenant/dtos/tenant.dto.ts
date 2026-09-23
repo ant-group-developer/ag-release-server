@@ -90,6 +90,14 @@ export abstract class UpdateTenantDto {
 	@IsBoolean()
 	isActive?: boolean;
 
+	@ApiPropertyOptional({
+		description: 'Whether releases of this tenant require manual review',
+		default: false,
+	})
+	@IsOptional()
+	@IsBoolean()
+	requiresManualReview?: boolean;
+
 	@ApiPropertyOptional()
 	@IsOptional()
 	@IsUUID()

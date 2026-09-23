@@ -798,7 +798,97 @@ export class ReleaseExecution3Service {
 		await this.queueService.queueRunPipeline(step.releaseExecutionId);
 	}
 
+	async resolveManualReview({
+		executionId,
+		reviewStatus,
+		stepStatus,
+	}: {
+		executionId: string;
+		reviewStatus:
+			| ReleaseReviewStatus.COMPLETED
+			| ReleaseReviewStatus.FAILED;
+		stepStatus:
+			| ReleaseExecutionStepStatus.DONE
+			| ReleaseExecutionStepStatus.FAILED;
+	}) {
+		const reviewSteps = await this.stepRepo.find({
+			where: {
+				releaseExecutionId: executionId,
+				type: ReleaseExecutionStepType.REVIEW_RELEASE,
+			},
+		});
+
+		if (!reviewSteps.length) {
+			throw new Error('REVIEW_NOT_FOUND');
+		}
+
+		// Không cho approve/reject khi còn review step chưa tới trạng thái chờ.
+		if (
+			reviewSteps.some(
+				(step) =>
+					step.status !== ReleaseExecutionStepStatus.WAITING_ACTION,
+			)
+		) {
+			throw new Error('REVIEW_NOT_READY');
+		}
+
+		const stepIds = reviewSteps.map((step) => step.id);
+
+		const now = new Date();
+
+		await this.stepRepo.update(
+			{
+				id: In(stepIds),
+			},
+			{
+				status: stepStatus,
+				completedAt: now,
+			},
+		);
+
+		const activeReviewStatuses = [
+			ReleaseReviewStatus.PENDING,
+			ReleaseReviewStatus.PROCESSING,
+		];
+
+		await this.manager.update(
+			ReleaseReview,
+			{
+				releaseExecutionId: executionId,
+				stepId: In(stepIds),
+				status: In(activeReviewStatuses),
+			},
+			{
+				status: reviewStatus,
+			},
+		);
+
+		await this.queueService.queueRunPipeline(executionId);
+
+		return {
+			executionId,
+			reviewedStepIds: stepIds,
+			reviewStatus,
+			stepStatus,
+		};
+	}
+
 	async findOne(id: string) {
 		return this.queryService.findOne(id);
+	}
+
+	async findWaitingManualReviewStep(releaseId: string) {
+		return this.stepRepo
+			.createQueryBuilder('reviewStep')
+			.innerJoin('reviewStep.releaseExecution', 'execution')
+			.where('execution.releaseId = :releaseId', { releaseId })
+			.andWhere('reviewStep.type = :reviewStepType', {
+				reviewStepType: ReleaseExecutionStepType.REVIEW_RELEASE,
+			})
+			.andWhere('reviewStep.status = :waitingActionStatus', {
+				waitingActionStatus: ReleaseExecutionStepStatus.WAITING_ACTION,
+			})
+			.orderBy('reviewStep.createdAt', 'DESC')
+			.getOne();
 	}
 }

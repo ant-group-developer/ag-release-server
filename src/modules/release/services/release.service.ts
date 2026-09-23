@@ -148,6 +148,18 @@ export class ReleaseService {
 		);
 	}
 
+	async updateReleaseReviews(
+		releaseIds: string[],
+		body: UpdateReleaseReviewDecisionDto,
+		reviewerId: string,
+	) {
+		return this.releaseReviewService.handleBulkResultReviewRelease(
+			releaseIds,
+			body,
+			reviewerId,
+		);
+	}
+
 	async getList(
 		query: QueryGetListReleaseDto,
 	): Promise<PageDto<IReleaseDetail>> {

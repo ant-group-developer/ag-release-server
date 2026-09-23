@@ -358,42 +358,21 @@ export class ReleaseExecution3Worker {
 		}
 	}
 
-	private async reviewRelease({
+	private reviewRelease({
 		step,
 		releaseExecution,
-	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+	}: StepTaskContext): ReleaseExecutionStepStatus {
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 
-			const review =
-				await this.releaseReviewService.findLatestByReleaseIdOrCreate({
-					data: {
-						releaseId,
-						releaseExecutionId: releaseExecution.id,
-						stepId: step.id,
-					},
-				});
-
-			step.metadata = {
-				...step.metadata,
-				input: {
-					...step.metadata?.input,
-					releaseId,
-				},
-				output: {
-					...step.metadata?.output,
-					releaseReviewId: review.id,
-					reviewCreated: true,
-				},
-			};
-
-			await this.manager.save(ReleaseExecutionStep3, step);
-
 			this.logService.success({
-				message: `[REVIEW_RELEASE] Review created, waiting for manual review`,
+				message: `[REVIEW_RELEASE] Waiting for manual review`,
 				releaseExecutionId: releaseExecution.id,
 				releaseExecutionStepId: step.id,
-				data: { releaseId, releaseReviewId: review.id },
+				data: {
+					releaseId,
+					waitingForManualReview: true,
+				},
 			});
 
 			return ReleaseExecutionStepStatus.WAITING_ACTION;

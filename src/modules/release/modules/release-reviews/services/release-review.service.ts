@@ -11,7 +11,7 @@ import { OrderDirection } from 'src/common/enums/common';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
 import { ReleaseExecution3Service } from 'src/modules/release/modules/release-executions3/services/release-execution3.service';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { ReleaseExecutionStepStatus } from '../../release-executions3/enums/release-execution3.enum';
 import {
 	CreateReleaseReviewDto,
@@ -152,19 +152,100 @@ export class ReleaseReviewService {
 		}
 	}
 
+	async findLatestPendingByReleaseId(releaseId: string) {
+		const review = await this.repo.findOne({
+			where: {
+				releaseId,
+				status: In([
+					ReleaseReviewStatus.PENDING,
+					ReleaseReviewStatus.PROCESSING,
+				]),
+			},
+			order: {
+				createdAt: 'DESC',
+			},
+		});
+
+		if (!review) {
+			throw new NotFoundException(
+				'Không tìm thấy release review đang chờ xử lý',
+			);
+		}
+
+		return review;
+	}
+
+	async findOrCreateByExecutionStep({
+		data,
+	}: {
+		data: {
+			releaseId: string;
+			releaseExecutionId: string;
+			stepId: string;
+			note?: string | null;
+		};
+	}) {
+		const review = await this.repo.findOne({
+			where: {
+				releaseId: data.releaseId,
+				releaseExecutionId: data.releaseExecutionId,
+				stepId: data.stepId,
+			},
+			order: {
+				createdAt: 'DESC',
+			},
+		});
+
+		if (review) {
+			return review;
+		}
+
+		return this.create({
+			releaseId: data.releaseId,
+			releaseExecutionId: data.releaseExecutionId,
+			stepId: data.stepId,
+			status: ReleaseReviewStatus.PENDING,
+			note: data.note,
+		});
+	}
+
 	async handleResultReviewRelease(
 		releaseId: string,
 		body: UpdateReleaseReviewDecisionDto,
 		reviewerId: string,
 	) {
-		const review = await this.findLatestByReleaseIdOrCreate({
-			data: { releaseId },
-		});
+		const waitingStep =
+			await this.releaseExecutionService.findWaitingManualReviewStep(
+				releaseId,
+			);
+
+		if (!waitingStep) {
+			throw new BadRequestException(
+				'Bản phát hành không đang trong trạng thái đợi duyệt!',
+			);
+		}
 
 		const stepStatus =
 			body.status === ReleaseReviewStatus.COMPLETED
 				? ReleaseExecutionStepStatus.DONE
 				: ReleaseExecutionStepStatus.FAILED;
+
+		// Chỉ tạo release review khi admin đã quyết định.
+		const review = await this.create({
+			releaseId,
+			releaseExecutionId: waitingStep.releaseExecutionId,
+			stepId: waitingStep.id,
+			status: body.status,
+			note: body.note ?? null,
+		});
+
+		await this.repo.update({ id: review.id }, { reviewerId });
+
+		const result = await this.releaseExecutionService.resolveManualReview({
+			executionId: waitingStep.releaseExecutionId,
+			reviewStatus: body.status,
+			stepStatus,
+		});
 
 		await this.releaseErrorService.bulkUpdateErrorsByReviewResult({
 			releaseId,
@@ -172,19 +253,18 @@ export class ReleaseReviewService {
 			reviewerId,
 		});
 
-		review.status = body.status;
-		review.reviewerId = reviewerId;
-		review.note = body.note ?? review.note;
-		await this.repo.save(review);
-
-		if (review.stepId) {
-			await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
-				{
-					stepId: review.stepId,
-					status: stepStatus,
-				},
-			);
+		if (body.status === ReleaseReviewStatus.FAILED) {
+			await this.releaseErrorService.createManualReviewError({
+				releaseId,
+				releaseExecutionId: waitingStep.releaseExecutionId,
+				releaseReviewId: review.id,
+				stepId: waitingStep.id,
+				message: body.note?.trim() ?? '',
+				reviewerId,
+			});
 		}
+
+		return result;
 	}
 
 	async remove(id: string) {
@@ -255,5 +335,34 @@ export class ReleaseReviewService {
 		}
 
 		orderAndPaging2({ qb, filter });
+	}
+
+	async handleBulkResultReviewRelease(
+		releaseIds: string[],
+		body: UpdateReleaseReviewDecisionDto,
+		reviewerId: string,
+	) {
+		const uniqueReleaseIds = [...new Set(releaseIds)];
+
+		let succeeded = 0;
+		let failed = 0;
+
+		for (const releaseId of uniqueReleaseIds) {
+			try {
+				await this.handleResultReviewRelease(
+					releaseId,
+					body,
+					reviewerId,
+				);
+
+				succeeded++;
+			} catch {
+				failed++;
+			}
+		}
+
+		return {
+			message: `Đã xử lý ${succeeded} bản thành công, ${failed} bản thất bại`,
+		};
 	}
 }
