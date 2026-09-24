@@ -23,11 +23,47 @@ export function getRawDetailsPageQuery(
       any(s.artist_name) AS fallback_artist_name,
       any(s.label_name) AS fallback_label_name,
       sum(s.total_usage) AS total_usage,
-      toString(sum(s.revenue_usd)) AS revenue_usd
+      toString(sum(s.revenue_usd)) AS revenue_amount,
+      toString(sum(s.revenue_usd)) AS revenue_usd,
+      'USD' AS currency
     FROM ${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY} s
     ${commonJoinsSql}
     ${whereSql}
     GROUP BY date, start_date, end_date, s.dsp_id, dsp_name, territory, isrc
+  `;
+}
+
+export function getRawStatementDetailsPageQuery(
+	resolvedDspName: string,
+	commonJoinsSql: string,
+	whereSql: string,
+): string {
+	return `
+    SELECT
+      formatDateTime(s.period, '%Y-%m') AS date,
+      formatDateTime(s.period, '%Y-%m-01') AS start_date,
+      formatDateTime(addDays(addMonths(toStartOfMonth(s.period), 1), -1), '%Y-%m-%d') AS end_date,
+      s.dsp_id AS dsp_id,
+      ${resolvedDspName} AS dsp_name,
+      s.territory_code AS territory,
+      s.isrc AS isrc,
+	  any(coalesce(nullIf(o.tenant_id, ''), nullIf(t.tenant_id, ''), nullIf(s.ingest_tenant_id, ''))) AS tenant_id,
+      any(t.release_id) AS release_id,
+	  any(coalesce(nullIf(o.label_id, ''), nullIf(t.label_id, ''), nullIf(s.ingest_label_id, ''))) AS label_id,
+      any(s.upc) AS fallback_upc,
+      any(s.track_title) AS fallback_track_title,
+      any(s.album_title) AS fallback_album_title,
+      any(s.artist_name) AS fallback_artist_name,
+      any(s.label_name) AS fallback_label_name,
+      sum(s.total_usage) AS total_usage,
+      toString(sum(s.revenue_local)) AS revenue_amount,
+      toString(sum(s.revenue_usd)) AS revenue_usd,
+      s.revenue_currency AS currency
+    FROM ${CLICKHOUSE_TABLES.SALES_STATEMENT_MONTHLY} s
+    ${commonJoinsSql}
+    ${whereSql}
+    GROUP BY date, start_date, end_date, s.dsp_id, dsp_name, territory,
+      isrc, s.revenue_currency
   `;
 }
 

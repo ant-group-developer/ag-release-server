@@ -51,6 +51,52 @@ describe('CubeRebuildService', () => {
 		);
 	});
 
+	it('drops and rebuilds the statement-currency cube for each sales partition', async () => {
+		await service.rebuildSalesCubesForPeriods(['2026-08']);
+
+		const sql = clickHouseService.execute.mock.calls
+			.map((call) => call[0] as string)
+			.join('\n');
+		expect(sql).toContain(
+			"ALTER TABLE music_analytics.sales_statement_monthly_cube DROP PARTITION '202608'",
+		);
+		expect(sql).toContain(
+			'INSERT INTO music_analytics.sales_statement_monthly_cube',
+		);
+		expect(sql).toContain(
+			"if(f.revenue_currency = '', 'USD', f.revenue_currency) AS revenue_currency",
+		);
+		expect(sql).toContain('f.revenue_local != 0 OR f.revenue_usd = 0');
+		expect(sql).toContain(
+			'f.ingest_tenant_id, f.ingest_label_id, revenue_currency',
+		);
+	});
+
+	it('includes and counts the statement-currency cube in a full sales rebuild', async () => {
+		clickHouseService.query
+			.mockResolvedValueOnce([{ cnt: '11' }])
+			.mockResolvedValueOnce([{ cnt: '12' }])
+			.mockResolvedValueOnce([{ cnt: '13' }])
+			.mockResolvedValueOnce([{ cnt: '14' }]);
+
+		await expect(service.rebuildAllSalesCubes()).resolves.toEqual({
+			dspRows: 11,
+			terRows: 12,
+			exportRows: 13,
+			statementRows: 14,
+		});
+
+		expect(clickHouseService.execute).toHaveBeenCalledWith(
+			'TRUNCATE TABLE IF EXISTS music_analytics.sales_statement_monthly_cube',
+		);
+		const sql = clickHouseService.execute.mock.calls
+			.map((call) => call[0] as string)
+			.join('\n');
+		expect(sql).toContain(
+			'INSERT INTO music_analytics.sales_statement_monthly_cube',
+		);
+	});
+
 	it('detaches leftover cube materialized views before a period fact write', async () => {
 		await service.pauseCubeMaterializedViews();
 

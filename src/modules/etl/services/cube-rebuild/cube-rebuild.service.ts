@@ -4,7 +4,10 @@ import {
 	CUBE_MATERIALIZED_VIEWS,
 } from '../../../clickhouse/clickhouse.constants';
 import { ClickHouseService } from '../../../clickhouse/clickhouse.service';
-import { REVENUE_USD_EXPRESSION } from './revenue-sql.util';
+import {
+	REVENUE_USD_EXPRESSION,
+	STATEMENT_REVENUE_EXPRESSION,
+} from './revenue-sql.util';
 
 @Injectable()
 export class CubeRebuildService {
@@ -122,6 +125,10 @@ export class CubeRebuildService {
 					CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY,
 					partition,
 				);
+				await this.dropPartition(
+					CLICKHOUSE_TABLES.SALES_STATEMENT_MONTHLY,
+					partition,
+				);
 
 				// 2. Re-insert aggregated data for the partition into sales dsp cube
 				await this.clickHouseService.execute(`
@@ -188,6 +195,34 @@ export class CubeRebuildService {
               AND f.revenue_currency = er.currency
           WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
           GROUP BY period, f.dsp_id, f.territory_code, f.isrc, import_source, f.ingest_tenant_id, f.ingest_label_id
+        `);
+
+				// 5. Re-insert the statement-currency export cube. Unlike the
+				// normalized export cube above, this keeps revenue_local and the
+				// imported revenue_currency as separate aggregation dimensions.
+				await this.clickHouseService.execute(`
+          INSERT INTO music_analytics.${CLICKHOUSE_TABLES.SALES_STATEMENT_MONTHLY}
+          SELECT
+              toStartOfMonth(f.reporting_period_start) AS period,
+              f.dsp_id,
+              f.territory_code,
+              f.isrc,
+              if(f.import_source = '', 'ftp', f.import_source) AS import_source,
+			  f.ingest_tenant_id,
+			  f.ingest_label_id,
+              if(f.revenue_currency = '', 'USD', f.revenue_currency) AS revenue_currency,
+              any(f.upc) AS upc,
+              any(f.track_title) AS track_title,
+              any(f.album_title) AS album_title,
+              any(f.artist_name) AS artist_name,
+              any(f.label_name) AS label_name,
+              sum(f.quantity) AS total_usage,
+              ${STATEMENT_REVENUE_EXPRESSION} AS revenue_local,
+              sum(f.revenue_usd) AS revenue_usd
+          FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
+          WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
+          GROUP BY period, f.dsp_id, f.territory_code, f.isrc, import_source,
+                   f.ingest_tenant_id, f.ingest_label_id, revenue_currency
         `);
 
 				this.logger.log(
@@ -428,6 +463,7 @@ export class CubeRebuildService {
 		dspRows: number;
 		terRows: number;
 		exportRows: number;
+		statementRows: number;
 	}> {
 		this.logger.log(
 			'Executing full rebuild of all sales cubes (DSP + Territory + Export)...',
@@ -442,6 +478,9 @@ export class CubeRebuildService {
 		);
 		await this.clickHouseService.execute(
 			`TRUNCATE TABLE IF EXISTS music_analytics.${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY}`,
+		);
+		await this.clickHouseService.execute(
+			`TRUNCATE TABLE IF EXISTS music_analytics.${CLICKHOUSE_TABLES.SALES_STATEMENT_MONTHLY}`,
 		);
 
 		// 2. Rebuild DSP cube
@@ -508,6 +547,31 @@ export class CubeRebuildService {
       GROUP BY period, f.dsp_id, f.territory_code, f.isrc, import_source, f.ingest_tenant_id, f.ingest_label_id
     `);
 
+		// 5. Rebuild the exact statement-currency export cube.
+		await this.clickHouseService.execute(`
+      INSERT INTO music_analytics.${CLICKHOUSE_TABLES.SALES_STATEMENT_MONTHLY}
+      SELECT
+          toStartOfMonth(f.reporting_period_start) AS period,
+          f.dsp_id,
+          f.territory_code,
+          f.isrc,
+          if(f.import_source = '', 'ftp', f.import_source) AS import_source,
+		  f.ingest_tenant_id,
+		  f.ingest_label_id,
+          if(f.revenue_currency = '', 'USD', f.revenue_currency) AS revenue_currency,
+          any(f.upc) AS upc,
+          any(f.track_title) AS track_title,
+          any(f.album_title) AS album_title,
+          any(f.artist_name) AS artist_name,
+          any(f.label_name) AS label_name,
+          sum(f.quantity) AS total_usage,
+          ${STATEMENT_REVENUE_EXPRESSION} AS revenue_local,
+          sum(f.revenue_usd) AS revenue_usd
+      FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
+      GROUP BY period, f.dsp_id, f.territory_code, f.isrc, import_source,
+               f.ingest_tenant_id, f.ingest_label_id, revenue_currency
+    `);
+
 		const dspCount = await this.clickHouseService.query<{ cnt: string }>(
 			`SELECT count() AS cnt FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY}`,
 		);
@@ -517,16 +581,22 @@ export class CubeRebuildService {
 		const exportCount = await this.clickHouseService.query<{ cnt: string }>(
 			`SELECT count() AS cnt FROM music_analytics.${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY}`,
 		);
+		const statementCount = await this.clickHouseService.query<{
+			cnt: string;
+		}>(
+			`SELECT count() AS cnt FROM music_analytics.${CLICKHOUSE_TABLES.SALES_STATEMENT_MONTHLY}`,
+		);
 
 		const dspRows = Number(dspCount[0]?.cnt ?? 0);
 		const terRows = Number(terCount[0]?.cnt ?? 0);
 		const exportRows = Number(exportCount[0]?.cnt ?? 0);
+		const statementRows = Number(statementCount[0]?.cnt ?? 0);
 
 		this.logger.log(
-			`✅ Full rebuild complete — DSP: ${dspRows} rows, Territory: ${terRows} rows, Export: ${exportRows} rows`,
+			`✅ Full rebuild complete — DSP: ${dspRows} rows, Territory: ${terRows} rows, Export: ${exportRows} rows, Statement export: ${statementRows} rows`,
 		);
 
-		return { dspRows, terRows, exportRows };
+		return { dspRows, terRows, exportRows, statementRows };
 	}
 
 	/** Rebuild every trends/usage cube from the canonical fact table. */

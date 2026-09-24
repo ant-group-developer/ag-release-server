@@ -1,5 +1,51 @@
 import { AnalyticsReportExportService } from './analytics-report-export.service';
 
+describe('AnalyticsReportExportService.createExportJob', () => {
+	it('persists statement mode and returns the matching SSE endpoint', async () => {
+		const importJobsService = {
+			create: jest.fn().mockResolvedValue({ id: 'job-statement' }),
+			markQueued: jest.fn().mockResolvedValue(undefined),
+		};
+		const exportQueueService = {
+			enqueue: jest.fn().mockResolvedValue(undefined),
+		};
+		const service = new AnalyticsReportExportService(
+			{} as never,
+			{} as never,
+			importJobsService as never,
+			exportQueueService as never,
+			{} as never,
+			{} as never,
+		);
+		const dto = {
+			fromDate: '2026-01',
+			endDate: '2026-01',
+			exportMode: 'statement' as const,
+		};
+
+		await expect(
+			service.createExportJob('tenant-a', 'user-1', dto),
+		).resolves.toMatchObject({
+			jobId: 'job-statement',
+			eventsUrl:
+				'/analytics/reports/statement-export/job-statement/events',
+		});
+
+		expect(importJobsService.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				params: expect.objectContaining({ exportMode: 'statement' }),
+				fileName: expect.stringContaining('_statement-report_'),
+			}),
+		);
+		expect(importJobsService.markQueued).toHaveBeenCalledWith(
+			'job-statement',
+		);
+		expect(exportQueueService.enqueue).toHaveBeenCalledWith(
+			'job-statement',
+		);
+	});
+});
+
 describe('AnalyticsReportExportService.reapStuckQueuedJobs', () => {
 	const originalRole = process.env.APP_ROLE;
 
