@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
+import { AssetOwnershipService } from 'src/modules/asset-import/services/asset-ownership.service';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
 import { LogModule } from 'src/modules/log/entites/logs.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
@@ -9,8 +10,7 @@ import { TenantService } from 'src/modules/tenant/tenant.service';
 import { TenantUser } from 'src/modules/user/entities/tenant-user.entity';
 import { TenantUserType } from 'src/modules/user/enum/user.enum';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
-import { DataSource, In, Not, Repository } from 'typeorm';
-import { AssetOwnershipService } from 'src/modules/asset-import/services/asset-ownership.service';
+import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import {
 	CHANNEL_TRANSFER_MAX_RELEASES,
 	ChannelException,
@@ -262,8 +262,79 @@ export class ChannelService {
 
 		// Kiem tra channel hien tai nam trong cay tenant ma nguoi dung quan ly.
 		const channel = await this.findOne(id, actorTenantId);
-		if (dto.tenantId !== undefined && dto.tenantId !== channel.tenantId) {
-			throw ChannelException.USE_TRANSFER_ENDPOINT();
+		const tenantChanged =
+			dto.tenantId !== undefined && dto.tenantId !== channel.tenantId;
+
+		if (tenantChanged) {
+			if (!dto.effectiveDate || !dto.revenueEffectiveFrom) {
+				throw ChannelException.DATES_REQUIRED();
+			}
+
+			const transferDto: TransferChannelTenantDto = {
+				tenantId: dto.tenantId!,
+				effectiveDate: dto.effectiveDate,
+				revenueEffectiveFrom: dto.revenueEffectiveFrom,
+			};
+			const prepared = await this.prepareTransfer(
+				id,
+				transferDto,
+				actorTenantId,
+			);
+			if (prepared.blockingSharedIsrcs.length) {
+				throw ChannelException.SHARED_ISRC({
+					blockingSharedIsrcs: prepared.blockingSharedIsrcs,
+				});
+			}
+			if (prepared.blockingReleases.length) {
+				throw ChannelException.DATE_NOT_AFTER_CURRENT_PERIOD({
+					blockingReleases: prepared.blockingReleases,
+				});
+			}
+
+			const revenueEffectiveFrom =
+				this.assetOwnershipService.normalizeRevenueMonth(
+					transferDto.revenueEffectiveFrom,
+				);
+
+			await this.dataSource.transaction(async (manager) => {
+				await this.applyPreparedTransfer(
+					manager,
+					id,
+					transferDto,
+					prepared,
+					revenueEffectiveFrom,
+					userId,
+				);
+				await manager.update(Channel, id, {
+					...(dto.thumbUrl !== undefined
+						? { thumbUrl: dto.thumbUrl }
+						: {}),
+					...(dto.isActive !== undefined
+						? { isActive: dto.isActive }
+						: {}),
+				});
+			});
+
+			await this.dataSource.query(
+				"SELECT pg_notify('clickhouse_sync_channel', 'asset_ownership_periods')",
+			);
+
+			this.logsService.log({
+				module: LogModule.COMMON,
+				message: `[CHANNEL_TRANSFER] ${prepared.channel.name} ${prepared.fromTenantId} -> ${transferDto.tenantId}`,
+				data: {
+					channelId: id,
+					mode: prepared.mode,
+					fromTenantId: prepared.fromTenantId,
+					toTenantId: transferDto.tenantId,
+					effectiveDate: transferDto.effectiveDate,
+					revenueEffectiveFrom,
+					transferredReleaseCount: prepared.releasesToTransfer.length,
+					source: 'channel_update',
+				},
+			});
+
+			return this.findOne(id, actorTenantId);
 		}
 
 		if (dto.name && dto.name !== channel.name) {
@@ -306,6 +377,53 @@ export class ChannelService {
 		return this.findOne(id, actorTenantId);
 	}
 
+	private async applyPreparedTransfer(
+		manager: EntityManager,
+		id: string,
+		dto: TransferChannelTenantDto,
+		prepared: Awaited<ReturnType<ChannelService['prepareTransfer']>>,
+		revenueEffectiveFrom: string,
+		userId: string,
+	) {
+		await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+			`channel_transfer:${id}`,
+		]);
+		await manager.query("SET LOCAL statement_timeout = '60s'");
+
+		const items = prepared.releasesToTransfer.map((release) => ({
+			releaseId: release.releaseId,
+			labelId: release.destLabelId,
+		}));
+		if (items.length) {
+			await this.assetOwnershipService.transferMany(manager, {
+				items,
+				tenantId: dto.tenantId,
+				effectiveDate: dto.effectiveDate,
+				revenueEffectiveFrom,
+				source: 'channel_transfer',
+				actorId: userId,
+				notify: false,
+			});
+		}
+
+		if (prepared.mode !== 'assets_only') {
+			await manager.save(
+				ChannelHistory,
+				this.channelHistoryRepo.create({
+					userId,
+					channelId: id,
+					channel: prepared.channel,
+					effectiveDate: dto.effectiveDate,
+					revenueEffectiveFrom,
+					fromTenantId: prepared.fromTenantId,
+					toTenantId: dto.tenantId,
+				}),
+			);
+			await manager.delete(UserChannel, { channelId: id });
+			await manager.update(Channel, id, { tenantId: dto.tenantId });
+		}
+	}
+
 	async previewTransfer(
 		id: string,
 		dto: TransferChannelTenantDto,
@@ -338,44 +456,14 @@ export class ChannelService {
 			);
 
 		await this.dataSource.transaction(async (manager) => {
-			await manager.query(
-				"SELECT pg_advisory_xact_lock(hashtext($1))",
-				[`channel_transfer:${id}`],
+			await this.applyPreparedTransfer(
+				manager,
+				id,
+				dto,
+				prepared,
+				revenueEffectiveFrom,
+				userId,
 			);
-			await manager.query("SET LOCAL statement_timeout = '60s'");
-
-			const items = prepared.releasesToTransfer.map((release) => ({
-				releaseId: release.releaseId,
-				labelId: release.destLabelId,
-			}));
-			if (items.length) {
-				await this.assetOwnershipService.transferMany(manager, {
-					items,
-					tenantId: dto.tenantId,
-					effectiveDate: dto.effectiveDate,
-					revenueEffectiveFrom,
-					source: 'channel_transfer',
-					actorId: userId,
-					notify: false,
-				});
-			}
-
-			if (prepared.mode !== 'assets_only') {
-				await manager.save(
-					ChannelHistory,
-					this.channelHistoryRepo.create({
-						userId,
-						channelId: id,
-						channel: prepared.channel,
-						effectiveDate: dto.effectiveDate,
-						revenueEffectiveFrom,
-						fromTenantId: prepared.fromTenantId,
-						toTenantId: dto.tenantId,
-					}),
-				);
-				await manager.delete(UserChannel, { channelId: id });
-				await manager.update(Channel, id, { tenantId: dto.tenantId });
-			}
 		});
 
 		await this.dataSource.query(
@@ -417,7 +505,10 @@ export class ChannelService {
 		dto: TransferChannelTenantDto,
 		actorTenantId: string,
 	) {
-		this.assetOwnershipService.assertDate(dto.effectiveDate, 'effectiveDate');
+		this.assetOwnershipService.assertDate(
+			dto.effectiveDate,
+			'effectiveDate',
+		);
 		const revenueEffectiveFrom =
 			this.assetOwnershipService.normalizeRevenueMonth(
 				dto.revenueEffectiveFrom,
@@ -483,7 +574,9 @@ export class ChannelService {
 				)
 			: [];
 
-		const uniqueReleaseIds = [...new Set(videoReleases.map((r) => r.release_id))];
+		const uniqueReleaseIds = [
+			...new Set(videoReleases.map((r) => r.release_id)),
+		];
 		const openPeriods: Array<{
 			release_id: string;
 			tenant_id: string;
@@ -514,7 +607,9 @@ export class ChannelService {
 							...new Set(
 								videoReleases
 									.map((r) => r.label_id)
-									.filter((labelId): labelId is string => Boolean(labelId)),
+									.filter((labelId): labelId is string =>
+										Boolean(labelId),
+									),
 							),
 						],
 					],
