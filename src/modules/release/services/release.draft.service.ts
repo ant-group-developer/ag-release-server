@@ -75,6 +75,8 @@ export class ReleaseDraftService {
 
 		private readonly trackDraftService: TrackDraftService,
 		private readonly dataSource: DataSource,
+		@InjectRepository(PriceTier)
+		private readonly priceTierRepo: Repository<PriceTier>,
 	) {}
 
 	// create
@@ -90,8 +92,9 @@ export class ReleaseDraftService {
 			primaryGenreId,
 			subGenreId,
 			releaseTimezoneId,
-			priceTierId,
 		} = releaseData;
+
+		let priceTierId = releaseData.priceTierId;
 
 		await this.releaseValidateService.validate({
 			albumFormatId,
@@ -102,8 +105,20 @@ export class ReleaseDraftService {
 			priceTierId,
 		});
 
+		if (priceTierId === undefined) {
+			const defaultPriceTier = await this.priceTierRepo.findOne({
+				where: {
+					isDefault: true,
+					isActive: true,
+				},
+			});
+
+			priceTierId = defaultPriceTier?.id ?? null;
+		}
+
 		const release = this.releaseRepo.create({
 			...releaseData,
+			priceTierId,
 			tenantId,
 			creatorId: userId,
 			modifierId: userId,
