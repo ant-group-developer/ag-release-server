@@ -11,7 +11,6 @@ import {
 	JoinColumn,
 	ManyToOne,
 	OneToMany,
-	OneToOne,
 } from 'typeorm';
 import { ReleaseReview } from '../../release-reviews/entities/release-review.entity';
 import {
@@ -83,8 +82,8 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 	@OneToMany(() => ReleaseError, (error) => error.releaseExecution)
 	releaseErrors: ReleaseError[];
 
-	@OneToOne(() => ReleaseReview, (review) => review.releaseExecution)
-	releaseReview?: ReleaseReview | null;
+	@OneToMany(() => ReleaseReview, (review) => review.releaseExecution)
+	releaseReview?: ReleaseReview[];
 
 	@OneToMany(() => Logs, (log) => log.releaseExecution)
 	logs: Logs[];
@@ -99,6 +98,10 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 			releaseSnapshot: Release;
 			dspCodes: string[];
 			dspDirect: Dsp[];
+			reviewPolicy?: {
+				tenantId: string;
+				requiresManualReview: boolean;
+			};
 			dspAggregator: {
 				ci: {
 					ci: Dsp[];

@@ -29,7 +29,6 @@ import {
 	VirtualColumnReleaseArr,
 } from '../enum/release.enum';
 import { ErrorSubmissionStatus } from '../modules/release-errors/entities/release-error.entity';
-import { ReleaseReviewStatus } from '../modules/release-reviews/entities/release-review.entity';
 import { parseJson } from '../utils/release.utils';
 
 interface IDataFromDb {
@@ -199,11 +198,18 @@ export class ReleaseQueryService {
 	async getStatusCounts(
 		query: QueryGetListReleaseDto,
 		user: UserFromRequest,
-	): Promise<Record<ReleaseStatus, number>> {
+	): Promise<Record<string, number>> {
+		const countQuery = Object.assign(new QueryGetListReleaseDto(), query, {
+			// Count phải tính cả release cần review,
+			// không bị filter needsReview hiện tại giới hạn lại.
+			needsReview: undefined,
+		});
+
 		const qb = this.releaseRepo.createQueryBuilder(this.mainAlias);
+
 		const { itemsToJoin } = this.filterByQuery2({
 			qb,
-			query,
+			query: countQuery,
 			user,
 			applyStatus: false,
 			applyOrderAndPaging: false,
@@ -212,9 +218,11 @@ export class ReleaseQueryService {
 		if (itemsToJoin.includes('release.ciData')) {
 			qb.leftJoin('release.ciData', 'releaseCiData');
 		}
+
 		if (itemsToJoin.includes('release.releaseArtists')) {
 			qb.leftJoin('release.releaseArtists', 'releaseArtist');
 		}
+
 		if (itemsToJoin.includes('release.video')) {
 			qb.leftJoin('release.video', 'video');
 		}
@@ -222,14 +230,43 @@ export class ReleaseQueryService {
 		const rawResults = await qb
 			.select('release.status', 'status')
 			.addSelect('COUNT(DISTINCT release.id)', 'count')
+			.addSelect(
+				`
+			COUNT(DISTINCT release.id) FILTER (
+				WHERE EXISTS (
+					SELECT 1
+					FROM release_execution_steps3 reviewStepCount
+					INNER JOIN release_excutions3 reviewExecutionCount
+						ON reviewExecutionCount.id = reviewStepCount.release_execution_id
+					WHERE reviewExecutionCount.release_id = release.id
+					AND reviewStepCount.type = :reviewStepType
+					AND reviewStepCount.status = :waitingActionStatus
+				)
+			)
+		`,
+				'needsReviewCount',
+			)
+			.setParameters({
+				reviewStepType: 'REVIEW_RELEASE',
+				waitingActionStatus: 'WAITING_ACTION',
+			})
 			.groupBy('release.status')
-			.getRawMany<{ status: ReleaseStatus; count: string }>();
+			.getRawMany();
+
 		const counts = Object.fromEntries(
 			Object.values(ReleaseStatus).map((status) => [status, 0]),
-		) as Record<ReleaseStatus, number>;
-		for (const { status, count } of rawResults) {
-			if (status in counts) counts[status] = Number(count);
+		) as Record<string, number>;
+
+		counts.needsReview = 0;
+
+		for (const row of rawResults) {
+			if (row.status in counts) {
+				counts[row.status] = Number(row.count);
+			}
+
+			counts.needsReview += Number(row.needsReviewCount);
 		}
+
 		return counts;
 	}
 
@@ -971,19 +1008,20 @@ export class ReleaseQueryService {
 			const reviewCondition = `
 				EXISTS (
 					SELECT 1
-					FROM release_reviews releaseReviewFilter
-					WHERE releaseReviewFilter.release_id = release.id
-					AND releaseReviewFilter.status IN (:...pendingReviewStatuses)
+					FROM release_execution_steps3 reviewStepFilter
+					INNER JOIN release_excutions3 reviewExecutionFilter
+						ON reviewExecutionFilter.id = reviewStepFilter.release_execution_id
+					WHERE reviewExecutionFilter.release_id = release.id
+					AND reviewStepFilter.type = :reviewStepType
+					AND reviewStepFilter.status = :waitingActionStatus
 				)
 			`;
 
 			qb.andWhere(
 				needsReview ? reviewCondition : `NOT ${reviewCondition}`,
 				{
-					pendingReviewStatuses: [
-						ReleaseReviewStatus.PENDING,
-						ReleaseReviewStatus.PROCESSING,
-					],
+					reviewStepType: 'REVIEW_RELEASE',
+					waitingActionStatus: 'WAITING_ACTION',
 				},
 			);
 		}
@@ -1352,19 +1390,20 @@ export class ReleaseQueryService {
 			const reviewCondition = `
 				EXISTS (
 					SELECT 1
-					FROM release_reviews releaseReviewFilter
-					WHERE releaseReviewFilter.release_id = release.id
-					AND releaseReviewFilter.status IN (:...pendingReviewStatuses)
+					FROM release_execution_steps3 reviewStepFilter
+					INNER JOIN release_excutions3 reviewExecutionFilter
+						ON reviewExecutionFilter.id = reviewStepFilter.release_execution_id
+					WHERE reviewExecutionFilter.release_id = release.id
+					AND reviewStepFilter.type = :reviewStepType
+					AND reviewStepFilter.status = :waitingActionStatus
 				)
 			`;
 
 			qb.andWhere(
 				needsReview ? reviewCondition : `NOT ${reviewCondition}`,
 				{
-					pendingReviewStatuses: [
-						ReleaseReviewStatus.PENDING,
-						ReleaseReviewStatus.PROCESSING,
-					],
+					reviewStepType: 'REVIEW_RELEASE',
+					waitingActionStatus: 'WAITING_ACTION',
 				},
 			);
 		}
