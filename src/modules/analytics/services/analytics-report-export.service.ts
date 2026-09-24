@@ -82,7 +82,9 @@ export class AnalyticsReportExportService {
 		return {
 			jobId: job.id,
 			status: ImportJobStatus.QUEUED,
-			eventsUrl: `/analytics/reports/export/${job.id}/events`,
+			eventsUrl: `/analytics/reports/${
+				dto.exportMode === 'statement' ? 'statement-export' : 'export'
+			}/${job.id}/events`,
 		};
 	}
 
@@ -420,6 +422,10 @@ export class AnalyticsReportExportService {
 		const pad = (n: number) => String(n).padStart(2, '0');
 		const now = new Date();
 		const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-		return `workspace_analytics-report_${dto.fromDate}_${dto.endDate}_${timestamp}.zip`;
+		const suffix =
+			dto.exportMode === 'statement'
+				? 'statement-report'
+				: 'analytics-report';
+		return `workspace_${suffix}_${dto.fromDate}_${dto.endDate}_${timestamp}.zip`;
 	}
 }

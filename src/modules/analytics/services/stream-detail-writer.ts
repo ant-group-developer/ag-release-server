@@ -149,6 +149,7 @@ export interface SummaryAccumulator {
 	maxEndDate: string;
 	rowCount: number;
 	tenantName: string;
+	currency: string;
 }
 
 export function createEmptyAccumulator(): SummaryAccumulator {
@@ -166,6 +167,7 @@ export function createEmptyAccumulator(): SummaryAccumulator {
 		maxEndDate: '',
 		rowCount: 0,
 		tenantName: '',
+		currency: '',
 	};
 }
 
@@ -220,6 +222,7 @@ export function updateAccumulator(
 	acc.rowCount++;
 	acc.totalUsage += Number(row.totalUsage ?? 0);
 	addRevenue(acc, row.revenueUsd);
+	if (!acc.currency) acc.currency = String(row.currency ?? '');
 
 	const isrc = String(row.isrc ?? '');
 	if (isrc) acc.uniqueIsrcs.add(isrc);

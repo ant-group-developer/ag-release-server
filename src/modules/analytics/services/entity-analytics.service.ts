@@ -174,7 +174,7 @@ export class EntityAnalyticsService {
       ${trackJoin} (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc${ownershipPeriod === 'revenue' ? " AND s.isrc NOT IN ('', 'N/A', 'NA')" : ''}
       ${buildOwnershipJoin(ownershipPeriod, ownershipPeriod === 'revenue' ? 's.period' : factDateExpression)}`;
 		let filterSql = `AND (t.isrc = '' OR t.is_deleted = 0)
-      AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`;
+      AND ${getOwnershipLedgerFallbackPredicate()}`;
 
 		if (!isSystem && entityType !== 'tenant') {
 			filterSql += ` AND ${tenantExpr} = {tenantId:String}`;
@@ -239,7 +239,9 @@ export class EntityAnalyticsService {
 				: tenantId;
 		const filters = buildDetailFilters(
 			scopeTenantId,
-			dto,
+			entityType === 'channel'
+				? { ...dto, channelId: dto.channelId ?? entityId }
+				: dto,
 			ownershipPeriod,
 			entityType !== 'track',
 		);

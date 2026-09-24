@@ -70,8 +70,36 @@ export class AnalyticsReportExportController {
 		@Body() dto: AnalyticsReportExportDto,
 	): Promise<ResponseSuccess<AnalyticsReportExportJobResult>> {
 		const tenantId = req.user!.tenantId;
+		dto.exportMode = 'usd';
 
 		// ── Validate & resolve tenantIds ────────────────────────────
+		await this.validateAndResolveTenantIds(dto, tenantId);
+
+		const data = await this.exportService.createExportJob(
+			tenantId,
+			req.user!.sub,
+			dto,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('statement-export')
+	@ApiOperation({
+		summary: 'Create exact statement-currency analytics report export job',
+		description:
+			'Creates an async export using revenue_local and revenue_currency imported into fact_sales_report.',
+	})
+	@ApiResponse({
+		status: 201,
+		description: 'Statement-currency export job created successfully.',
+	})
+	async exportStatementReport(
+		@Req() req: Request,
+		@Body() dto: AnalyticsReportExportDto,
+	): Promise<ResponseSuccess<AnalyticsReportExportJobResult>> {
+		const tenantId = req.user!.tenantId;
+		dto.exportMode = 'statement';
+
 		await this.validateAndResolveTenantIds(dto, tenantId);
 
 		const data = await this.exportService.createExportJob(
@@ -271,6 +299,17 @@ export class AnalyticsReportExportController {
 				);
 			}, true),
 		);
+	}
+
+	@Sse('statement-export/:jobId/events')
+	@ApiOperation({
+		summary: 'Stream statement-currency analytics export progress via SSE',
+	})
+	streamStatementExportEvents(
+		@Req() req: Request,
+		@Param('jobId') jobId: string,
+	): Observable<MessageEvent> {
+		return this.streamExportEvents(req, jobId);
 	}
 
 	/**

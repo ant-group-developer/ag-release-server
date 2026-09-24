@@ -1843,20 +1843,16 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: TimelineQueryDto,
 	): Promise<OverviewTrendsResponse> {
+		const {
+			joinSql,
+			filterSql,
+			params: filterParams,
+		} = this.buildDetailFilters(tenantId, query, 'trend', true);
 		const params: Record<string, any> = {
+			...filterParams,
 			from: query.fromDate,
 			to: query.toDate,
 		};
-
-		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-		let filterSql = 'AND t.is_deleted = 0';
-
-		filterSql = this.appendDetailFilters(
-			tenantId,
-			query,
-			filterSql,
-			params,
-		);
 
 		// Query 1: views, dsps, tracks, labels
 		const mainSql = queries.getTrendsOverviewMainQuery(joinSql, filterSql);

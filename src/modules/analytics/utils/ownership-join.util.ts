@@ -18,16 +18,45 @@ export function getOwnershipDatePredicate(
 		: `${factDateExpr} >= o.effective_from AND (o.effective_to IS NULL OR ${factDateExpr} < o.effective_to)`;
 }
 
+const OWNERSHIP_SYNC_TABLE = `music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC}`;
+
+/**
+ * Latest version of each ReplacingMergeTree key (isrc, effective_from, release_id).
+ * GROUP BY matches ORDER BY so the aggregation can stream. FINAL cannot: after an
+ * asset transfer writes many unmerged parts, FINAL merges the whole table in RAM
+ * and ClickHouse kills it in AggregatingTransform (code 241, ~2.7 GiB server cap).
+ * Tombstones stay out via argMax(is_deleted), so an older live version is not revived.
+ */
+function getVersionCollapsedOwnershipSql(): string {
+	return `(SELECT
+		    isrc,
+		    release_id,
+		    effective_from,
+		    argMax(effective_to, updated_at) AS effective_to,
+		    argMax(revenue_effective_from, updated_at) AS revenue_effective_from,
+		    argMax(revenue_effective_to, updated_at) AS revenue_effective_to,
+		    argMax(tenant_id, updated_at) AS tenant_id,
+		    argMax(label_id, updated_at) AS label_id,
+		    max(updated_at) AS version_updated_at
+		  FROM ${OWNERSHIP_SYNC_TABLE}
+		  GROUP BY isrc, effective_from, release_id
+		  HAVING argMax(is_deleted, updated_at) = 0)`;
+}
+
 /**
  * Deduped ownership subquery.
  * One ISRC may belong to multiple releases sharing the same ownership window
- * (e.g. compilation / re-release).  The raw table has ORDER BY
- * (isrc, effective_from, release_id) so FINAL keeps one row per release_id,
- * not per window.  An ISRC-scoped LEFT JOIN on window alone fans out each
- * fact row N times.  Grouping by (isrc, window) and picking the latest
- * updated_at deterministically collapses those duplicates to one row.
+ * (e.g. compilation / re-release). The sort key keeps one row per release_id,
+ * not per window. An ISRC-scoped LEFT JOIN on window alone fans out each fact
+ * row N times. Grouping by (isrc, window) and picking the latest updated_at
+ * collapses those duplicates to one row.
  */
 function getDedupedOwnershipSubquery(ownershipPeriod: OwnershipPeriod): string {
+	const metrics = `argMax(tenant_id, version_updated_at) AS tenant_id,
+		    argMax(label_id, version_updated_at) AS label_id,
+		    argMax(release_id, version_updated_at) AS release_id`;
+	const groupedBy =
+		'isrc, effective_from, effective_to, revenue_effective_from, revenue_effective_to';
 	if (ownershipPeriod === 'revenue') {
 		return `(SELECT
 		    isrc,
@@ -35,12 +64,9 @@ function getDedupedOwnershipSubquery(ownershipPeriod: OwnershipPeriod): string {
 		    revenue_effective_to,
 		    effective_from,
 		    effective_to,
-		    argMax(tenant_id, updated_at) AS tenant_id,
-		    argMax(label_id, updated_at) AS label_id,
-		    argMax(release_id, updated_at) AS release_id
-		  FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
-		  WHERE is_deleted = 0
-		  GROUP BY isrc, revenue_effective_from, revenue_effective_to, effective_from, effective_to)`;
+		    ${metrics}
+		  FROM ${getVersionCollapsedOwnershipSql()}
+		  GROUP BY ${groupedBy})`;
 	}
 	return `(SELECT
 		    isrc,
@@ -48,12 +74,9 @@ function getDedupedOwnershipSubquery(ownershipPeriod: OwnershipPeriod): string {
 		    effective_to,
 		    revenue_effective_from,
 		    revenue_effective_to,
-		    argMax(tenant_id, updated_at) AS tenant_id,
-		    argMax(label_id, updated_at) AS label_id,
-		    argMax(release_id, updated_at) AS release_id
-		  FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
-		  WHERE is_deleted = 0
-		  GROUP BY isrc, effective_from, effective_to, revenue_effective_from, revenue_effective_to)`;
+		    ${metrics}
+		  FROM ${getVersionCollapsedOwnershipSql()}
+		  GROUP BY ${groupedBy})`;
 }
 
 /**
@@ -86,7 +109,12 @@ export function getRevenueLabelExpr(): string {
 }
 
 export function getOwnershipLedgerFallbackPredicate(): string {
-	return `(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`;
+	return `(o.isrc != '' OR s.isrc NOT IN (
+		  SELECT isrc
+		  FROM ${OWNERSHIP_SYNC_TABLE}
+		  GROUP BY isrc, effective_from, release_id
+		  HAVING argMax(is_deleted, updated_at) = 0
+		))`;
 }
 
 export function buildPgTracksJoin(): string {

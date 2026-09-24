@@ -1,10 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
-	IsEnum,
 	Allow,
 	ArrayNotEmpty,
 	IsArray,
+	IsEnum,
 	IsIn,
 	IsOptional,
 	IsString,
@@ -36,6 +36,13 @@ export class AnalyticsReportExportDto {
 	/** Server-only scope injected from the authenticated request. */
 	@Allow()
 	analyticsVideoScope?: AnalyticsVideoScope;
+
+	/**
+	 * Server-selected revenue projection. The public legacy endpoint uses
+	 * `usd`; the statement export endpoint overrides this to `statement`.
+	 */
+	@Allow()
+	exportMode?: 'usd' | 'statement';
 	@ApiProperty({
 		description:
 			'Start month of the report range. Accepts YYYY-MM or YYYY-MM-DD (day is ignored, normalized to month).',
@@ -79,7 +86,8 @@ export class AnalyticsReportExportDto {
 	releaseId?: string;
 
 	@ApiPropertyOptional({
-		description: 'Filter by DSP ID, DSP report ID, DSP UUID, or DSP code (legacy generic)',
+		description:
+			'Filter by DSP ID, DSP report ID, DSP UUID, or DSP code (legacy generic)',
 	})
 	@IsOptional()
 	@IsString()

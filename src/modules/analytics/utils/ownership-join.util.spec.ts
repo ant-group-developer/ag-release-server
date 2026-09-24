@@ -34,21 +34,29 @@ describe('ownership-join.util', () => {
 
 	describe('getDedupedOwnershipSubquerySql', () => {
 		it.each<['trend' | 'revenue']>([['trend'], ['revenue']])(
-			'dedup query for %s contains argMax/GROUP BY and FINAL',
+			'dedup query for %s collapses versions by sort key, then by window',
 			(period) => {
 				const sql = getDedupedOwnershipSubquerySql(period);
 				expect(sql).toMatch(/argMax\s*\(/i);
-				expect(sql).toMatch(/GROUP BY/i);
-				expect(sql).toMatch(/FINAL/i);
+				expect(sql).toMatch(
+					/GROUP BY isrc, effective_from, release_id/i,
+				);
+				expect(sql).toContain('max(updated_at) AS version_updated_at');
+				expect(sql).not.toContain('max(updated_at) AS updated_at');
+				expect(sql).toContain('argMax(tenant_id, version_updated_at)');
+				expect(sql).toMatch(
+					/GROUP BY isrc, effective_from, effective_to, revenue_effective_from, revenue_effective_to/i,
+				);
+				expect(sql).not.toMatch(/FINAL/i);
 				expect(sql).toContain('pg_asset_ownership_sync');
 			},
 		);
 
 		it.each<['trend' | 'revenue']>([['trend'], ['revenue']])(
-			'dedup query for %s filters out tombstoned rows (is_deleted = 0)',
+			'dedup query for %s drops tombstones without reviving an older version',
 			(period) => {
 				const sql = getDedupedOwnershipSubquerySql(period);
-				expect(sql).toContain('is_deleted = 0');
+				expect(sql).toContain('argMax(is_deleted, updated_at) = 0');
 			},
 		);
 	});
@@ -84,16 +92,20 @@ describe('ownership-join.util', () => {
 		it.each<['trend' | 'revenue']>([['trend'], ['revenue']])(
 			'LEFT JOIN for %s filters out tombstoned rows',
 			(period) => {
-				expect(buildOwnershipJoin(period)).toContain('is_deleted = 0');
+				expect(buildOwnershipJoin(period)).toContain(
+					'argMax(is_deleted, updated_at) = 0',
+				);
+				expect(buildOwnershipJoin(period)).not.toMatch(/FINAL/i);
 			},
 		);
 	});
 
 	describe('getOwnershipLedgerFallbackPredicate', () => {
-		it('filters out tombstoned rows', () => {
-			expect(getOwnershipLedgerFallbackPredicate()).toContain(
-				'is_deleted = 0',
-			);
+		it('drops tombstones by the sort key instead of FINAL on the whole table', () => {
+			const sql = getOwnershipLedgerFallbackPredicate();
+			expect(sql).toContain('argMax(is_deleted, updated_at) = 0');
+			expect(sql).toMatch(/GROUP BY isrc, effective_from, release_id/i);
+			expect(sql).not.toMatch(/FINAL/i);
 		});
 	});
 
