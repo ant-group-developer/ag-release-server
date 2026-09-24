@@ -929,13 +929,18 @@ export class Ern43Builder2 {
 		// Track release deals
 		if (this.input.deals?.tracks && this.input.deals.tracks.length > 0) {
 			for (let i = 0; i < this.input.tracks.length; i++) {
+				const trackDeals = this.input.deals.tracks[i] ?? [];
+
+				if (trackDeals.length === 0) {
+					continue;
+				}
 				const releaseRef = `R${i + 1}`;
 				const techRef = `T${i + 1}S`;
 
 				const rd = dealList.ele('ReleaseDeal');
 				rd.ele('DealReleaseReference').txt(releaseRef);
 
-				for (const deal of this.input.deals.tracks) {
+				for (const deal of trackDeals) {
 					const d = rd.ele('Deal');
 					const terms = d.ele('DealTerms');
 

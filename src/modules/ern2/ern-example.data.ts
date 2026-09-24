@@ -253,30 +253,32 @@ export const ern382Example: ErnInput2 = {
 			},
 		],
 		tracks: [
-			{
-				territories: ['CN', 'US'],
-				startDate: '2025-11-25T12:43:22+08:00',
-				endDate: '2099-12-31T00:00:00Z',
-				commercialModels: ['SubscriptionModel'],
-				useTypes: ['ConditionalDownload'],
-				price: {
-					priceType: 'StandardRetailPrice',
-					value: 0,
-					currencyCode: 'USD',
+			[
+				{
+					territories: ['CN', 'US'],
+					startDate: '2025-11-25T12:43:22+08:00',
+					endDate: '2099-12-31T00:00:00Z',
+					commercialModels: ['SubscriptionModel'],
+					useTypes: ['ConditionalDownload'],
+					price: {
+						priceType: 'StandardRetailPrice',
+						value: 0,
+						currencyCode: 'USD',
+					},
 				},
-			},
-			{
-				territories: ['CN', 'US'],
-				startDate: '2025-11-25T12:43:22+08:00',
-				endDate: '2099-12-31T00:00:00Z',
-				commercialModels: ['AdvertisementSupportedModel'],
-				useTypes: ['OnDemandStream'],
-				price: {
-					priceType: 'StandardRetailPrice',
-					value: 0,
-					currencyCode: 'USD',
+				{
+					territories: ['CN', 'US'],
+					startDate: '2025-11-25T12:43:22+08:00',
+					endDate: '2099-12-31T00:00:00Z',
+					commercialModels: ['AdvertisementSupportedModel'],
+					useTypes: ['OnDemandStream'],
+					price: {
+						priceType: 'StandardRetailPrice',
+						value: 0,
+						currencyCode: 'USD',
+					},
 				},
-			},
+			],
 		],
 	},
 };

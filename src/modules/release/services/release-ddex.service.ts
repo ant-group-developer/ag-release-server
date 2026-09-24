@@ -878,6 +878,10 @@ export class ReleaseDdexService {
 
 		const territories = this.getTerritoriesFromRelease(release);
 
+		const sortedTracks = [...release.tracks].sort(
+			(a, b) => a.order - b.order,
+		);
+
 		const result: ErnInput2 = {
 			version: ernVersion,
 
@@ -972,108 +976,106 @@ export class ReleaseDdexService {
 					: undefined,
 			},
 
-			tracks: [...release.tracks]
-				.sort((a, b) => a.order - b.order)
-				.map((track, index) => ({
-					isrc: track.isrc ?? '',
+			tracks: sortedTracks.map((track, index) => ({
+				isrc: track.isrc ?? '',
 
-					title: track.title ?? '',
+				title: track.title ?? '',
 
-					version: track.version ?? undefined,
+				version: track.version ?? undefined,
 
-					duration: this.convertDurationToISO8601(
-						track.audioFile?.duration ?? 0,
-					),
+				duration: this.convertDurationToISO8601(
+					track.audioFile?.duration ?? 0,
+				),
 
-					order: track.order,
+				order: track.order,
 
-					price: {
-						priceType: 'StandardRetailPrice',
-						value: track.priceTier?.amount ?? 0,
-						currencyCode:
-							track.priceTier?.currency?.code ||
-							DEFAULT_PRICE_CURRENCY_CODE,
-						priceRangeType:
-							track.priceTier?.ciCode || DEFAULT_PRICE_RANGE_TYPE,
-					},
+				price: {
+					priceType: 'StandardRetailPrice',
+					value: track.priceTier?.amount ?? 0,
+					currencyCode:
+						track.priceTier?.currency?.code ||
+						DEFAULT_PRICE_CURRENCY_CODE,
+					priceRangeType:
+						track.priceTier?.ciCode || DEFAULT_PRICE_RANGE_TYPE,
+				},
 
-					genre:
-						(track.primaryGenre?.name
-							? GENRE_MAPPING[track.primaryGenre.name]
-							: undefined) ??
-						track.primaryGenre?.name ??
-						(release.primaryGenre?.name
-							? GENRE_MAPPING[release.primaryGenre.name]
-							: undefined) ??
-						release.primaryGenre?.name ??
-						undefined,
+				genre:
+					(track.primaryGenre?.name
+						? GENRE_MAPPING[track.primaryGenre.name]
+						: undefined) ??
+					track.primaryGenre?.name ??
+					(release.primaryGenre?.name
+						? GENRE_MAPPING[release.primaryGenre.name]
+						: undefined) ??
+					release.primaryGenre?.name ??
+					undefined,
 
-					subGenre:
-						(track.subGenre?.name
-							? GENRE_MAPPING[track.subGenre.name]
-							: undefined) ??
-						track.subGenre?.name ??
-						undefined,
+				subGenre:
+					(track.subGenre?.name
+						? GENRE_MAPPING[track.subGenre.name]
+						: undefined) ??
+					track.subGenre?.name ??
+					undefined,
 
-					...(track.isInstrumental
-						? { isInstrumental: true }
-						: {
-								// No linguistic content:
-								// https://service.ddex.net/dd/DD-AVS-002.old/dd/avs_ZXX_Language.html
-								languageOfPerformance:
-									track.trackLanguage?.audioLanguage?.code ??
-									NO_LINGUISTIC_CONTENT_LANGUAGE,
-							}),
+				...(track.isInstrumental
+					? { isInstrumental: true }
+					: {
+							// No linguistic content:
+							// https://service.ddex.net/dd/DD-AVS-002.old/dd/avs_ZXX_Language.html
+							languageOfPerformance:
+								track.trackLanguage?.audioLanguage?.code ??
+								NO_LINGUISTIC_CONTENT_LANGUAGE,
+						}),
 
-					parentalWarning: normalizeParentalWarning(
-						track.trackSensitive?.code,
-					),
+				parentalWarning: normalizeParentalWarning(
+					track.trackSensitive?.code,
+				),
 
-					artists: track.trackArtists.map((ta) => ({
-						name: resolveDdexArtistName(ta.artist),
-						role: 'MainArtist',
-					})),
+				artists: track.trackArtists.map((ta) => ({
+					name: resolveDdexArtistName(ta.artist),
+					role: 'MainArtist',
+				})),
 
-					contributors: track.trackContributors?.map((c) => ({
-						name: resolveDdexArtistName(c.artist),
-						role: c.artistRole?.code ?? '',
-					})),
+				contributors: track.trackContributors?.map((c) => ({
+					name: resolveDdexArtistName(c.artist),
+					role: c.artistRole?.code ?? '',
+				})),
 
-					pLine:
-						track.pLineYear && track.pLineOwner
-							? {
-									year: track.pLineYear,
-									text: `${track.pLineYear} ${track.pLineOwner}`,
-								}
-							: undefined,
-
-					recordingMode: 'Stereo',
-
-					audioFile: track.audioFile
+				pLine:
+					track.pLineYear && track.pLineOwner
 						? {
-								fileName: `${track.isrc}_T${index}S${this.normalizeAudioExtension(track.audioFile.file?.extension ?? 'wav')}`,
-
-								filePath: 'resources',
-
-								codecType:
-									track.audioFile.file?.extension.toUpperCase() ??
-									'WAV',
-
-								bitRate: track.audioFile.bitrate ?? undefined,
-
-								samplingRate: track.audioFile.sampleRate
-									? parseInt(
-											track.audioFile.sampleRate.replace(
-												/[^0-9]/g,
-												'',
-											),
-										)
-									: undefined,
-
-								bitDepth: track.audioFile.bitDepth ?? undefined,
+								year: track.pLineYear,
+								text: `${track.pLineYear} ${track.pLineOwner}`,
 							}
 						: undefined,
-				})),
+
+				recordingMode: 'Stereo',
+
+				audioFile: track.audioFile
+					? {
+							fileName: `${track.isrc}_T${index}S${this.normalizeAudioExtension(track.audioFile.file?.extension ?? 'wav')}`,
+
+							filePath: 'resources',
+
+							codecType:
+								track.audioFile.file?.extension.toUpperCase() ??
+								'WAV',
+
+							bitRate: track.audioFile.bitrate ?? undefined,
+
+							samplingRate: track.audioFile.sampleRate
+								? parseInt(
+										track.audioFile.sampleRate.replace(
+											/[^0-9]/g,
+											'',
+										),
+									)
+								: undefined,
+
+							bitDepth: track.audioFile.bitDepth ?? undefined,
+						}
+					: undefined,
+			})),
 
 			deals: {
 				release: [
@@ -1104,71 +1106,52 @@ export class ReleaseDdexService {
 						},
 					},
 				],
-				tracks: [
-					{
-						territories,
-						startDate: release.releaseDate
-							? this.formatDateTime(release.releaseDate)
-							: '',
-						endDate: release.releaseEndDate
-							? this.formatDateTime(release.releaseEndDate)
-							: '',
-						commercialModels: ['PayAsYouGoModel'],
-						useTypes: ['PermanentDownload'],
-						price: {
-							priceType: 'StandardRetailPrice',
-							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
-							currencyCode:
-								release.tracks?.[0]?.priceTier?.currency
-									?.code || DEFAULT_PRICE_CURRENCY_CODE,
-							priceRangeType:
-								release.tracks?.[0]?.priceTier?.ciCode ||
-								DEFAULT_PRICE_RANGE_TYPE,
+				tracks: sortedTracks.map((track) => {
+					const price = {
+						priceType: 'StandardRetailPrice' as const,
+						value: track.priceTier?.amount ?? 0,
+						currencyCode:
+							track.priceTier?.currency?.code ||
+							DEFAULT_PRICE_CURRENCY_CODE,
+						priceRangeType:
+							track.priceTier?.ciCode || DEFAULT_PRICE_RANGE_TYPE,
+					};
+
+					const startDate = release.releaseDate
+						? this.formatDateTime(release.releaseDate)
+						: '';
+
+					const endDate = release.releaseEndDate
+						? this.formatDateTime(release.releaseEndDate)
+						: '';
+
+					return [
+						{
+							territories,
+							startDate,
+							endDate,
+							commercialModels: ['PayAsYouGoModel'],
+							useTypes: ['PermanentDownload'],
+							price,
 						},
-					},
-					{
-						territories,
-						startDate: release.releaseDate
-							? this.formatDateTime(release.releaseDate)
-							: '',
-						endDate: release.releaseEndDate
-							? this.formatDateTime(release.releaseEndDate)
-							: '',
-						commercialModels: ['AdvertisementSupportedModel'],
-						useTypes: ['Stream'],
-						price: {
-							priceType: 'StandardRetailPrice',
-							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
-							currencyCode:
-								release.tracks?.[0]?.priceTier?.currency
-									?.code || DEFAULT_PRICE_CURRENCY_CODE,
-							priceRangeType:
-								release.tracks?.[0]?.priceTier?.ciCode ||
-								DEFAULT_PRICE_RANGE_TYPE,
+						{
+							territories,
+							startDate,
+							endDate,
+							commercialModels: ['AdvertisementSupportedModel'],
+							useTypes: ['Stream'],
+							price,
 						},
-					},
-					{
-						territories,
-						startDate: release.releaseDate
-							? this.formatDateTime(release.releaseDate)
-							: '',
-						endDate: release.releaseEndDate
-							? this.formatDateTime(release.releaseEndDate)
-							: '',
-						commercialModels: ['SubscriptionModel'],
-						useTypes: ['Stream'],
-						price: {
-							priceType: 'StandardRetailPrice',
-							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
-							currencyCode:
-								release.tracks?.[0]?.priceTier?.currency
-									?.code || DEFAULT_PRICE_CURRENCY_CODE,
-							priceRangeType:
-								release.tracks?.[0]?.priceTier?.ciCode ||
-								DEFAULT_PRICE_RANGE_TYPE,
+						{
+							territories,
+							startDate,
+							endDate,
+							commercialModels: ['SubscriptionModel'],
+							useTypes: ['Stream'],
+							price,
 						},
-					},
-				],
+					];
+				}),
 			},
 		};
 
