@@ -395,6 +395,8 @@ export class DemographicsAnalyticsService {
 			filterSql,
 			params,
 			analyticsScope,
+			't',
+			chartDto.channelId,
 		);
 
 		return { joinSql, filterSql, params };

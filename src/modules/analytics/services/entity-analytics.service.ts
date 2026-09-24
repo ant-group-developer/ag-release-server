@@ -239,7 +239,9 @@ export class EntityAnalyticsService {
 				: tenantId;
 		const filters = buildDetailFilters(
 			scopeTenantId,
-			dto,
+			entityType === 'channel'
+				? { ...dto, channelId: dto.channelId ?? entityId }
+				: dto,
 			ownershipPeriod,
 			entityType !== 'track',
 		);

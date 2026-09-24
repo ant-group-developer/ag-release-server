@@ -151,6 +151,8 @@ export class RankingService {
 			filterSql,
 			params,
 			getAnalyticsVideoScope(query),
+			't',
+			query.channelId,
 		);
 
 		return { joinSql, filterSql, params };

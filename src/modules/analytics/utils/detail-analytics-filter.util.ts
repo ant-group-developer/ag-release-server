@@ -71,6 +71,7 @@ export function appendDetailFilters(
 		params.detailReleaseType = query.releaseType;
 	}
 	if (query.channelId) {
+		// Channel is the filter. Callers do not also send releaseType=video.
 		filterSql += ' AND t.channel_id = {channelId:String}';
 		params.channelId = query.channelId;
 	}
@@ -98,6 +99,8 @@ export function appendDetailFilters(
 		filterSql,
 		params,
 		getAnalyticsVideoScope(query),
+		't',
+		query.channelId,
 	);
 
 	return filterSql;

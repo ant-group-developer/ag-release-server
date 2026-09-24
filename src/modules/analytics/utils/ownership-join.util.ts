@@ -37,7 +37,7 @@ function getVersionCollapsedOwnershipSql(): string {
 		    argMax(revenue_effective_to, updated_at) AS revenue_effective_to,
 		    argMax(tenant_id, updated_at) AS tenant_id,
 		    argMax(label_id, updated_at) AS label_id,
-		    max(updated_at) AS updated_at
+		    max(updated_at) AS version_updated_at
 		  FROM ${OWNERSHIP_SYNC_TABLE}
 		  GROUP BY isrc, effective_from, release_id
 		  HAVING argMax(is_deleted, updated_at) = 0)`;
@@ -52,9 +52,9 @@ function getVersionCollapsedOwnershipSql(): string {
  * collapses those duplicates to one row.
  */
 function getDedupedOwnershipSubquery(ownershipPeriod: OwnershipPeriod): string {
-	const metrics = `argMax(tenant_id, updated_at) AS tenant_id,
-		    argMax(label_id, updated_at) AS label_id,
-		    argMax(release_id, updated_at) AS release_id`;
+	const metrics = `argMax(tenant_id, version_updated_at) AS tenant_id,
+		    argMax(label_id, version_updated_at) AS label_id,
+		    argMax(release_id, version_updated_at) AS release_id`;
 	const groupedBy =
 		'isrc, effective_from, effective_to, revenue_effective_from, revenue_effective_to';
 	if (ownershipPeriod === 'revenue') {

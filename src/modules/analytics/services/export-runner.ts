@@ -801,6 +801,8 @@ export class ExportRunner {
 			'',
 			params,
 			getAnalyticsVideoScope(dto),
+			't',
+			dto.channelId,
 		);
 		if (scopedFilter) {
 			filters.push('t.is_deleted = 0');

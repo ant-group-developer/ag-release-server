@@ -41,6 +41,9 @@ describe('ownership-join.util', () => {
 				expect(sql).toMatch(
 					/GROUP BY isrc, effective_from, release_id/i,
 				);
+				expect(sql).toContain('max(updated_at) AS version_updated_at');
+				expect(sql).not.toContain('max(updated_at) AS updated_at');
+				expect(sql).toContain('argMax(tenant_id, version_updated_at)');
 				expect(sql).toMatch(
 					/GROUP BY isrc, effective_from, effective_to, revenue_effective_from, revenue_effective_to/i,
 				);
