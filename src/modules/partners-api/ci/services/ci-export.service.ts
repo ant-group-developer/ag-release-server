@@ -8,6 +8,7 @@ export interface CiDspStatus {
 	ciCode: string;
 	name: string;
 	status: string;
+	status_cause: string | null;
 	task: string | null;
 	taskStatus: string | null;
 	deliveredAt: Date | null;
@@ -123,6 +124,7 @@ export class CiExportService {
 					desire.exportBatch?.batch_transfer_status ||
 					desire.status ||
 					'not_found',
+				status_cause: desire.status_cause || null,
 				task: desire.exportRequest?.task || null,
 				taskStatus: desire.status || null,
 				deliveredAt: desire.exportBatch?.transfer_end_time
