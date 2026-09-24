@@ -20,6 +20,10 @@ const OUTBOX_BATCH_SIZE = 200;
 // So ban ghi insert moi batch khi initial sync
 const INITIAL_SYNC_BATCH_SIZE = 2000;
 
+// Moi chunk ownership: loc tracks/videos theo release, khong quet ca catalog.
+const OWNERSHIP_SYNC_RELEASE_CHUNK = 100;
+const OWNERSHIP_SYNC_INSERT_BATCH = 5_000;
+
 interface OutboxJob {
 	id: number;
 	entity_name: string;
@@ -920,21 +924,71 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 	private async syncOwnershipForReleases(
 		releaseIds: string[],
 	): Promise<void> {
-		const rows = await this.entityManager.query(
-			`SELECT DISTINCT p.id, x.isrc, p.release_id, p.tenant_id, COALESCE(p.label_id, '') AS label_id,
-			        p.effective_from, p.effective_to, p.revenue_effective_from, p.revenue_effective_to,
-			        p.updated_at
-			 FROM asset_ownership_periods p
-			 INNER JOIN (
-			   SELECT release_id, isrc FROM tracks WHERE isrc IS NOT NULL AND isrc != ''
-			   UNION
-			   SELECT release_id, isrc FROM videos WHERE isrc IS NOT NULL AND isrc != ''
-			 ) x ON x.release_id = p.release_id
-			 WHERE p.release_id = ANY($1)`,
-			[releaseIds],
+		const unique = [...new Set(releaseIds.filter(Boolean))];
+		if (!unique.length) return;
+
+		// One timestamp for the whole call so every chunk beats the previous
+		// ClickHouse version together. Dedupe stays global: the same ISRC window
+		// can show up on two releases that land in different chunks.
+		const updatedAt = new Date().toISOString().slice(0, 23).replace('T', ' ');
+		const deduped = new Map<string, AssetOwnershipSyncRow>();
+
+		for (
+			let offset = 0;
+			offset < unique.length;
+			offset += OWNERSHIP_SYNC_RELEASE_CHUNK
+		) {
+			const chunk = unique.slice(
+				offset,
+				offset + OWNERSHIP_SYNC_RELEASE_CHUNK,
+			);
+			const rows = await this.entityManager.query(
+				`SELECT DISTINCT p.id, x.isrc, p.release_id, p.tenant_id, COALESCE(p.label_id, '') AS label_id,
+				        to_char(p.effective_from, 'YYYY-MM-DD') AS effective_from,
+				        to_char(p.effective_to, 'YYYY-MM-DD') AS effective_to,
+				        to_char(p.revenue_effective_from, 'YYYY-MM-DD') AS revenue_effective_from,
+				        to_char(p.revenue_effective_to, 'YYYY-MM-DD') AS revenue_effective_to,
+				        p.updated_at
+				 FROM asset_ownership_periods p
+				 INNER JOIN (
+				   SELECT release_id, isrc FROM tracks
+				   WHERE release_id = ANY($1) AND isrc IS NOT NULL AND isrc != ''
+				   UNION
+				   SELECT release_id, isrc FROM videos
+				   WHERE release_id = ANY($1) AND isrc IS NOT NULL AND isrc != ''
+				 ) x ON x.release_id = p.release_id
+				 WHERE p.release_id = ANY($1)`,
+				[chunk],
+			);
+			for (const row of rows) {
+				const mapped = this.toOwnershipSyncRow(row, updatedAt);
+				const key = [
+					mapped.isrc,
+					mapped.effective_from,
+					mapped.effective_to ?? '',
+					mapped.revenue_effective_from,
+					mapped.revenue_effective_to ?? '',
+				].join('|');
+				const existing = deduped.get(key);
+				if (!existing || mapped.updated_at > existing.updated_at) {
+					deduped.set(key, mapped);
+				}
+			}
+		}
+
+		if (!deduped.size) return;
+		await this.clickHouseService.insertBatched(
+			CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC,
+			Array.from(deduped.values()),
+			OWNERSHIP_SYNC_INSERT_BATCH,
 		);
-		if (!rows.length) return;
-		const data: AssetOwnershipSyncRow[] = rows.map((row: any) => ({
+	}
+
+	private toOwnershipSyncRow(
+		row: any,
+		updatedAt: string,
+	): AssetOwnershipSyncRow {
+		return {
 			isrc: row.isrc,
 			release_id: row.release_id,
 			tenant_id: row.tenant_id,
@@ -950,36 +1004,21 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				? this.toClickHouseDate(row.revenue_effective_to)
 				: null,
 			is_deleted: 0,
-			updated_at: new Date().toISOString().slice(0, 23).replace('T', ' '),
-		}));
-		// Dedupe theo (isrc, window): mot ISRC co the xuat hien trong nhieu release
-		// (compilation/re-release) voi cung ownership window. Chi giu row co
-		// updated_at moi nhat de tranh fan-out khi analytics LEFT JOIN theo window.
-		const deduped = new Map<string, AssetOwnershipSyncRow>();
-		for (const row of data) {
-			const key = [
-				row.isrc,
-				row.effective_from,
-				row.effective_to ?? '',
-				row.revenue_effective_from,
-				row.revenue_effective_to ?? '',
-			].join('|');
-			const existing = deduped.get(key);
-			if (!existing || row.updated_at > existing.updated_at) {
-				deduped.set(key, row);
-			}
-		}
-		await this.clickHouseService.insert(
-			CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC,
-			Array.from(deduped.values()),
-		);
+			updated_at: updatedAt,
+		};
 	}
 
 	private toClickHouseDate(value: string | Date): string {
-		if (value instanceof Date) return value.toISOString().slice(0, 10);
-		const parsed = new Date(value);
-		if (!Number.isNaN(parsed.getTime())) {
-			return parsed.toISOString().slice(0, 10);
+		// node-pg tra DATE thanh Date theo gio dia phuong. toISOString() lui 1 ngay
+		// (o 1900 con lech offset lich su), roi ClickHouse Date ep ve 1970-01-01.
+		if (typeof value === 'string') {
+			const match = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+			if (match) return match[1];
+		}
+		if (value instanceof Date && !Number.isNaN(value.getTime())) {
+			const month = String(value.getMonth() + 1).padStart(2, '0');
+			const day = String(value.getDate()).padStart(2, '0');
+			return `${value.getFullYear()}-${month}-${day}`;
 		}
 		throw new Error(
 			`Invalid ownership date received from PostgreSQL: ${value}`,
@@ -999,34 +1038,58 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 	private async tombstoneOwnershipForReleases(
 		releaseIds: string[],
 	): Promise<void> {
-		if (!releaseIds.length) return;
-		const existing = await this.clickHouseService.query<{
-			isrc: string;
-			release_id: string;
-			tenant_id: string;
-			label_id: string;
-			effective_from: string;
-			effective_to: string | null;
-			revenue_effective_from: string;
-			revenue_effective_to: string | null;
-		}>(
-			`SELECT isrc, release_id, tenant_id, label_id, effective_from, effective_to,
-			        revenue_effective_from, revenue_effective_to
-			 FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL
-			 WHERE release_id IN ({releaseIds:Array(String)}) AND is_deleted = 0`,
-			{ releaseIds },
-		);
-		if (!existing.length) return;
+		const unique = [...new Set(releaseIds.filter(Boolean))];
+		if (!unique.length) return;
 		const now = new Date().toISOString().slice(0, 23).replace('T', ' ');
-		const tombstones: AssetOwnershipSyncRow[] = existing.map((row) => ({
-			...row,
-			is_deleted: 1,
-			updated_at: now,
-		}));
-		await this.clickHouseService.insert(
-			CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC,
-			tombstones,
-		);
+		for (
+			let offset = 0;
+			offset < unique.length;
+			offset += OWNERSHIP_SYNC_RELEASE_CHUNK
+		) {
+			const chunk = unique.slice(
+				offset,
+				offset + OWNERSHIP_SYNC_RELEASE_CHUNK,
+			);
+			// Group by the sort key instead of FINAL. FINAL merges every part
+			// before the release_id filter and is what blows AggregatingTransform
+			// when a transfer has just written a lot of unmerged versions.
+			const existing = await this.clickHouseService.query<{
+				isrc: string;
+				release_id: string;
+				tenant_id: string;
+				label_id: string;
+				effective_from: string;
+				effective_to: string | null;
+				revenue_effective_from: string;
+				revenue_effective_to: string | null;
+			}>(
+				`SELECT
+				   isrc,
+				   release_id,
+				   argMax(tenant_id, updated_at) AS tenant_id,
+				   argMax(label_id, updated_at) AS label_id,
+				   effective_from,
+				   argMax(effective_to, updated_at) AS effective_to,
+				   argMax(revenue_effective_from, updated_at) AS revenue_effective_from,
+				   argMax(revenue_effective_to, updated_at) AS revenue_effective_to
+				 FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC}
+				 WHERE release_id IN ({releaseIds:Array(String)})
+				 GROUP BY isrc, effective_from, release_id
+				 HAVING argMax(is_deleted, updated_at) = 0`,
+				{ releaseIds: chunk },
+			);
+			if (!existing.length) continue;
+			const tombstones: AssetOwnershipSyncRow[] = existing.map((row) => ({
+				...row,
+				is_deleted: 1,
+				updated_at: now,
+			}));
+			await this.clickHouseService.insertBatched(
+				CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC,
+				tombstones,
+				OWNERSHIP_SYNC_INSERT_BATCH,
+			);
+		}
 	}
 
 	/**

@@ -21,7 +21,10 @@ import {
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
-import { buildOwnershipJoin } from '../utils/ownership-join.util';
+import {
+	buildOwnershipJoin,
+	getOwnershipLedgerFallbackPredicate,
+} from '../utils/ownership-join.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	appendAnalyticsVideoScopeFilter,
@@ -99,7 +102,7 @@ export class RankingService {
 		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       ${buildOwnershipJoin('trend')}`;
 		filterSql += ` AND t.is_deleted = 0
-      AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`;
+      AND ${getOwnershipLedgerFallbackPredicate()}`;
 
 		const effectiveTenantId = isSystem ? query.tenantId : tenantId;
 		if (effectiveTenantId) {

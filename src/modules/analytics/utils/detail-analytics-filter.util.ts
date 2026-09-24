@@ -7,6 +7,7 @@ import {
 } from '../services/analytics-video-scope.service';
 import {
 	buildOwnershipJoin,
+	getOwnershipLedgerFallbackPredicate,
 	getRevenueLabelExpr,
 	getRevenueTenantExpr,
 } from './ownership-join.util';
@@ -133,7 +134,7 @@ export function buildDetailFilters(
 	// ISRC that already has ownership history (that would reassign old facts).
 	let filterSql = needsTrackJoin
 		? ` AND (t.isrc = '' OR t.is_deleted = 0)
-          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`
+          AND ${getOwnershipLedgerFallbackPredicate()}`
 		: '';
 	const params: Record<string, any> = {};
 

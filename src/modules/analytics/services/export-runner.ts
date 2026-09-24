@@ -24,7 +24,10 @@ import {
 	getTenantNamesQuery,
 	getTrackMetadataQuery,
 } from '../queries/analytics-report-export.queries';
-import { getDedupedOwnershipSubquerySql } from '../utils/ownership-join.util';
+import {
+	getDedupedOwnershipSubquerySql,
+	getOwnershipLedgerFallbackPredicate,
+} from '../utils/ownership-join.util';
 import {
 	appendAnalyticsVideoScopeFilter,
 	getAnalyticsVideoScope,
@@ -731,7 +734,7 @@ export class ExportRunner {
 		const filters: string[] = [
 			's.period >= toDate({from:String})',
 			's.period <= toDate({to:String})',
-			`(o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`,
+			getOwnershipLedgerFallbackPredicate(),
 		];
 
 		// tenant: tenantIds (batch) ưu tiên hơn tenantId (single) > current tenant > system all
