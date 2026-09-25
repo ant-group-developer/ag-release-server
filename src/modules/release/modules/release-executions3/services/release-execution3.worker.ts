@@ -1336,10 +1336,12 @@ export class ReleaseExecution3Worker {
 				throw new Error(`VEVO video file not found: ${video.fileId}`);
 			}
 
-			const remoteFileName = path.basename(fileDb.fileName);
+			const remoteFileName = path.posix.basename(fileDb.key);
 
 			if (!remoteFileName) {
-				throw new Error('VEVO video original file name is empty');
+				throw new Error(
+					'VEVO video storage key does not contain a file name',
+				);
 			}
 
 			this.logger.log(
