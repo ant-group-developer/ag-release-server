@@ -711,6 +711,29 @@ export function getTrendViewLineChartQuery(
   `;
 }
 
+export function getTrendViewSeriesLineChartQuery(
+	joinSql: string,
+	filterSql: string,
+	seriesExpr: string,
+	granularity: TrendChartGranularity | undefined = 'day',
+): string {
+	const { periodExpr, groupExpr } = getTrendPeriodExprs(granularity);
+	return `
+    SELECT
+      ${seriesExpr} AS series_id,
+      ${periodExpr} AS period,
+      sum(s.total_quantity) AS total_views
+    FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+    ${joinSql}
+    WHERE 1=1
+      AND s.reporting_date >= toDate({from:String})
+      AND s.reporting_date <= toDate({to:String})
+      ${filterSql}
+    GROUP BY series_id, ${groupExpr}, period
+    ORDER BY series_id ASC, ${groupExpr} ASC
+  `;
+}
+
 export function getTrendViewDspBarChartTotalQuery(
 	joinSql: string,
 	filterSql: string,
@@ -770,6 +793,28 @@ export function getRevenueLineChartQuery(
       ${filterSql}
     GROUP BY period
     ORDER BY period ASC
+  `;
+}
+
+export function getRevenueSeriesLineChartQuery(
+	joinSql: string,
+	filterSql: string,
+	seriesExpr: string,
+): string {
+	return `
+    SELECT
+      ${seriesExpr} AS series_id,
+      formatDateTime(s.period, '%Y-%m') AS period,
+      sum(s.total_revenue_usd) AS revenue_usd,
+      sum(s.total_quantity) AS quantity
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    ${joinSql}
+    WHERE 1=1
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+    GROUP BY series_id, period
+    ORDER BY series_id ASC, period ASC
   `;
 }
 

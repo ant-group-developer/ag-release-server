@@ -455,6 +455,52 @@ export interface TrendViewLineChartItem {
 	totalViews: number;
 }
 
+export interface TrendViewLineChartSeries {
+	id: string;
+	/** Display-ready entity data for chart legends/tooltips. */
+	metadata: AnalyticsSeriesMetadata;
+	values: TrendViewLineChartItem[];
+}
+
+export interface TrendViewLineChartSeriesResponse {
+	seriesBy: string;
+	series: TrendViewLineChartSeries[];
+}
+
+/**
+ * Common legend metadata returned for every Analytics V2 chart series.
+ * `id` always equals its enclosing series.id. Fields that do not apply to a
+ * particular entity type are omitted.
+ */
+export interface AnalyticsSeriesMetadata {
+	id: string;
+	type:
+		| 'total'
+		| 'isrc'
+		| 'release'
+		| 'channel'
+		| 'artist'
+		| 'label'
+		| 'tenant'
+		| 'dsp'
+		| 'importSource';
+	name: string;
+	imageUrl: string | null;
+	subtitle?: string | null;
+	title?: string | null;
+	upc?: string | null;
+	labelId?: string | null;
+	labelName?: string | null;
+	releaseId?: string | null;
+	releaseName?: string | null;
+	tenantId?: string | null;
+	tenantName?: string | null;
+	youtubeChannelId?: string | null;
+	pgDspId?: string | null;
+	dspReportId?: string | null;
+	importSource?: string | null;
+}
+
 /** Một cột trong bar-chart DSP (top 5 + Other) */
 export interface DspBarChartItem {
 	dspName: string;
@@ -521,6 +567,18 @@ export interface RevenueLineChartItem {
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
+}
+
+export interface RevenueLineChartSeries {
+	id: string;
+	/** Display-ready entity data for chart legends/tooltips. */
+	metadata: AnalyticsSeriesMetadata;
+	values: RevenueLineChartItem[];
+}
+
+export interface RevenueLineChartSeriesResponse {
+	seriesBy: string;
+	series: RevenueLineChartSeries[];
 }
 
 /** Metadata của DSP entity (lookup từ Postgres nếu có pgDspId) */
