@@ -11,10 +11,13 @@ import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	RevenueChartQueryDto,
+	RevenueSeriesChartQueryDto,
 	TimelineQueryDto,
+	TrendSeriesChartQueryDto,
 } from '../dto/analytics-query.dto';
 import {
 	AnalyticsChannelInfo,
+	AnalyticsSeriesMetadata,
 	AnalyticsSummaryResponse,
 	AnalyticsWorkspaceInfo,
 	DspBarChartItem,
@@ -24,6 +27,7 @@ import {
 	RevenueDspItem,
 	RevenueLabelItem,
 	RevenueLineChartItem,
+	RevenueLineChartSeriesResponse,
 	RevenueOverviewResponse,
 	RevenueReleaseItem,
 	RevenueReleaseVideoItem,
@@ -33,8 +37,11 @@ import {
 	SourceBreakdownItem,
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
+	TrendViewLineChartSeriesResponse,
 } from '../interfaces/analytics.interface';
 import * as queries from '../queries/global-timeline.queries';
+import { buildAnalyticsSeriesFilters } from '../utils/analytics-series-filter.util';
+import type { ResolvedAnalyticsSeriesBy } from '../utils/analytics-series-filter.util';
 import {
 	appendDetailFilters,
 	buildDetailFilters,
@@ -53,6 +60,7 @@ import { SourceTypeConfigService } from './source-type-config.service';
 @Injectable()
 export class TimelineAnalyticsService {
 	private readonly logger = new Logger(TimelineAnalyticsService.name);
+	private static readonly dspSeriesSeparator = '\u001f';
 	// Audio: yeu cau release_upc chuan (10-14 chu so sau khi strip leading zeros).
 	// Video: bypass filter - luon cho pass du release_upc dang placeholder (ISRC-xxx).
 	private readonly validReleaseUpcFilter =
@@ -79,6 +87,250 @@ export class TimelineAnalyticsService {
 		sortBy?: 'revenue' | 'usage';
 	}): 'revenue_usd' | 'quantity' {
 		return query.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
+	}
+
+	/**
+	 * Enrich V2 series with names/images so a client can render a useful legend
+	 * without doing N follow-up entity lookups.
+	 */
+	private async getSeriesMetadata(
+		seriesBy: ResolvedAnalyticsSeriesBy,
+		seriesIds: string[],
+	): Promise<Map<string, AnalyticsSeriesMetadata>> {
+		const fallback = (
+			id: string,
+			type: AnalyticsSeriesMetadata['type'],
+			name = id,
+		): AnalyticsSeriesMetadata => ({
+			id,
+			type,
+			name,
+			imageUrl: null,
+		});
+		const result = new Map<string, AnalyticsSeriesMetadata>();
+
+		if (seriesBy === 'total') {
+			result.set('total', fallback('total', 'total', 'All content'));
+			return result;
+		}
+
+		if (seriesBy === 'tenant') {
+			const metadata =
+				await this.isrcResolverService.getTenantMetadata(seriesIds);
+			for (const id of seriesIds) {
+				const item = metadata.get(id);
+				result.set(
+					id,
+					item
+						? {
+								...fallback(id, 'tenant', item.name),
+								title: item.title,
+								imageUrl: item.logo,
+							}
+						: fallback(id, 'tenant'),
+				);
+			}
+			return result;
+		}
+
+		if (seriesBy === 'label') {
+			const metadata =
+				await this.isrcResolverService.getLabelMetadata(seriesIds);
+			for (const id of seriesIds) {
+				const item = metadata.get(id);
+				result.set(
+					id,
+					item
+						? {
+								...fallback(id, 'label', item.name),
+								imageUrl: item.picture,
+								tenantId: item.tenant?.id ?? null,
+								tenantName: item.tenant?.name ?? null,
+							}
+						: fallback(id, 'label'),
+				);
+			}
+			return result;
+		}
+
+		if (seriesBy === 'artist') {
+			const metadata =
+				await this.isrcResolverService.getArtistMetadata(seriesIds);
+			for (const id of seriesIds) {
+				const item = metadata.get(id);
+				result.set(
+					id,
+					item
+						? {
+								...fallback(id, 'artist', item.name),
+								imageUrl: item.picture,
+								subtitle: [item.country, item.genre]
+									.filter(Boolean)
+									.join(' · ') || null,
+							}
+						: fallback(id, 'artist'),
+				);
+			}
+			return result;
+		}
+
+		if (seriesBy === 'channel') {
+			const metadata =
+				await this.isrcResolverService.getChannelMetadata(seriesIds);
+			for (const id of seriesIds) {
+				const item = metadata.get(id);
+				result.set(
+					id,
+					item
+						? {
+								...fallback(id, 'channel', item.name),
+								imageUrl: item.thumbUrl,
+								youtubeChannelId: item.youtubeChannelId,
+								tenantId: item.tenant?.id ?? null,
+								tenantName: item.tenant?.name ?? null,
+							}
+						: fallback(id, 'channel'),
+				);
+			}
+			return result;
+		}
+
+		if (seriesBy === 'release') {
+			const metadata =
+				await this.isrcResolverService.getReleaseMetadata(seriesIds);
+			for (const id of seriesIds) {
+				const item = metadata.get(id);
+				result.set(
+					id,
+					item
+						? {
+								...fallback(id, 'release', item.title),
+								imageUrl:
+									item.coverArtThumbnails?.['75x75'] ?? null,
+								upc: item.upc,
+								labelId: item.labelId,
+								labelName: item.labelName,
+							}
+						: fallback(id, 'release'),
+				);
+			}
+			return result;
+		}
+
+		if (seriesBy === 'isrc') {
+			const tracks =
+				await this.isrcResolverService.getTrackMetadataMap(seriesIds);
+			const releases = await this.isrcResolverService.getReleaseMetadata(
+				[
+					...new Set(
+						[...tracks.values()]
+							.map((item) => item.releaseId)
+							.filter(Boolean),
+					),
+				],
+			);
+			for (const id of seriesIds) {
+				const track = tracks.get(id);
+				const release = track
+					? releases.get(track.releaseId)
+					: undefined;
+				result.set(
+					id,
+					track
+						? {
+								...fallback(id, 'isrc', track.trackTitle),
+								imageUrl:
+									release?.coverArtThumbnails?.['75x75'] ??
+									null,
+								subtitle: track.trackVersion || `ISRC: ${id}`,
+								releaseId: track.releaseId,
+								releaseName: track.releaseTitle,
+								labelId: track.labelId,
+								labelName: track.labelName,
+							}
+						: fallback(id, 'isrc'),
+				);
+			}
+			return result;
+		}
+
+		if (seriesBy === 'importSource') {
+			for (const id of seriesIds) {
+				const source = this.sourceTypeConfigService.resolve(id);
+				result.set(id, {
+					...fallback(id, 'importSource', source.label),
+					imageUrl: source.imageUrl,
+					importSource: source.sourceType,
+				});
+			}
+			return result;
+		}
+
+		// DSP IDs are composite (pgDspId + unit-separator + dspReportId).
+		const pairs = seriesIds
+			.map((id) => {
+				const [pgDspId, dspReportId] = id.split(
+					TimelineAnalyticsService.dspSeriesSeparator,
+				);
+				return { id, pgDspId, dspReportId };
+			})
+			.filter((item) => item.pgDspId && item.dspReportId);
+		if (!pairs.length) return result;
+
+		const dspPredicates = pairs.map(
+			(_, index) =>
+				`(r.pg_uuid = {seriesDspPgId${index}:String} AND r.id_dsps_report = {seriesDspReportId${index}:String})`,
+		);
+		const dspParams = Object.fromEntries(
+			pairs.flatMap((pair, index) => [
+				[`seriesDspPgId${index}`, pair.pgDspId],
+				[`seriesDspReportId${index}`, pair.dspReportId],
+			]),
+		);
+		const dspRows = await this.clickHouseService.query<{
+			pg_dsp_id: string;
+			dsp_report_id: string;
+			dsp_name: string;
+			image_url: string | null;
+		}>(
+			`
+				SELECT
+					r.pg_uuid AS pg_dsp_id,
+					r.id_dsps_report AS dsp_report_id,
+					coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), r.id_dsps_report) AS dsp_name,
+					nullIf(p.picture, '') AS image_url
+				FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} r
+				LEFT JOIN music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} p
+					ON r.pg_uuid = p.pg_uuid
+				WHERE ${dspPredicates.join(' OR ')}
+			`,
+			dspParams,
+		);
+		const metadataByPair = new Map(
+			dspRows.map((row) => [
+				`${row.pg_dsp_id}${TimelineAnalyticsService.dspSeriesSeparator}${row.dsp_report_id}`,
+				row,
+			]),
+		);
+		for (const pair of pairs) {
+			const item = metadataByPair.get(pair.id);
+			result.set(
+				pair.id,
+				item
+					? {
+							...fallback(pair.id, 'dsp', item.dsp_name),
+							imageUrl: toDspImageUrl(item.image_url),
+							pgDspId: pair.pgDspId,
+							dspReportId: pair.dspReportId,
+						}
+					: {
+							...fallback(pair.id, 'dsp', pair.pgDspId),
+							pgDspId: pair.pgDspId,
+							dspReportId: pair.dspReportId,
+						},
+			);
+		}
+		return result;
 	}
 
 	private addRevenueExact(values: Array<string | null | undefined>): string {
@@ -2424,6 +2676,77 @@ export class TimelineAnalyticsService {
 		}));
 	}
 
+	async getTrendViewSeriesLineChart(
+		tenantId: string,
+		query: TrendSeriesChartQueryDto,
+	): Promise<TrendViewLineChartSeriesResponse> {
+		const key = this.cache.buildKey(
+			'tl:chart-trend-line-v2',
+			tenantId,
+			query,
+		);
+		return this.cache.wrap(key, () =>
+			this.computeTrendViewSeriesLineChart(tenantId, query),
+		);
+	}
+
+	private async computeTrendViewSeriesLineChart(
+		tenantId: string,
+		query: TrendSeriesChartQueryDto,
+	): Promise<TrendViewLineChartSeriesResponse> {
+		if (query.fromDate > query.toDate) {
+			throw new BadRequestException(
+				'fromDate must be before or equal to toDate',
+			);
+		}
+		const { joinSql, filterSql, params, seriesBy, seriesIds, seriesExpr } =
+			buildAnalyticsSeriesFilters(tenantId, query, 'trend');
+		params.from = query.fromDate;
+		params.to = query.toDate;
+
+		const rows = await this.clickHouseService.query<{
+			series_id: string;
+			period: string;
+			total_views: string;
+		}>(
+			queries.getTrendViewSeriesLineChartQuery(
+				joinSql,
+				filterSql,
+				seriesExpr,
+				query.granularity,
+			),
+			params,
+		);
+
+		const valuesBySeries = new Map<string, TrendViewLineChartItem[]>();
+		for (const row of rows) {
+			const values = valuesBySeries.get(row.series_id) ?? [];
+			values.push({
+				period: row.period,
+				totalViews: Number(row.total_views),
+			});
+			valuesBySeries.set(row.series_id, values);
+		}
+		const metadataBySeries = await this.getSeriesMetadata(
+			seriesBy,
+			seriesIds,
+		);
+
+		return {
+			seriesBy,
+			series: seriesIds.map((id) => ({
+				id,
+				metadata: metadataBySeries.get(id) ?? {
+					id,
+					type: seriesBy,
+					name: id,
+					imageUrl: null,
+				},
+				values: valuesBySeries.get(id) ?? [],
+			})),
+		};
+	}
+
 	// ═══════════════════════════════════════════════════════
 	// CHART API 2: TREND-VIEW DSP BAR CHART (Top 5 + Other)
 	// Tổng trend-view theo DSP, top 5 + Other
@@ -2622,6 +2945,81 @@ export class TimelineAnalyticsService {
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
 			quantity: Number(r.quantity),
 		}));
+	}
+
+	async getRevenueSeriesLineChart(
+		tenantId: string,
+		query: RevenueSeriesChartQueryDto,
+	): Promise<RevenueLineChartSeriesResponse> {
+		const key = this.cache.buildKey(
+			'tl:chart-rev-line-v2',
+			tenantId,
+			query,
+		);
+		return this.cache.wrap(key, () =>
+			this.computeRevenueSeriesLineChart(tenantId, query),
+		);
+	}
+
+	private async computeRevenueSeriesLineChart(
+		tenantId: string,
+		query: RevenueSeriesChartQueryDto,
+	): Promise<RevenueLineChartSeriesResponse> {
+		if (query.fromDate > query.toDate) {
+			throw new BadRequestException(
+				'fromDate must be before or equal to toDate',
+			);
+		}
+		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+		const toDate = normalizeDateToFirstOfMonth(query.toDate);
+		const { joinSql, filterSql, params, seriesBy, seriesIds, seriesExpr } =
+			buildAnalyticsSeriesFilters(tenantId, query, 'revenue');
+		params.from = fromDate;
+		params.to = toDate;
+
+		const rows = await this.clickHouseService.query<{
+			series_id: string;
+			period: string;
+			revenue_usd: string;
+			quantity: string;
+		}>(
+			queries.getRevenueSeriesLineChartQuery(
+				joinSql,
+				filterSql,
+				seriesExpr,
+			),
+			params,
+		);
+
+		const valuesBySeries = new Map<string, RevenueLineChartItem[]>();
+		for (const row of rows) {
+			const values = valuesBySeries.get(row.series_id) ?? [];
+			values.push({
+				period: row.period,
+				revenueUsd: this.revenueNumber(row.revenue_usd),
+				revenueUsdExact: this.revenueExact(row.revenue_usd),
+				quantity: Number(row.quantity),
+			});
+			valuesBySeries.set(row.series_id, values);
+		}
+		const metadataBySeries = await this.getSeriesMetadata(
+			seriesBy,
+			seriesIds,
+		);
+
+		return {
+			seriesBy,
+			series: seriesIds.map((id) => ({
+				id,
+				metadata: metadataBySeries.get(id) ?? {
+					id,
+					type: seriesBy,
+					name: id,
+					imageUrl: null,
+				},
+				values: valuesBySeries.get(id) ?? [],
+			})),
+		};
 	}
 
 	// ═══════════════════════════════════════════════════════

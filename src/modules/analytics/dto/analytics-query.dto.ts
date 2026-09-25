@@ -2,6 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
 	Allow,
+	ArrayMaxSize,
+	ArrayNotEmpty,
+	ArrayUnique,
+	IsArray,
 	IsBoolean,
 	IsDateString,
 	IsEnum,
@@ -13,6 +17,7 @@ import {
 	IsUUID,
 	Max,
 	Min,
+	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import type { AnalyticsVideoScope } from '../services/analytics-video-scope.service';
@@ -23,6 +28,119 @@ const normalizeOptionalReleaseType = (value: unknown): unknown => {
 	const normalized = value.trim().toLowerCase();
 	return normalized === '' || normalized === 'all' ? undefined : normalized;
 };
+
+export const ANALYTICS_SERIES_BY_VALUES = [
+	'auto',
+	'isrc',
+	'release',
+	'channel',
+	'artist',
+	'label',
+	'tenant',
+	'dsp',
+	'importSource',
+] as const;
+
+export type AnalyticsSeriesBy = (typeof ANALYTICS_SERIES_BY_VALUES)[number];
+
+const MAX_ANALYTICS_FILTER_VALUES = 200;
+
+/**
+ * A DSP is identified by the mapped Postgres DSP ID and the raw report ID
+ * together. Keeping them in one object prevents accidental cross-pairing.
+ */
+export class AnalyticsDspIdDto {
+	@ApiProperty({ description: 'Mapped Postgres DSP ID' })
+	@IsString()
+	@IsNotEmpty()
+	pgDspId: string;
+
+	@ApiProperty({ description: 'Raw ClickHouse DSP report ID' })
+	@IsString()
+	@IsNotEmpty()
+	dspReportId: string;
+}
+
+export class AnalyticsFilterSetDto {
+	@ApiPropertyOptional({ type: [String], format: 'uuid' })
+	@IsOptional()
+	@IsArray()
+	@ArrayNotEmpty()
+	@ArrayUnique()
+	@ArrayMaxSize(MAX_ANALYTICS_FILTER_VALUES)
+	@IsUUID('4', { each: true })
+	tenantIds?: string[];
+
+	@ApiPropertyOptional({ type: [String] })
+	@IsOptional()
+	@IsArray()
+	@ArrayNotEmpty()
+	@ArrayUnique()
+	@ArrayMaxSize(MAX_ANALYTICS_FILTER_VALUES)
+	@IsString({ each: true })
+	labelIds?: string[];
+
+	@ApiPropertyOptional({ type: [String] })
+	@IsOptional()
+	@IsArray()
+	@ArrayNotEmpty()
+	@ArrayUnique()
+	@ArrayMaxSize(MAX_ANALYTICS_FILTER_VALUES)
+	@IsString({ each: true })
+	artistIds?: string[];
+
+	@ApiPropertyOptional({ type: [String], format: 'uuid' })
+	@IsOptional()
+	@IsArray()
+	@ArrayNotEmpty()
+	@ArrayUnique()
+	@ArrayMaxSize(MAX_ANALYTICS_FILTER_VALUES)
+	@IsUUID('4', { each: true })
+	releaseIds?: string[];
+
+	@ApiPropertyOptional({ type: [String], format: 'uuid' })
+	@IsOptional()
+	@IsArray()
+	@ArrayNotEmpty()
+	@ArrayUnique()
+	@ArrayMaxSize(MAX_ANALYTICS_FILTER_VALUES)
+	@IsUUID('4', { each: true })
+	channelIds?: string[];
+
+	@ApiPropertyOptional({ type: [String] })
+	@IsOptional()
+	@IsArray()
+	@ArrayNotEmpty()
+	@ArrayUnique()
+	@ArrayMaxSize(MAX_ANALYTICS_FILTER_VALUES)
+	@IsString({ each: true })
+	isrcs?: string[];
+
+	@ApiPropertyOptional({ type: [String] })
+	@IsOptional()
+	@IsArray()
+	@ArrayNotEmpty()
+	@ArrayUnique()
+	@ArrayMaxSize(MAX_ANALYTICS_FILTER_VALUES)
+	@IsString({ each: true })
+	importSources?: string[];
+
+	@ApiPropertyOptional({
+		type: [AnalyticsDspIdDto],
+		description:
+			'DSP identifier pairs. Every item must include the matching pgDspId and dspReportId.',
+	})
+	@IsOptional()
+	@IsArray()
+	@ArrayNotEmpty()
+	@ArrayUnique(
+		(item: AnalyticsDspIdDto) => `${item.pgDspId}\u001f${item.dspReportId}`,
+	)
+	@ArrayMaxSize(MAX_ANALYTICS_FILTER_VALUES)
+	@ValidateNested({ each: true })
+	@Type(() => AnalyticsDspIdDto)
+	dspIds?: AnalyticsDspIdDto[];
+}
 
 /**
  * Base DTO cho tất cả analytics queries.
@@ -111,7 +229,8 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
 	tenantId?: string;
 
 	@ApiPropertyOptional({
-		description: 'Filter by a specific artist ID (external IDs are supported).',
+		description:
+			'Filter by a specific artist ID (external IDs are supported).',
 	})
 	@IsOptional()
 	@IsString()
@@ -333,7 +452,8 @@ export class DspChartQueryDto extends DspOverviewQueryDto {
  */
 export class VevoDemographicsBarChartQueryDto extends DspChartQueryDto {
 	@ApiPropertyOptional({
-		description: 'Sort bar items by views (default). Age chart still uses age-bucket order.',
+		description:
+			'Sort bar items by views (default). Age chart still uses age-bucket order.',
 		enum: ['views'],
 		default: 'views',
 	})
@@ -555,7 +675,8 @@ export class ChartQueryDto {
 	tenantId?: string;
 
 	@ApiPropertyOptional({
-		description: 'Filter by a specific artist ID (external IDs are supported).',
+		description:
+			'Filter by a specific artist ID (external IDs are supported).',
 	})
 	@IsOptional()
 	@IsString()
@@ -617,6 +738,72 @@ export class RevenueChartQueryDto extends ChartQueryDto {
 	@IsIn(['revenue', 'usage'])
 	sortBy?: 'revenue' | 'usage';
 }
+
+/**
+ * V2 line-chart request. Filters are arrays so a chart can return one series
+ * for each selected entity instead of a single scalar-filtered aggregate.
+ */
+export class AnalyticsSeriesChartQueryDto {
+	/** Server-only scope injected from the authenticated request. */
+	@Allow()
+	analyticsVideoScope?: AnalyticsVideoScope;
+
+	@ApiProperty({
+		description: 'Start date of the filter range (inclusive)',
+		example: '2026-01-01',
+	})
+	@IsDateString()
+	fromDate: string;
+
+	@ApiProperty({
+		description: 'End date of the filter range (inclusive)',
+		example: '2026-06-30',
+	})
+	@IsDateString()
+	toDate: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by release type: audio or video. Omit for both.',
+		enum: ['audio', 'video'],
+	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
+	@IsOptional()
+	@IsIn(['audio', 'video'])
+	releaseType?: 'audio' | 'video';
+
+	@ApiPropertyOptional({
+		description:
+			'Series dimension. auto selects the most specific non-empty filter array.',
+		enum: ANALYTICS_SERIES_BY_VALUES,
+		default: 'auto',
+	})
+	@IsOptional()
+	@IsIn(ANALYTICS_SERIES_BY_VALUES)
+	seriesBy?: AnalyticsSeriesBy = 'auto';
+
+	@ApiPropertyOptional({
+		type: AnalyticsFilterSetDto,
+		description:
+			'Array-based analytics filters. Arrays within a field are OR; fields intersect.',
+	})
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => AnalyticsFilterSetDto)
+	filters?: AnalyticsFilterSetDto;
+}
+
+export class TrendSeriesChartQueryDto extends AnalyticsSeriesChartQueryDto {
+	@ApiPropertyOptional({
+		description: 'Trend bucket granularity.',
+		enum: ['day', 'month'],
+		default: 'day',
+	})
+	@IsOptional()
+	@IsIn(['day', 'month'])
+	granularity?: 'day' | 'month' = 'day';
+}
+
+export class RevenueSeriesChartQueryDto extends AnalyticsSeriesChartQueryDto {}
 
 /** DTO cho Vevo demographics endpoints (device / gender / age). */
 export class DemographicsQueryDto extends ChartQueryDto {

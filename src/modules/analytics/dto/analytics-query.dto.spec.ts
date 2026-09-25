@@ -1,7 +1,11 @@
 import { validate } from 'class-validator';
 import {
+	AnalyticsFilterSetDto,
+	AnalyticsDspIdDto,
 	ChartQueryDto,
+	RevenueSeriesChartQueryDto,
 	TimelineQueryDto,
+	TrendSeriesChartQueryDto,
 } from './analytics-query.dto';
 
 describe('analytics query DTOs', () => {
@@ -62,5 +66,61 @@ describe('trend-view line-chart granularity', () => {
 	it('defaults granularity to day when omitted', () => {
 		const q = new ChartQueryDto();
 		expect(q.granularity).toBe('day');
+	});
+});
+
+describe('array-based series chart DTOs', () => {
+	it('accepts array filters and nested series options', async () => {
+		const query = new TrendSeriesChartQueryDto();
+		query.fromDate = '2026-01-01';
+		query.toDate = '2026-01-31';
+		query.filters = Object.assign(new AnalyticsFilterSetDto(), {
+			tenantIds: ['11111111-1111-4111-8111-111111111111'],
+			isrcs: ['USAAA2600001', 'USAAA2600002'],
+		});
+		query.seriesBy = 'isrc';
+		expect(await validate(query)).toEqual([]);
+	});
+
+	it('requires each V2 DSP filter to carry the mapped and raw IDs together', async () => {
+		const query = new TrendSeriesChartQueryDto();
+		query.fromDate = '2026-01-01';
+		query.toDate = '2026-01-31';
+		query.filters = Object.assign(new AnalyticsFilterSetDto(), {
+			dspIds: [
+				Object.assign(new AnalyticsDspIdDto(), {
+					pgDspId: 'spotify',
+					dspReportId: 'spotify-us',
+				}),
+			],
+		});
+
+		expect(await validate(query)).toEqual([]);
+
+		query.filters = Object.assign(new AnalyticsFilterSetDto(), {
+			dspIds: [
+				Object.assign(new AnalyticsDspIdDto(), { pgDspId: 'spotify' }),
+			],
+		});
+		const errors = await validate(query);
+		expect(errors.some((error) => error.property === 'filters')).toBe(true);
+	});
+
+	it('rejects scalar values in array filters and unknown series dimensions', async () => {
+		const query = new RevenueSeriesChartQueryDto() as unknown as Record<
+			string,
+			unknown
+		>;
+		query.fromDate = '2026-01-01';
+		query.toDate = '2026-01-31';
+		query.filters = { isrcs: 'USAAA2600001' };
+		query.seriesBy = 'track';
+		const errors = await validate(
+			query as unknown as RevenueSeriesChartQueryDto,
+		);
+		expect(errors.some((error) => error.property === 'filters')).toBe(true);
+		expect(errors.some((error) => error.property === 'seriesBy')).toBe(
+			true,
+		);
 	});
 });

@@ -6,11 +6,14 @@ import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	RevenueChartQueryDto,
+	RevenueSeriesChartQueryDto,
 	TimelineQueryDto,
+	TrendSeriesChartQueryDto,
 	VevoDemographicsBarChartQueryDto,
 } from '../dto/analytics-query.dto';
 import {
 	AnalyticsSummaryResponse,
+	DemographicsBarChartResponse,
 	DspBarChartItem,
 	OverviewTrendsResponse,
 	RevenueArtistItem,
@@ -18,6 +21,7 @@ import {
 	RevenueDspItem,
 	RevenueLabelItem,
 	RevenueLineChartItem,
+	RevenueLineChartSeriesResponse,
 	RevenueOverviewResponse,
 	RevenueReleaseItem,
 	RevenueReleaseVideoItem,
@@ -26,7 +30,7 @@ import {
 	RevenueTrackItem,
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
-	DemographicsBarChartResponse,
+	TrendViewLineChartSeriesResponse,
 } from '../interfaces/analytics.interface';
 import { DemographicsAnalyticsService } from '../services/demographics-analytics.service';
 import { TimelineAnalyticsService } from '../services/global-timeline.service';
@@ -339,6 +343,23 @@ export class TimelineAnalyticsController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Post('trend-view/line-chart/v2')
+	@ApiOperation({
+		summary: 'Get multi-series trend views line chart data',
+		description:
+			'Accepts array filters and returns one series for every selected value in the most specific filter array.',
+	})
+	async getTrendViewSeriesLineChart(
+		@Req() req: Request,
+		@Body() query: TrendSeriesChartQueryDto,
+	): Promise<ResponseSuccess<TrendViewLineChartSeriesResponse>> {
+		const data = await this.timelineService.getTrendViewSeriesLineChart(
+			req.user!.tenantId,
+			query,
+		);
+		return new ResponseSuccess({ data });
+	}
+
 	@Post('trend-view/dsp/bar-chart')
 	@ApiOperation({
 		summary: 'Get top 5 DSPs by trend views bar chart data',
@@ -458,6 +479,23 @@ export class TimelineAnalyticsController {
 		@Body() query: RevenueChartQueryDto,
 	): Promise<ResponseSuccess<RevenueLineChartItem[]>> {
 		const data = await this.timelineService.getRevenueLineChart(
+			req.user!.tenantId,
+			query,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('revenue/line-chart/v2')
+	@ApiOperation({
+		summary: 'Get multi-series revenue line chart data',
+		description:
+			'Accepts array filters and returns one series for every selected value in the most specific filter array.',
+	})
+	async getRevenueSeriesLineChart(
+		@Req() req: Request,
+		@Body() query: RevenueSeriesChartQueryDto,
+	): Promise<ResponseSuccess<RevenueLineChartSeriesResponse>> {
+		const data = await this.timelineService.getRevenueSeriesLineChart(
 			req.user!.tenantId,
 			query,
 		);
