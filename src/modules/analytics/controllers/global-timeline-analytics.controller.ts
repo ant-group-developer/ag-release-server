@@ -3,8 +3,11 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	AnalyticsAggregateChartQueryDto,
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	DemographicsAggregateChartQueryDto,
+	RevenueAggregateChartQueryDto,
 	RevenueChartQueryDto,
 	RevenueSeriesChartQueryDto,
 	TimelineQueryDto,
@@ -317,6 +320,24 @@ export class TimelineAnalyticsController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Post('trend-view/summary/v2')
+	@ApiOperation({
+		summary: 'Get trend-view summary with V2 array filters',
+		description:
+			'Uses the same array filter contract as V2 trend line charts so all trend widgets share one scope.',
+	})
+	async getTrendsOverviewV2(
+		@Req() req: Request,
+		@Body() query: AnalyticsAggregateChartQueryDto,
+	): Promise<ResponseSuccess<OverviewTrendsResponse>> {
+		return new ResponseSuccess({
+			data: await this.timelineService.getTrendsOverviewV2(
+				req.user!.tenantId,
+				query,
+			),
+		});
+	}
+
 	// ═══════════════════════════════════════════════════════
 	// CHART APIs (Line Chart & Bar Chart)
 	// ═══════════════════════════════════════════════════════
@@ -382,6 +403,22 @@ export class TimelineAnalyticsController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Post('trend-view/dsp/bar-chart/v2')
+	@ApiOperation({
+		summary: 'Get trend DSP breakdown with V2 array filters',
+	})
+	async getTrendViewDspBarChartV2(
+		@Req() req: Request,
+		@Body() query: AnalyticsAggregateChartQueryDto,
+	): Promise<ResponseSuccess<DspBarChartItem[]>> {
+		return new ResponseSuccess({
+			data: await this.timelineService.getTrendViewDspBarChartV2(
+				req.user!.tenantId,
+				query,
+			),
+		});
+	}
+
 	@Post('trend-view/ter/bar-chart')
 	@ApiOperation({
 		summary: 'Get top 5 territories by trend views bar chart data',
@@ -405,6 +442,22 @@ export class TimelineAnalyticsController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Post('trend-view/ter/bar-chart/v2')
+	@ApiOperation({
+		summary: 'Get trend territory breakdown with V2 array filters',
+	})
+	async getTrendViewTerritoryBarChartV2(
+		@Req() req: Request,
+		@Body() query: AnalyticsAggregateChartQueryDto,
+	): Promise<ResponseSuccess<TerritoryBarChartItem[]>> {
+		return new ResponseSuccess({
+			data: await this.timelineService.getTrendViewTerritoryBarChartV2(
+				req.user!.tenantId,
+				query,
+			),
+		});
+	}
+
 	@Post('trend-view/device/bar-chart')
 	@ApiOperation({
 		summary: 'Vevo device breakdown bar chart',
@@ -419,6 +472,22 @@ export class TimelineAnalyticsController {
 	): Promise<ResponseSuccess<DemographicsBarChartResponse>> {
 		return new ResponseSuccess({
 			data: await this.demographicsSvc.getDspDeviceBarChart(
+				query,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/device/bar-chart/v2')
+	@ApiOperation({
+		summary: 'Get Vevo device breakdown with V2 array filters',
+	})
+	async getTrendViewDeviceBarChartV2(
+		@Req() req: Request,
+		@Body() query: DemographicsAggregateChartQueryDto,
+	): Promise<ResponseSuccess<DemographicsBarChartResponse>> {
+		return new ResponseSuccess({
+			data: await this.demographicsSvc.getDspDeviceBarChartV2(
 				query,
 				req.user!.tenantId,
 			),
@@ -444,6 +513,22 @@ export class TimelineAnalyticsController {
 		});
 	}
 
+	@Post('trend-view/gender/bar-chart/v2')
+	@ApiOperation({
+		summary: 'Get Vevo gender breakdown with V2 array filters',
+	})
+	async getTrendViewGenderBarChartV2(
+		@Req() req: Request,
+		@Body() query: DemographicsAggregateChartQueryDto,
+	): Promise<ResponseSuccess<DemographicsBarChartResponse>> {
+		return new ResponseSuccess({
+			data: await this.demographicsSvc.getDspGenderBarChartV2(
+				query,
+				req.user!.tenantId,
+			),
+		});
+	}
+
 	@Post('trend-view/age-range/bar-chart')
 	@ApiOperation({
 		summary: 'Vevo age-range breakdown bar chart',
@@ -457,6 +542,22 @@ export class TimelineAnalyticsController {
 	): Promise<ResponseSuccess<DemographicsBarChartResponse>> {
 		return new ResponseSuccess({
 			data: await this.demographicsSvc.getDspAgeBarChart(
+				query,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/age-range/bar-chart/v2')
+	@ApiOperation({
+		summary: 'Get Vevo age breakdown with V2 array filters',
+	})
+	async getTrendViewAgeBarChartV2(
+		@Req() req: Request,
+		@Body() query: DemographicsAggregateChartQueryDto,
+	): Promise<ResponseSuccess<DemographicsBarChartResponse>> {
+		return new ResponseSuccess({
+			data: await this.demographicsSvc.getDspAgeBarChartV2(
 				query,
 				req.user!.tenantId,
 			),
@@ -524,6 +625,22 @@ export class TimelineAnalyticsController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Post('revenue/dsp/bar-chart/v2')
+	@ApiOperation({
+		summary: 'Get revenue/usage DSP breakdown with V2 array filters',
+	})
+	async getRevenueDspBarChartV2(
+		@Req() req: Request,
+		@Body() query: RevenueAggregateChartQueryDto,
+	): Promise<ResponseSuccess<DspBarChartItem[]>> {
+		return new ResponseSuccess({
+			data: await this.timelineService.getRevenueDspBarChartV2(
+				req.user!.tenantId,
+				query,
+			),
+		});
+	}
+
 	@Post('revenue/ter/bar-chart')
 	@ApiOperation({
 		summary: 'Get top 5 territories by revenue bar chart data',
@@ -544,5 +661,21 @@ export class TimelineAnalyticsController {
 			query,
 		);
 		return new ResponseSuccess({ data });
+	}
+
+	@Post('revenue/ter/bar-chart/v2')
+	@ApiOperation({
+		summary: 'Get revenue/usage territory breakdown with V2 array filters',
+	})
+	async getRevenueTerritoryBarChartV2(
+		@Req() req: Request,
+		@Body() query: RevenueAggregateChartQueryDto,
+	): Promise<ResponseSuccess<TerritoryBarChartItem[]>> {
+		return new ResponseSuccess({
+			data: await this.timelineService.getRevenueTerritoryBarChartV2(
+				req.user!.tenantId,
+				query,
+			),
+		});
 	}
 }

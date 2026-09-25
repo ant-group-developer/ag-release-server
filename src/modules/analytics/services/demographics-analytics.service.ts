@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
+	AnalyticsFilterSetDto,
+	DemographicsAggregateChartQueryDto,
 	DemographicsQueryDto,
 	VevoDemographicsBarChartQueryDto,
 } from '../dto/analytics-query.dto';
@@ -10,6 +12,9 @@ import {
 	DemographicsBarChartItem,
 	DemographicsBarChartResponse,
 } from '../interfaces/analytics.interface';
+import {
+	buildAnalyticsFactFilters,
+} from '../utils/analytics-series-filter.util';
 import {
 	buildOwnershipJoin,
 	getOwnershipLedgerFallbackPredicate,
@@ -175,6 +180,49 @@ export class DemographicsAnalyticsService {
 		);
 	}
 
+	/**
+	 * V2 widgets use one shared array-filter payload. The demographics cube is
+	 * Vevo-only; dspIds therefore act as a Vevo-pair eligibility filter while
+	 * all catalog filters are applied directly to the cube facts.
+	 */
+	async getDspDeviceBarChartV2(
+		dto: DemographicsAggregateChartQueryDto,
+		tenantId: string,
+	): Promise<DemographicsBarChartResponse> {
+		this.assertValidDateRange(dto);
+		const key = this.cache.buildKey('demographics:dsp-device-v2', tenantId, dto);
+		return this.cache.wrap(key, async () => {
+			if (!(await this.shouldQueryVevoDemographicsV2(dto))) {
+				return { totalViews: 0, coverage: null, items: [] };
+			}
+			const { rows, total } = await this.queryDimensionV2(
+				'device',
+				dto,
+				tenantId,
+			);
+			this.sortRows(rows, 'device', false);
+			return {
+				totalViews: total,
+				coverage: null,
+				items: this.toBarChartItems(rows),
+			};
+		});
+	}
+
+	async getDspGenderBarChartV2(
+		dto: DemographicsAggregateChartQueryDto,
+		tenantId: string,
+	): Promise<DemographicsBarChartResponse> {
+		return this.getDspEstimateBarChartV2('gender', dto, tenantId);
+	}
+
+	async getDspAgeBarChartV2(
+		dto: DemographicsAggregateChartQueryDto,
+		tenantId: string,
+	): Promise<DemographicsBarChartResponse> {
+		return this.getDspEstimateBarChartV2('age_group', dto, tenantId);
+	}
+
 	// ─────────────────────────────────────────────────────
 	// Compute
 	// ─────────────────────────────────────────────────────
@@ -204,6 +252,40 @@ export class DemographicsAnalyticsService {
 		};
 	}
 
+	private async getDspEstimateBarChartV2(
+		dimension: 'gender' | 'age_group',
+		dto: DemographicsAggregateChartQueryDto,
+		tenantId: string,
+	): Promise<DemographicsBarChartResponse> {
+		this.assertValidDateRange(dto);
+		const key = this.cache.buildKey(
+			`demographics:dsp-${dimension}-v2`,
+			tenantId,
+			dto,
+		);
+		return this.cache.wrap(key, async () => {
+			if (!(await this.shouldQueryVevoDemographicsV2(dto))) {
+				return { totalViews: 0, coverage: null, items: [] };
+			}
+			const [dimensionResult, deviceResult] = await Promise.all([
+				this.queryDimensionV2(dimension, dto, tenantId),
+				this.queryDimensionV2('device', dto, tenantId),
+			]);
+			this.sortRows(dimensionResult.rows, dimension, false);
+			return {
+				totalViews: dimensionResult.total,
+				coverage:
+					deviceResult.total > 0
+						? Math.round(
+								(dimensionResult.total / deviceResult.total) *
+									10000,
+							) / 10000
+						: null,
+				items: this.toBarChartItems(dimensionResult.rows),
+			};
+		});
+	}
+
 	/**
 	 * Cube demographics is Vevo-only. Skip the DSP lookup unless the caller
 	 * sent pgDspId/dspReportId — then empty unless that DSP is Vevo.
@@ -230,6 +312,27 @@ export class DemographicsAnalyticsService {
 			params,
 		);
 		if (rows.length === 0) return false;
+		return rows.some((row) => /vevo|vvo/i.test(row.dsp_name || ''));
+	}
+
+	private async shouldQueryVevoDemographicsV2(
+		dto: DemographicsAggregateChartQueryDto,
+	): Promise<boolean> {
+		const dspIds = dto.filters?.dspIds ?? [];
+		if (!dspIds.length) return true;
+
+		const params: Record<string, string> = {};
+		const predicates = dspIds.map((dsp, index) => {
+			params[`pgDspId${index}`] = dsp.pgDspId;
+			params[`dspReportId${index}`] = dsp.dspReportId;
+			return `(pg_uuid = {pgDspId${index}:String} AND id_dsps_report = {dspReportId${index}:String})`;
+		});
+		const rows = await this.clickHouseService.query<{ dsp_name: string }>(
+			`SELECT dsp_name
+       FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL
+       WHERE ${predicates.join(' OR ')}`,
+			params,
+		);
 		return rows.some((row) => /vevo|vvo/i.test(row.dsp_name || ''));
 	}
 
@@ -316,6 +419,55 @@ export class DemographicsAnalyticsService {
 		return { rows, total };
 	}
 
+	private async queryDimensionV2(
+		dimension: string,
+		dto: DemographicsAggregateChartQueryDto,
+		tenantId: string,
+	): Promise<{ rows: AggregatedRow[]; total: number }> {
+		// trends_demographics_cube has no dsp_id. DSP pair filtering is handled
+		// above as a Vevo eligibility check; the remaining fields share the
+		// exact fact-filter logic used by trend V2 line/summary/bar endpoints.
+		const { dspIds: _dspIds, ...nonDspFilters } =
+			dto.filters ?? ({} as AnalyticsFilterSetDto);
+		const { joinSql, filterSql, params } = buildAnalyticsFactFilters(
+			tenantId,
+			{
+				filters: nonDspFilters as AnalyticsFilterSetDto,
+				releaseType: dto.releaseType,
+				analyticsVideoScope: dto.analyticsVideoScope,
+			},
+			'trend',
+		);
+		params.dimension = dimension;
+		params.from = dto.fromDate;
+		params.to = dto.toDate;
+
+		const cubeRows = await this.clickHouseService.query<DemographicsCubeRow>(
+			`
+				SELECT
+					s.dimension_value AS dimension_value,
+					sum(s.views) AS views
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DEMOGRAPHICS_CUBE} s
+				${joinSql}
+				WHERE s.reporting_date >= toDate({from:String})
+					AND s.reporting_date <= toDate({to:String})
+					AND s.dimension = {dimension:String}
+					${filterSql}
+				GROUP BY s.dimension_value
+			`,
+			params,
+		);
+		const rows = cubeRows.map((row) => ({
+			territoryCode: '',
+			dimensionValue: row.dimension_value,
+			views: Number(row.views),
+		}));
+		return {
+			rows,
+			total: rows.reduce((sum, row) => sum + row.views, 0),
+		};
+	}
+
 	// ─────────────────────────────────────────────────────
 	// Helper: JOIN + WHERE scoped theo track + tenant
 	// (replicate track-case của EntityAnalyticsService.buildEntityFilters)
@@ -400,6 +552,17 @@ export class DemographicsAnalyticsService {
 		);
 
 		return { joinSql, filterSql, params };
+	}
+
+	private assertValidDateRange(dto: {
+		fromDate: string;
+		toDate: string;
+	}): void {
+		if (dto.fromDate > dto.toDate) {
+			throw new BadRequestException(
+				'fromDate must be before or equal to toDate',
+			);
+		}
 	}
 
 	// ─────────────────────────────────────────────────────

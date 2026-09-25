@@ -835,6 +835,61 @@ export class RevenueChartQueryDto extends ChartQueryDto {
 }
 
 /**
+ * Common V2 request for summary and breakdown charts. It deliberately accepts
+ * only the array-based filter contract used by V2 line charts.
+ */
+export class AnalyticsAggregateChartQueryDto {
+	/** Server-only scope injected from the authenticated request. */
+	@Allow()
+	analyticsVideoScope?: AnalyticsVideoScope;
+
+	@ApiProperty({ example: '2026-01-01' })
+	@IsDateString()
+	fromDate: string;
+
+	@ApiProperty({ example: '2026-06-30' })
+	@IsDateString()
+	toDate: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by release type: audio or video. Omit for both.',
+		enum: ['audio', 'video'],
+	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
+	@IsOptional()
+	@IsIn(['audio', 'video'])
+	releaseType?: 'audio' | 'video';
+
+	@ApiPropertyOptional({
+		type: AnalyticsFilterSetDto,
+		description:
+			'Array-based analytics filters. Arrays within a field are OR; fields intersect.',
+	})
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => AnalyticsFilterSetDto)
+	filters?: AnalyticsFilterSetDto;
+}
+
+/** Revenue breakdown V2. Metric controls the bar ordering, not the scope. */
+export class RevenueAggregateChartQueryDto extends AnalyticsAggregateChartQueryDto {
+	@ApiPropertyOptional({
+		enum: ['revenueUsd', 'usage'],
+		default: 'revenueUsd',
+		description: 'Metric used to rank revenue breakdown bars.',
+	})
+	@IsOptional()
+	@IsIn(['revenueUsd', 'usage'])
+	metric?: 'revenueUsd' | 'usage' = 'revenueUsd';
+}
+
+/**
+ * The demographics cube is Vevo-only. It supports the same array scope as
+ * V2 trend charts, while a dspIds filter selects Vevo pairs only.
+ */
+export class DemographicsAggregateChartQueryDto extends AnalyticsAggregateChartQueryDto {}
+
+/**
  * V2 line-chart request. Filters are arrays so a chart can return one series
  * for each selected entity instead of a single scalar-filtered aggregate.
  */

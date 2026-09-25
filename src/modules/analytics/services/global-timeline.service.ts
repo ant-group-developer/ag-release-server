@@ -9,8 +9,10 @@ import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
 	AnalyticsFilterSetDto,
+	AnalyticsAggregateChartQueryDto,
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueAggregateChartQueryDto,
 	RevenueChartQueryDto,
 	RevenueSeriesChartQueryDto,
 	TimelineQueryDto,
@@ -560,6 +562,53 @@ export class TimelineAnalyticsService {
 			'revenue',
 			forceTrackJoin,
 		);
+	}
+
+	private assertValidDateRange(query: {
+		fromDate: string;
+		toDate: string;
+	}): void {
+		if (query.fromDate > query.toDate) {
+			throw new BadRequestException(
+				'fromDate must be before or equal to toDate',
+			);
+		}
+	}
+
+	private buildV2AggregateFilters(
+		tenantId: string,
+		query: AnalyticsAggregateChartQueryDto,
+		ownershipPeriod: 'trend' | 'revenue',
+		options?: { forceTrackJoin?: boolean; dspMode?: 'join' | 'subquery' },
+	) {
+		return buildAnalyticsFactFilters(
+			tenantId,
+			{
+				filters: query.filters,
+				releaseType: query.releaseType,
+				analyticsVideoScope: query.analyticsVideoScope,
+			},
+			ownershipPeriod,
+			options,
+		);
+	}
+
+	private dspMetadataJoinForV2(
+		filters?: AnalyticsFilterSetDto,
+		joinSql?: string,
+	): string {
+		const hasReportJoin =
+			Boolean(filters?.dspIds?.length) &&
+			Boolean(joinSql?.includes(CLICKHOUSE_TABLES.DSPS_REPORT));
+		return hasReportJoin
+			? `
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p
+        ON r.pg_uuid = p.pg_uuid`
+			: `
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL) r
+        ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p
+        ON r.pg_uuid = p.pg_uuid`;
 	}
 
 	async getSummary(
@@ -2160,6 +2209,54 @@ export class TimelineAnalyticsService {
 		};
 	}
 
+	async getTrendsOverviewV2(
+		tenantId: string,
+		query: AnalyticsAggregateChartQueryDto,
+	): Promise<OverviewTrendsResponse> {
+		this.assertValidDateRange(query);
+		const key = this.cache.buildKey(
+			'tl:trends-overview-v2',
+			tenantId,
+			query,
+		);
+		return this.cache.wrap(key, async () => {
+			const { joinSql, filterSql, params } = this.buildV2AggregateFilters(
+				tenantId,
+				query,
+				'trend',
+				{ forceTrackJoin: true },
+			);
+			const queryParams = {
+				...params,
+				from: query.fromDate,
+				to: query.toDate,
+			};
+			const [mainResult, artistResult] = await Promise.all([
+				this.clickHouseService.query<{
+					total_views: string;
+					total_dsps: string;
+					total_tracks: string;
+					total_labels: string;
+				}>(
+					queries.getTrendsOverviewMainQuery(joinSql, filterSql),
+					queryParams,
+				),
+				this.clickHouseService.query<{ total_artists: string }>(
+					queries.getTrendsOverviewArtistQuery(joinSql, filterSql),
+					queryParams,
+				),
+			]);
+
+			return {
+				totalViews: Number(mainResult[0]?.total_views ?? 0),
+				totalDsps: Number(mainResult[0]?.total_dsps ?? 0),
+				totalTracks: Number(mainResult[0]?.total_tracks ?? 0),
+				totalArtists: Number(artistResult[0]?.total_artists ?? 0),
+				totalLabels: Number(mainResult[0]?.total_labels ?? 0),
+			};
+		});
+	}
+
 	// ═══════════════════════════════════════════════════════
 	// REVENUE TOP RELEASE (Top releases by revenue)
 	// ═══════════════════════════════════════════════════════
@@ -2862,6 +2959,72 @@ export class TimelineAnalyticsService {
 		return items;
 	}
 
+	async getTrendViewDspBarChartV2(
+		tenantId: string,
+		query: AnalyticsAggregateChartQueryDto,
+	): Promise<DspBarChartItem[]> {
+		this.assertValidDateRange(query);
+		const key = this.cache.buildKey(
+			'tl:chart-trend-dsp-bar-v2',
+			tenantId,
+			query,
+		);
+		return this.cache.wrap(key, async () => {
+			const { joinSql, filterSql, params } =
+				this.buildV2AggregateFilters(tenantId, query, 'trend', {
+					dspMode: 'join',
+				});
+			const queryParams = {
+				...params,
+				from: query.fromDate,
+				to: query.toDate,
+			};
+			const totalResult = await this.clickHouseService.query<{
+				total_views: string;
+			}>(
+				queries.getTrendViewDspBarChartTotalQuery(joinSql, filterSql),
+				queryParams,
+			);
+			const rows = await this.clickHouseService.query<{
+				pg_dsp_id: string | null;
+				dsp_report_id: string;
+				dsp_report_ids: string[];
+				dsp_name: string;
+				image_url: string | null;
+				total_views: string;
+			}>(
+				queries.getTrendViewDspBarChartQuery(
+					joinSql,
+					filterSql,
+					`coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`,
+					this.dspMetadataJoinForV2(query.filters, joinSql),
+				),
+				queryParams,
+			);
+			const items: DspBarChartItem[] = rows.map((row) => ({
+				pgDspId: row.pg_dsp_id || null,
+				dspReportId: row.dsp_report_id,
+				dspReportIds: row.dsp_report_ids,
+				dspName: row.dsp_name,
+				imageUrl: toDspImageUrl(row.image_url),
+				totalViews: Number(row.total_views),
+			}));
+			const otherViews =
+				Number(totalResult[0]?.total_views ?? 0) -
+				items.reduce((sum, item) => sum + (item.totalViews ?? 0), 0);
+			if (otherViews > 0) {
+				items.push({
+					pgDspId: null,
+					dspReportId: '',
+					dspName: 'Other',
+					imageUrl: null,
+					totalViews: otherViews,
+				});
+			}
+			return items;
+		});
+	}
+
 	// ═══════════════════════════════════════════════════════
 	// CHART API 3: REVENUE LINE CHART (Monthly)
 	// Tổng revenue theo tháng từ sales_dsp_monthly_cube_v2
@@ -2931,6 +3094,62 @@ export class TimelineAnalyticsService {
 		}
 
 		return this.mapTerritoryCodesToCountryNames(items);
+	}
+
+	async getTrendViewTerritoryBarChartV2(
+		tenantId: string,
+		query: AnalyticsAggregateChartQueryDto,
+	): Promise<TerritoryBarChartItem[]> {
+		this.assertValidDateRange(query);
+		const key = this.cache.buildKey(
+			'tl:chart-trend-ter-bar-v2',
+			tenantId,
+			query,
+		);
+		return this.cache.wrap(key, async () => {
+			const { joinSql, filterSql, params } =
+				this.buildV2AggregateFilters(tenantId, query, 'trend');
+			const queryParams = {
+				...params,
+				from: query.fromDate,
+				to: query.toDate,
+			};
+			const [totalResult, rows] = await Promise.all([
+				this.clickHouseService.query<{ total_views: string }>(
+					queries.getTrendViewTerritoryBarChartTotalQuery(
+						joinSql,
+						filterSql,
+					),
+					queryParams,
+				),
+				this.clickHouseService.query<{
+					territory: string;
+					total_views: string;
+				}>(
+					queries.getTrendViewTerritoryBarChartQuery(
+						joinSql,
+						filterSql,
+					),
+					queryParams,
+				),
+			]);
+			const items: TerritoryBarChartItem[] = rows.map((row) => ({
+				territory: row.territory,
+				imageUrl: null,
+				totalViews: Number(row.total_views),
+			}));
+			const otherViews =
+				Number(totalResult[0]?.total_views ?? 0) -
+				items.reduce((sum, item) => sum + (item.totalViews ?? 0), 0);
+			if (otherViews > 0) {
+				items.push({
+					territory: 'Other',
+					imageUrl: null,
+					totalViews: otherViews,
+				});
+			}
+			return this.mapTerritoryCodesToCountryNames(items);
+		});
 	}
 
 	async getRevenueLineChart(
@@ -3157,6 +3376,90 @@ export class TimelineAnalyticsService {
 		return items;
 	}
 
+	async getRevenueDspBarChartV2(
+		tenantId: string,
+		query: RevenueAggregateChartQueryDto,
+	): Promise<DspBarChartItem[]> {
+		this.assertValidDateRange(query);
+		const key = this.cache.buildKey(
+			'tl:chart-rev-dsp-bar-v2',
+			tenantId,
+			query,
+		);
+		return this.cache.wrap(key, async () => {
+			const { joinSql, filterSql, params } =
+				this.buildV2AggregateFilters(tenantId, query, 'revenue', {
+					dspMode: 'join',
+				});
+			const queryParams = {
+				...params,
+				from: normalizeDateToFirstOfMonth(query.fromDate),
+				to: normalizeDateToFirstOfMonth(query.toDate),
+			};
+			const [totalResult, rows] = await Promise.all([
+				this.clickHouseService.query<{
+					total_rev: string;
+					total_qty: string;
+				}>(
+					queries.getRevenueDspBarChartTotalQuery(joinSql, filterSql),
+					queryParams,
+				),
+				this.clickHouseService.query<{
+					pg_dsp_id: string | null;
+					dsp_report_id: string;
+					dsp_report_ids: string[];
+					dsp_name: string;
+					image_url: string | null;
+					revenue_usd: string;
+					quantity: string;
+				}>(
+					queries.getRevenueDspBarChartQuery(
+						joinSql,
+						this.dspMetadataJoinForV2(query.filters, joinSql),
+						filterSql,
+						`coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`,
+						query.metric === 'usage' ? 'quantity' : 'revenue_usd',
+					),
+					queryParams,
+				),
+			]);
+			const items: DspBarChartItem[] = rows.map((row) => ({
+				pgDspId: row.pg_dsp_id || null,
+				dspReportId: row.dsp_report_id,
+				dspReportIds: row.dsp_report_ids,
+				dspName: row.dsp_name,
+				imageUrl: toDspImageUrl(row.image_url),
+				revenueUsd: this.revenueNumber(row.revenue_usd),
+				revenueUsdExact: this.revenueExact(row.revenue_usd),
+				quantity: Number(row.quantity),
+			}));
+			const otherRevenueExact = this.subtractRevenueExact(
+				this.revenueExact(totalResult[0]?.total_rev),
+				this.addRevenueExact(
+					items.map((item) => item.revenueUsdExact),
+				),
+			);
+			const otherQuantity = Math.max(
+				0,
+				Number(totalResult[0]?.total_qty ?? 0) -
+					items.reduce((sum, item) => sum + (item.quantity ?? 0), 0),
+			);
+			const otherRevenue = this.revenueNumber(otherRevenueExact);
+			if (otherRevenue > 0 || otherQuantity > 0) {
+				items.push({
+					pgDspId: null,
+					dspReportId: '',
+					dspName: 'Other',
+					imageUrl: null,
+					revenueUsd: otherRevenue,
+					revenueUsdExact: otherRevenueExact,
+					quantity: otherQuantity,
+				});
+			}
+			return items;
+		});
+	}
+
 	async getRevenueTerritoryBarChart(
 		tenantId: string,
 		query: RevenueChartQueryDto,
@@ -3239,6 +3542,82 @@ export class TimelineAnalyticsService {
 		}
 
 		return this.mapTerritoryCodesToCountryNames(items);
+	}
+
+	async getRevenueTerritoryBarChartV2(
+		tenantId: string,
+		query: RevenueAggregateChartQueryDto,
+	): Promise<TerritoryBarChartItem[]> {
+		this.assertValidDateRange(query);
+		const key = this.cache.buildKey(
+			'tl:chart-rev-ter-bar-v2',
+			tenantId,
+			query,
+		);
+		return this.cache.wrap(key, async () => {
+			const { joinSql, filterSql, params } =
+				this.buildV2AggregateFilters(tenantId, query, 'revenue');
+			const queryParams = {
+				...params,
+				from: normalizeDateToFirstOfMonth(query.fromDate),
+				to: normalizeDateToFirstOfMonth(query.toDate),
+			};
+			const [totalResult, rows] = await Promise.all([
+				this.clickHouseService.query<{
+					total_rev: string;
+					total_qty: string;
+				}>(
+					queries.getRevenueTerritoryBarChartTotalQuery(
+						joinSql,
+						filterSql,
+					),
+					queryParams,
+				),
+				this.clickHouseService.query<{
+					territory: string;
+					revenue_usd: string;
+					quantity: string;
+				}>(
+					queries.getRevenueTerritoryBarChartQuery(
+						joinSql,
+						filterSql,
+						query.metric === 'usage'
+							? 'quantity'
+							: 'revenue_usd',
+					),
+					queryParams,
+				),
+			]);
+			const items: TerritoryBarChartItem[] = rows.map((row) => ({
+				territory: row.territory,
+				imageUrl: null,
+				revenueUsd: this.revenueNumber(row.revenue_usd),
+				revenueUsdExact: this.revenueExact(row.revenue_usd),
+				quantity: Number(row.quantity),
+			}));
+			const otherRevenueExact = this.subtractRevenueExact(
+				this.revenueExact(totalResult[0]?.total_rev),
+				this.addRevenueExact(
+					items.map((item) => item.revenueUsdExact),
+				),
+			);
+			const otherQuantity = Math.max(
+				0,
+				Number(totalResult[0]?.total_qty ?? 0) -
+					items.reduce((sum, item) => sum + (item.quantity ?? 0), 0),
+			);
+			const otherRevenue = this.revenueNumber(otherRevenueExact);
+			if (otherRevenue > 0 || otherQuantity > 0) {
+				items.push({
+					territory: 'Other',
+					imageUrl: null,
+					revenueUsd: otherRevenue,
+					revenueUsdExact: otherRevenueExact,
+					quantity: otherQuantity,
+				});
+			}
+			return this.mapTerritoryCodesToCountryNames(items);
+		});
 	}
 
 	private async mapTerritoryCodesToCountryNames(

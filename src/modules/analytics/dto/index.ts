@@ -1,11 +1,14 @@
 export {
 	AnalyticsSummaryQueryDto,
+	AnalyticsAggregateChartQueryDto,
 	BaseAnalyticsQueryDto,
 	ChartQueryDto,
+	DemographicsAggregateChartQueryDto,
 	DspAnalyticsSummaryQueryDto,
 	DspRevenueChartQueryDto,
 	AnalyticsRankingV2QueryDto,
 	RankingQueryDto,
 	RevenueChartQueryDto,
+	RevenueAggregateChartQueryDto,
 	TimelineQueryDto,
 } from './analytics-query.dto';
