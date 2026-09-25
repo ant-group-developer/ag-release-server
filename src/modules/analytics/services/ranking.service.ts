@@ -4,7 +4,10 @@ import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
-import { RankingQueryDto } from '../dto/analytics-query.dto';
+import {
+	AnalyticsFilterSetDto,
+	RankingQueryDto,
+} from '../dto/analytics-query.dto';
 import {
 	AnalyticsChannelInfo,
 	AnalyticsWorkspaceInfo,
@@ -19,6 +22,7 @@ import {
 	TenantRankingItem,
 	TrackRankingItem,
 } from '../interfaces/analytics.interface';
+import { buildAnalyticsFactFilters } from '../utils/analytics-series-filter.util';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import {
@@ -63,6 +67,28 @@ export class RankingService {
 		query: RankingQueryDto,
 		forceTrackJoin = false,
 	): { joinSql: string; filterSql: string; params: Record<string, any> } {
+		const arrayFilters = (
+			query as RankingQueryDto & {
+				filters?: AnalyticsFilterSetDto;
+			}
+		).filters;
+		if (arrayFilters) {
+			const built = buildAnalyticsFactFilters(
+				tenantId,
+				{
+					filters: arrayFilters,
+					releaseType: query.releaseType,
+					analyticsVideoScope: getAnalyticsVideoScope(query),
+				},
+				'trend',
+				{ forceTrackJoin: true },
+			);
+			return {
+				joinSql: built.joinSql,
+				filterSql: built.filterSql,
+				params: built.params,
+			};
+		}
 		const params: Record<string, any> = {};
 		let filterSql = '';
 
@@ -190,13 +216,28 @@ export class RankingService {
 	}
 
 	private hasDspFilter(query: RankingQueryDto): boolean {
-		return !!(query.pgDspId || query.dspReportId || query.dspId);
+		const filters = (
+			query as RankingQueryDto & {
+				filters?: { dspIds?: unknown[] };
+			}
+		).filters;
+		return !!(
+			query.pgDspId ||
+			query.dspReportId ||
+			query.dspId ||
+			filters?.dspIds?.length
+		);
 	}
 
 	private buildDspFilter(
 		query: RankingQueryDto,
 		params: Record<string, any>,
 	): string {
+		if (
+			(query as RankingQueryDto & { filters?: unknown }).filters
+		) {
+			return '';
+		}
 		if (query.pgDspId) {
 			params.pgDspId = query.pgDspId;
 			return `AND s.dsp_id IN (

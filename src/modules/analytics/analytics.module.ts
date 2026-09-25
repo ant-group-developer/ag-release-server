@@ -47,6 +47,7 @@ import { EntityAnalyticsService } from './services/entity-analytics.service';
 import { ExportQueueService } from './services/export-queue.service';
 import { TimelineAnalyticsService } from './services/global-timeline.service';
 import { IsrcResolverService } from './services/isrc-resolver.service';
+import { AnalyticsRankingV2Service } from './services/analytics-ranking-v2.service';
 import { RankingService } from './services/ranking.service';
 import { SourceTypeConfigService } from './services/source-type-config.service';
 import { TerAnalyticsService } from './services/ter-analytics.service';
@@ -95,6 +96,7 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 		IsrcResolverService,
 		TimelineAnalyticsService,
 		RankingService,
+		AnalyticsRankingV2Service,
 		ClickHouseSyncService,
 		DspSeedingService,
 		DashboardAnalyticsService,

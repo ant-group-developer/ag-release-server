@@ -44,7 +44,10 @@ export class AnalyticsVideoScopeInterceptor implements NestInterceptor {
 		}
 
 		if (request.body.channelId) {
-			this.scopeService.assertChannelAccess(scope, request.body.channelId);
+			this.scopeService.assertChannelAccess(
+				scope,
+				request.body.channelId,
+			);
 		}
 		if (request.body.releaseId) {
 			await this.scopeService.assertReleaseAccess(
@@ -54,6 +57,36 @@ export class AnalyticsVideoScopeInterceptor implements NestInterceptor {
 		}
 		if (request.body.isrc) {
 			await this.scopeService.assertIsrcAccess(scope, request.body.isrc);
+		}
+
+		const filters = request.body.filters;
+		if (filters && typeof filters === 'object') {
+			const channelIds = Array.isArray(filters.channelIds)
+				? filters.channelIds
+				: [];
+			const releaseIds = Array.isArray(filters.releaseIds)
+				? filters.releaseIds
+				: [];
+			const isrcs = Array.isArray(filters.isrcs) ? filters.isrcs : [];
+
+			for (const channelId of channelIds) {
+				if (typeof channelId === 'string') {
+					this.scopeService.assertChannelAccess(scope, channelId);
+				}
+			}
+			for (const releaseId of releaseIds) {
+				if (typeof releaseId === 'string') {
+					await this.scopeService.assertReleaseAccess(
+						scope,
+						releaseId,
+					);
+				}
+			}
+			for (const isrc of isrcs) {
+				if (typeof isrc === 'string') {
+					await this.scopeService.assertIsrcAccess(scope, isrc);
+				}
+			}
 		}
 
 		return next.handle();
