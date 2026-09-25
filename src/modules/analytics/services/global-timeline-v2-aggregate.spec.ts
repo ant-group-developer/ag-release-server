@@ -54,6 +54,52 @@ describe('TimelineAnalyticsService V2 aggregate widgets', () => {
 		}
 	});
 
+	it('applies one V2 filter payload to all unified summary metrics', async () => {
+		const query = jest.fn().mockImplementation((sql: string) => {
+			if (sql.includes('total_trend_views')) {
+				return [{ total_trend_views: '120' }];
+			}
+			return [{ total_usage: '45', total_revenue_usd: '6.75' }];
+		});
+		const service = createService(query);
+
+		await expect(
+			service.getSummaryV2(SYSTEM_TENANT_ID, {
+				fromDate: '2026-01-12',
+				toDate: '2026-02-20',
+				filters: {
+					isrcs: ['USAAA2600001'],
+				},
+			}),
+		).resolves.toEqual({
+			totalTrendViews: 120,
+			totalUsage: 45,
+			totalRevenueUsd: 6.75,
+			totalRevenueUsdExact: '6.75',
+		});
+
+		const callsBySql = query.mock.calls.map(([sql, params]) => ({
+			sql: sql as string,
+			params,
+		}));
+		expect(
+			callsBySql.find((call) =>
+				call.sql.includes('total_trend_views'),
+			)?.params,
+		).toMatchObject({
+			isrcs: ['USAAA2600001'],
+			from: '2026-01-12',
+			to: '2026-02-20',
+		});
+		expect(
+			callsBySql.find((call) => call.sql.includes('total_usage'))?.params,
+		).toMatchObject({
+			isrcs: ['USAAA2600001'],
+			from: '2026-01-01',
+			to: '2026-02-01',
+		});
+	});
+
 	it('keeps DSP IDs paired and orders the revenue DSP bar by usage', async () => {
 		const query = jest.fn().mockImplementation((sql: string) => {
 			if (sql.includes('AS total_rev')) {

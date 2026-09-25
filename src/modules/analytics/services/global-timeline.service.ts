@@ -95,6 +95,61 @@ export class TimelineAnalyticsService {
 		return query.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
 	}
 
+	private dateKey(date: Date): string {
+		return date.toISOString().slice(0, 10);
+	}
+
+	/**
+	 * ClickHouse only returns groups with facts. V2 charts intentionally pad
+	 * the requested domain so clients receive a stable, continuous timeline.
+	 */
+	private getTrendPeriods(
+		fromDate: string,
+		toDate: string,
+		granularity: 'day' | 'month' = 'day',
+	): string[] {
+		const start = new Date(`${fromDate}T00:00:00.000Z`);
+		const end = new Date(`${toDate}T00:00:00.000Z`);
+		const periods: string[] = [];
+
+		if (granularity === 'month') {
+			const cursor = new Date(
+				Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1),
+			);
+			const last = new Date(
+				Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1),
+			);
+			while (cursor <= last) {
+				periods.push(this.dateKey(cursor));
+				cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+			}
+			return periods;
+		}
+
+		const cursor = new Date(start);
+		while (cursor <= end) {
+			periods.push(this.dateKey(cursor));
+			cursor.setUTCDate(cursor.getUTCDate() + 1);
+		}
+		return periods;
+	}
+
+	private getRevenuePeriods(fromDate: string, toDate: string): string[] {
+		const start = new Date(
+			`${normalizeDateToFirstOfMonth(fromDate)}T00:00:00.000Z`,
+		);
+		const end = new Date(
+			`${normalizeDateToFirstOfMonth(toDate)}T00:00:00.000Z`,
+		);
+		const periods: string[] = [];
+		const cursor = new Date(start);
+		while (cursor <= end) {
+			periods.push(cursor.toISOString().slice(0, 7));
+			cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+		}
+		return periods;
+	}
+
 	/**
 	 * Enrich V2 series with names/images so a client can render a useful legend
 	 * without doing N follow-up entity lookups.
@@ -2209,6 +2264,76 @@ export class TimelineAnalyticsService {
 		};
 	}
 
+	/**
+	 * Dashboard V2 summary. Both fact tables receive the same array filter
+	 * payload so the three header cards match the V2 timeline/breakdown charts.
+	 */
+	async getSummaryV2(
+		tenantId: string,
+		query: AnalyticsAggregateChartQueryDto,
+	): Promise<AnalyticsSummaryResponse> {
+		this.assertValidDateRange(query);
+		const key = this.cache.buildKey('tl:summary-v2', tenantId, query);
+		return this.cache.wrap(key, async () => {
+			const [trendFilters, salesFilters] = [
+				this.buildV2AggregateFilters(tenantId, query, 'trend'),
+				this.buildV2AggregateFilters(tenantId, query, 'revenue'),
+			];
+			const trendParams = {
+				...trendFilters.params,
+				from: query.fromDate,
+				to: query.toDate,
+			};
+			const salesParams = {
+				...salesFilters.params,
+				from: normalizeDateToFirstOfMonth(query.fromDate),
+				to: normalizeDateToFirstOfMonth(query.toDate),
+			};
+			const [trendRows, salesRows] = await Promise.all([
+				this.clickHouseService.query<{ total_trend_views: string }>(
+					`
+						SELECT sum(s.total_quantity) AS total_trend_views
+						FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+						${trendFilters.joinSql}
+						WHERE s.reporting_date >= toDate({from:String})
+							AND s.reporting_date <= toDate({to:String})
+							${trendFilters.filterSql}
+					`,
+					trendParams,
+				),
+				this.clickHouseService.query<{
+					total_usage: string;
+					total_revenue_usd: string;
+				}>(
+					`
+						SELECT
+							sum(s.total_quantity) AS total_usage,
+							sum(s.total_revenue_usd) AS total_revenue_usd
+						FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+						${salesFilters.joinSql}
+						WHERE s.period >= toDate({from:String})
+							AND s.period <= toDate({to:String})
+							${salesFilters.filterSql}
+					`,
+					salesParams,
+				),
+			]);
+
+			return {
+				totalTrendViews: Number(
+					trendRows[0]?.total_trend_views ?? 0,
+				),
+				totalUsage: Number(salesRows[0]?.total_usage ?? 0),
+				totalRevenueUsd: this.revenueNumber(
+					salesRows[0]?.total_revenue_usd,
+				),
+				totalRevenueUsdExact: this.revenueExact(
+					salesRows[0]?.total_revenue_usd,
+				),
+			};
+		});
+	}
+
 	async getTrendsOverviewV2(
 		tenantId: string,
 		query: AnalyticsAggregateChartQueryDto,
@@ -2850,6 +2975,11 @@ export class TimelineAnalyticsService {
 			});
 			valuesBySeries.set(row.series_id, values);
 		}
+		const periods = this.getTrendPeriods(
+			query.fromDate,
+			query.toDate,
+			query.granularity ?? 'day',
+		);
 		const metadataBySeries = await this.getSeriesMetadata(
 			seriesBy,
 			seriesIds,
@@ -2865,7 +2995,22 @@ export class TimelineAnalyticsService {
 					name: id,
 					imageUrl: null,
 				},
-				values: valuesBySeries.get(id) ?? [],
+				values: (() => {
+					const seriesValues = valuesBySeries.get(id) ?? [];
+					// A selected entity with no facts remains an empty series.
+					// Zero-padding only fills gaps inside a series that exists.
+					if (!seriesValues.length) return [];
+					const valuesByPeriod = new Map(
+						seriesValues.map((value) => [value.period, value]),
+					);
+					return periods.map(
+						(period) =>
+							valuesByPeriod.get(period) ?? {
+								period,
+								totalViews: 0,
+							},
+					);
+				})(),
 			})),
 		};
 	}
@@ -3247,6 +3392,7 @@ export class TimelineAnalyticsService {
 			});
 			valuesBySeries.set(row.series_id, values);
 		}
+		const periods = this.getRevenuePeriods(query.fromDate, query.toDate);
 		const metadataBySeries = await this.getSeriesMetadata(
 			seriesBy,
 			seriesIds,
@@ -3262,7 +3408,24 @@ export class TimelineAnalyticsService {
 					name: id,
 					imageUrl: null,
 				},
-				values: valuesBySeries.get(id) ?? [],
+				values: (() => {
+					const seriesValues = valuesBySeries.get(id) ?? [];
+					// Keep a genuinely missing entity empty; only fill holes in
+					// a series that has at least one real data point.
+					if (!seriesValues.length) return [];
+					const valuesByPeriod = new Map(
+						seriesValues.map((value) => [value.period, value]),
+					);
+					return periods.map(
+						(period) =>
+							valuesByPeriod.get(period) ?? {
+								period,
+								revenueUsd: 0,
+								revenueUsdExact: '0',
+								quantity: 0,
+							},
+					);
+				})(),
 			})),
 		};
 	}

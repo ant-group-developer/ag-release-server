@@ -320,6 +320,24 @@ export class TimelineAnalyticsController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Post('summary/v2')
+	@ApiOperation({
+		summary: 'Get unified analytics summary with V2 array filters',
+		description:
+			'Returns trend views, usage, and revenue USD from the exact same V2 array-filter scope used by the dashboard charts.',
+	})
+	async getSummaryV2(
+		@Req() req: Request,
+		@Body() query: AnalyticsAggregateChartQueryDto,
+	): Promise<ResponseSuccess<AnalyticsSummaryResponse>> {
+		return new ResponseSuccess({
+			data: await this.timelineService.getSummaryV2(
+				req.user!.tenantId,
+				query,
+			),
+		});
+	}
+
 	@Post('trend-view/summary/v2')
 	@ApiOperation({
 		summary: 'Get trend-view summary with V2 array filters',

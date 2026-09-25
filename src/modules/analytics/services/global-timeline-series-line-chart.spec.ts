@@ -23,7 +23,7 @@ describe('TimelineAnalyticsService V2 series line charts', () => {
 		return { service, clickhouse };
 	}
 
-	it('preserves request order and returns empty values for a selected ISRC without facts', async () => {
+	it('keeps missing series empty and pads missing days in existing series', async () => {
 		const { service, clickhouse } = createService([
 			{
 				series_id: 'USAAA2600002',
@@ -36,7 +36,7 @@ describe('TimelineAnalyticsService V2 series line charts', () => {
 			SYSTEM_TENANT_ID,
 			{
 				fromDate: '2026-01-01',
-				toDate: '2026-01-31',
+				toDate: '2026-01-03',
 				filters: { isrcs: ['USAAA2600001', 'USAAA2600002'] },
 			},
 		);
@@ -62,7 +62,11 @@ describe('TimelineAnalyticsService V2 series line charts', () => {
 						name: 'USAAA2600002',
 						imageUrl: null,
 					},
-					values: [{ period: '2026-01-02', totalViews: 12 }],
+					values: [
+						{ period: '2026-01-01', totalViews: 0 },
+						{ period: '2026-01-02', totalViews: 12 },
+						{ period: '2026-01-03', totalViews: 0 },
+					],
 				},
 			],
 		});
@@ -71,7 +75,7 @@ describe('TimelineAnalyticsService V2 series line charts', () => {
 		);
 	});
 
-	it('normalizes revenue dates and returns a valid empty response when filters do not intersect', async () => {
+	it('normalizes revenue dates and keeps non-intersecting series empty', async () => {
 		const { service, clickhouse } = createService([]);
 
 		const result = await service.getRevenueSeriesLineChart(
