@@ -2,7 +2,7 @@ import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { ChannelService } from './channel.service';
 
 describe('ChannelService.update tenant change', () => {
-	it('rejects PUT tenant changes and points to the transfer endpoint', async () => {
+	it('requires effective dates when the tenant changes', async () => {
 		const service = Object.create(
 			ChannelService.prototype,
 		) as ChannelService;
@@ -26,7 +26,7 @@ describe('ChannelService.update tenant change', () => {
 			.update('ch-1', { tenantId: 'tenant-b' }, 'tenant-a', 'user-1')
 			.catch((error: ResponseError) => {
 				expect(error.getResponse()).toMatchObject({
-					messageCode: 'channel.transfer.useTransferEndpoint',
+					messageCode: 'channel.transfer.datesRequired',
 				});
 			});
 	});

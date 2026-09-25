@@ -58,7 +58,9 @@ export interface RawDetailRow {
 	fallback_artist_name: string;
 	fallback_label_name: string;
 	total_usage: string;
+	revenue_amount: string;
 	revenue_usd: string;
+	currency: string;
 }
 
 export interface DetailRow {

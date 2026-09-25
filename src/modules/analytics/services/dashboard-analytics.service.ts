@@ -7,6 +7,7 @@ import { DashboardAnalyticsQueryDto } from '../dto/analytics-query.dto';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import {
 	buildOwnershipJoin,
+	getOwnershipLedgerFallbackPredicate,
 	getRevenueTenantExpr,
 } from '../utils/ownership-join.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
@@ -54,7 +55,7 @@ export class DashboardAnalyticsService {
       ${trackJoin} (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc${ownershipPeriod === 'revenue' ? " AND s.isrc NOT IN ('', 'N/A', 'NA')" : ''}
       ${buildOwnershipJoin(ownershipPeriod, 's.period')}`;
 		filterSql += ` AND (t.isrc = '' OR t.is_deleted = 0)
-      AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`;
+      AND ${getOwnershipLedgerFallbackPredicate()}`;
 
 		if (!isSystem) {
 			const tenantExpr =
@@ -226,7 +227,7 @@ export class DashboardAnalyticsService {
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
         ${buildOwnershipJoin('trend')}
         WHERE t.is_deleted = 0 AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
-          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))
+          AND ${getOwnershipLedgerFallbackPredicate()}
           AND s.reporting_date >= toDate({from:String})
           AND s.reporting_date <= toDate({to:String})
           ${tenantFilter}
@@ -245,7 +246,7 @@ export class DashboardAnalyticsService {
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
         ${buildOwnershipJoin('revenue')}
         WHERE t.is_deleted = 0 AND coalesce(nullIf(o.label_id, ''), t.label_id) != ''
-          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))
+          AND ${getOwnershipLedgerFallbackPredicate()}
           AND s.period >= toDate({from:String})
           AND s.period <= toDate({to:String})
           ${tenantFilter}
@@ -346,7 +347,7 @@ export class DashboardAnalyticsService {
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
         ${buildOwnershipJoin('trend')}
         WHERE t.is_deleted = 0 AND artistId != ''
-          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))
+          AND ${getOwnershipLedgerFallbackPredicate()}
           AND s.reporting_date >= toDate({from:String})
           AND s.reporting_date <= toDate({to:String})
           ${tenantFilter}
@@ -365,7 +366,7 @@ export class DashboardAnalyticsService {
         INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
         ${buildOwnershipJoin('revenue')}
         WHERE t.is_deleted = 0 AND artistId != ''
-          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))
+          AND ${getOwnershipLedgerFallbackPredicate()}
           AND s.period >= toDate({from:String})
           AND s.period <= toDate({to:String})
           ${tenantFilter}

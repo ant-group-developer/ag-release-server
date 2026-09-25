@@ -28,16 +28,24 @@ export const getAnalyticsVideoScope = (
 /**
  * Keep audio analytics unchanged while restricting every video row to channels
  * explicitly assigned to a normal user.
+ *
+ * An explicit channelId is the filter by itself. Do not also require
+ * release_type = video — rows from other channels simply do not match
+ * channel_id.
  */
 export const appendAnalyticsVideoScopeFilter = (
 	filterSql: string,
 	params: Record<string, unknown>,
 	scope?: AnalyticsVideoScope,
 	trackAlias = 't',
+	explicitChannelId?: string,
 ): string => {
 	if (!scope || scope.allowedChannelIds === undefined) return filterSql;
 
 	params.analyticsAllowedChannelIds = scope.allowedChannelIds;
+	if (explicitChannelId) {
+		return `${filterSql} AND ${trackAlias}.channel_id IN ({analyticsAllowedChannelIds:Array(String)})`;
+	}
 	return `${filterSql} AND (${trackAlias}.release_type != 'video' OR ${trackAlias}.channel_id IN ({analyticsAllowedChannelIds:Array(String)}))`;
 };
 

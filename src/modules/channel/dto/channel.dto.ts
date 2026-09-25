@@ -16,6 +16,8 @@ import { IsValidName } from 'src/common/decorators/common.decorator-validate';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { ChannelStatus } from '../enum/channel.enum';
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 export class CreateChannelDto {
 	@ApiProperty({
 		maxLength: 20,
@@ -80,9 +82,29 @@ export class CreateChannelDto {
 	existedOnVevoBackstage?: boolean;
 }
 
-export class UpdateChannelDto extends PartialType(CreateChannelDto) {}
+export class UpdateChannelDto extends PartialType(CreateChannelDto) {
+	@ApiPropertyOptional({
+		example: '2026-09-01',
+		description:
+			'Required when tenantId changes. Start date for views/trend attribution (YYYY-MM-DD).',
+	})
+	@IsOptional()
+	@Matches(ISO_DATE, {
+		message: 'effectiveDate must be in YYYY-MM-DD format',
+	})
+	effectiveDate?: string;
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+	@ApiPropertyOptional({
+		example: '2026-09-01',
+		description:
+			'Required when tenantId changes. Start month for revenue attribution (YYYY-MM-DD).',
+	})
+	@IsOptional()
+	@Matches(ISO_DATE, {
+		message: 'revenueEffectiveFrom must be in YYYY-MM-DD format',
+	})
+	revenueEffectiveFrom?: string;
+}
 
 export class TransferChannelTenantDto {
 	@ApiProperty({

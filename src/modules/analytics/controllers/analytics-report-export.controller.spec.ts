@@ -13,15 +13,13 @@ describe('AnalyticsReportExportController terminal SSE snapshot', () => {
 			const controller = new AnalyticsReportExportController(
 				{} as never,
 				{
-					findById: jest
-						.fn()
-						.mockResolvedValue({
-							id: 'job-1',
-							tenantId: 'tenant-1',
-							status,
-							progressTotal: 5,
-							params: {},
-						}),
+					findById: jest.fn().mockResolvedValue({
+						id: 'job-1',
+						tenantId: 'tenant-1',
+						status,
+						progressTotal: 5,
+						params: {},
+					}),
 				} as never,
 				{ subscribe: () => EMPTY } as never,
 				{} as never,
@@ -105,6 +103,78 @@ describe('AnalyticsReportExportController.validateAndResolveTenantIds', () => {
 			validate({ tenantIds: ['anything'] }, 'system-tenant'),
 		).resolves.toBeUndefined();
 		expect(tenantService.getDescendantIds).not.toHaveBeenCalled();
+	});
+});
+
+describe('AnalyticsReportExportController.exportStatementReport', () => {
+	it('keeps the legacy export endpoint on normalized USD mode', async () => {
+		const exportService = {
+			createExportJob: jest.fn().mockResolvedValue({
+				jobId: 'job-usd',
+				status: ImportJobStatus.QUEUED,
+				eventsUrl: '/analytics/reports/export/job-usd/events',
+			}),
+		};
+		const controller = new AnalyticsReportExportController(
+			exportService as never,
+			{} as never,
+			{} as never,
+			{
+				getDescendantIds: jest.fn().mockResolvedValue(['tenant-a']),
+			} as never,
+		);
+		const dto: any = {
+			fromDate: '2026-01',
+			endDate: '2026-01',
+			exportMode: 'statement',
+		};
+
+		await controller.exportReport(
+			{ user: { tenantId: 'tenant-a', sub: 'user-1' } } as any,
+			dto,
+		);
+
+		expect(dto.exportMode).toBe('usd');
+		expect(exportService.createExportJob).toHaveBeenCalledWith(
+			'tenant-a',
+			'user-1',
+			dto,
+		);
+	});
+
+	it('forces statement mode before creating the export job', async () => {
+		const exportService = {
+			createExportJob: jest.fn().mockResolvedValue({
+				jobId: 'job-1',
+				status: ImportJobStatus.QUEUED,
+				eventsUrl: '/analytics/reports/statement-export/job-1/events',
+			}),
+		};
+		const tenantService = {
+			getDescendantIds: jest.fn().mockResolvedValue(['tenant-a']),
+		};
+		const controller = new AnalyticsReportExportController(
+			exportService as never,
+			{} as never,
+			{} as never,
+			tenantService as never,
+		);
+		const dto: any = {
+			fromDate: '2026-01',
+			endDate: '2026-01',
+		};
+
+		await controller.exportStatementReport(
+			{ user: { tenantId: 'tenant-a', sub: 'user-1' } } as any,
+			dto,
+		);
+
+		expect(dto.exportMode).toBe('statement');
+		expect(exportService.createExportJob).toHaveBeenCalledWith(
+			'tenant-a',
+			'user-1',
+			dto,
+		);
 	});
 });
 

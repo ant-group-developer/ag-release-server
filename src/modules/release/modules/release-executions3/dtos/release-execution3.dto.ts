@@ -6,6 +6,7 @@ export class ReleaseExecutionResultDto {
 	dspCode: string;
 	dspCodeCi?: string | null;
 	status: ReleaseDspStatus;
+	status_cause?: string | null;
 }
 
 export class ReleaseExecution3Metadata extends Metadata {

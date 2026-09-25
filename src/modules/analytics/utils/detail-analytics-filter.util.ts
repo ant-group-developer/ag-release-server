@@ -7,6 +7,7 @@ import {
 } from '../services/analytics-video-scope.service';
 import {
 	buildOwnershipJoin,
+	getOwnershipLedgerFallbackPredicate,
 	getRevenueLabelExpr,
 	getRevenueTenantExpr,
 } from './ownership-join.util';
@@ -70,6 +71,7 @@ export function appendDetailFilters(
 		params.detailReleaseType = query.releaseType;
 	}
 	if (query.channelId) {
+		// Channel is the filter. Callers do not also send releaseType=video.
 		filterSql += ' AND t.channel_id = {channelId:String}';
 		params.channelId = query.channelId;
 	}
@@ -97,6 +99,8 @@ export function appendDetailFilters(
 		filterSql,
 		params,
 		getAnalyticsVideoScope(query),
+		't',
+		query.channelId,
 	);
 
 	return filterSql;
@@ -133,7 +137,7 @@ export function buildDetailFilters(
 	// ISRC that already has ownership history (that would reassign old facts).
 	let filterSql = needsTrackJoin
 		? ` AND (t.isrc = '' OR t.is_deleted = 0)
-          AND (o.isrc != '' OR s.isrc NOT IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_ASSET_OWNERSHIP_SYNC} FINAL WHERE is_deleted = 0))`
+          AND ${getOwnershipLedgerFallbackPredicate()}`
 		: '';
 	const params: Record<string, any> = {};
 

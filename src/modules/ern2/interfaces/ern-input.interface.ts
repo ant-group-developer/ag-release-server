@@ -50,7 +50,7 @@ export interface ErnInput2 {
 	/** Deal terms (optional — defaults generated if omitted) */
 	deals?: {
 		release: ErnDealInput2[];
-		tracks?: ErnDealInput2[];
+		tracks?: ErnDealInput2[][];
 		videos?: ErnDealInput2[];
 	};
 }

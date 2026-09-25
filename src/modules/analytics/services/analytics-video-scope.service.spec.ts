@@ -35,6 +35,25 @@ describe('appendAnalyticsVideoScopeFilter', () => {
 		expect(params.analyticsAllowedChannelIds).toEqual(['channel-a']);
 	});
 
+	it('filters an explicit channelId without requiring release_type = video', () => {
+		const params: Record<string, unknown> = {};
+		const scope: AnalyticsVideoScope = { allowedChannelIds: ['channel-a'] };
+
+		const sql = appendAnalyticsVideoScopeFilter(
+			'',
+			params,
+			scope,
+			't',
+			'channel-a',
+		);
+
+		expect(sql).toContain(
+			't.channel_id IN ({analyticsAllowedChannelIds:Array(String)})',
+		);
+		expect(sql).not.toContain("release_type != 'video'");
+		expect(params.analyticsAllowedChannelIds).toEqual(['channel-a']);
+	});
+
 	it.each([TenantUserType.OWNER, TenantUserType.ADMIN])(
 		'leaves analytics unrestricted for tenant %s',
 		async (tenantUserType) => {

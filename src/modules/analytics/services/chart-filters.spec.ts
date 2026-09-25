@@ -1,6 +1,9 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { SYSTEM_TENANT_ID } from 'src/modules/tenant/tenant.constant';
-import { RevenueChartQueryDto } from '../dto/analytics-query.dto';
+import {
+	RevenueChartQueryDto,
+	TimelineQueryDto,
+} from '../dto/analytics-query.dto';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { DspAnalyticsService } from './dsp-analytics.service';
 import { EntityAnalyticsService, EntityType } from './entity-analytics.service';
@@ -373,6 +376,28 @@ describe('DSP chart filters', () => {
 });
 
 describe('global chart filter regression', () => {
+	it('getTrendsOverview includes the ownership join required by tenant filters', async () => {
+		const { clickhouse } = setup();
+		const service = new TimelineAnalyticsService(
+			clickhouse as never,
+			{} as never,
+			{} as never,
+			new AnalyticsCacheService(),
+			{} as never,
+		);
+
+		await service.getTrendsOverview(
+			SYSTEM_TENANT_ID,
+			Object.assign(new TimelineQueryDto(), filters),
+		);
+
+		expect(clickhouse.query).toHaveBeenCalledTimes(2);
+		for (const [sql, params] of clickhouse.query.mock.calls) {
+			expectFullFilters(sql, params, false);
+			expect(sql).toContain('AS o ON s.isrc = o.isrc');
+		}
+	});
+
 	it.each(chartMethods)(
 		'%s retains the full filter set after sharing the builder',
 		async (method) => {

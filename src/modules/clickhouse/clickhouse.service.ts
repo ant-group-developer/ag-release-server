@@ -49,6 +49,10 @@ export class ClickHouseService implements OnModuleDestroy {
 						ClickHouseService.DEFAULT_MAX_RESULT_ROWS,
 					),
 					result_overflow_mode: 'throw',
+					// Ownership dedup GROUP BY follows the table sort key. Without
+					// this, a post-transfer read hash-aggregates every part and hits
+					// the server memory cap inside AggregatingTransform.
+					optimize_aggregation_in_order: 1,
 					...settings,
 				},
 			});

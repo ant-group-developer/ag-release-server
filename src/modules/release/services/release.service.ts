@@ -1323,6 +1323,7 @@ export class ReleaseService {
 				dspCode: delivery.dsp.code,
 				dspCodeCi: delivery.dsp.codeCi,
 				status: this.mapCiDspStatusToReleaseDspStatus(ciStatus),
+				status_cause: ciStatus.status_cause,
 			});
 		}
 

@@ -770,11 +770,16 @@ export class Ern382Builder2 {
 		// Track release deals
 		if (this.input.deals?.tracks && this.input.deals.tracks.length > 0) {
 			for (let i = 0; i < this.input.tracks.length; i++) {
+				const trackDeals = this.input.deals.tracks[i] ?? [];
+
+				if (trackDeals.length === 0) {
+					continue;
+				}
 				const releaseRef = `R${i + 1}`;
 				const rd = dealList.ele('ReleaseDeal');
 				rd.ele('DealReleaseReference').txt(releaseRef);
 
-				for (const deal of this.input.deals.tracks) {
+				for (const deal of trackDeals) {
 					const d = rd.ele('Deal');
 					const terms = d.ele('DealTerms');
 
@@ -813,7 +818,7 @@ export class Ern382Builder2 {
 
 				// Add EffectiveDate once per ReleaseDeal
 				rd.ele('EffectiveDate').txt(
-					this.input.deals.tracks[0].startDate.split('T')[0],
+					trackDeals[0].startDate.split('T')[0],
 				);
 			}
 		}

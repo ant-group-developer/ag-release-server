@@ -39,16 +39,18 @@ describe('Ern382Builder2 price information', () => {
 			deals: {
 				release: [],
 				tracks: [
-					{
-						...ern382Example.deals!.tracks![0],
-						useTypes: ['Stream'],
-						price: {
-							priceType: 'StandardRetailPrice',
-							value: 0,
-							currencyCode: 'USD',
-							priceRangeType: 'mid',
+					[
+						{
+							...ern382Example.deals!.tracks![0][0],
+							useTypes: ['Stream'],
+							price: {
+								priceType: 'StandardRetailPrice',
+								value: 0,
+								currencyCode: 'USD',
+								priceRangeType: 'mid',
+							},
 						},
-					},
+					],
 				],
 			},
 		};
