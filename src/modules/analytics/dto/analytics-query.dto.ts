@@ -376,6 +376,101 @@ export class RankingQueryDto extends BaseAnalyticsQueryDto {
 	pgDspId?: string;
 }
 
+export const ANALYTICS_RANKING_METRICS = [
+	'trendViews',
+	'revenueUsd',
+	'usage',
+] as const;
+
+export type AnalyticsRankingMetric =
+	(typeof ANALYTICS_RANKING_METRICS)[number];
+
+export const ANALYTICS_RANKING_ENTITY_TYPES = [
+	'track',
+	'release',
+	'releaseVideo',
+	'artist',
+	'label',
+	'tenant',
+	'channel',
+	'dsp',
+	'sourceType',
+] as const;
+
+export type AnalyticsRankingEntityType =
+	(typeof ANALYTICS_RANKING_ENTITY_TYPES)[number];
+
+/**
+ * One ranking list. `metric` selects both the fact table and the sort.
+ * Array filters are the only filters; legacy scalars are not accepted.
+ */
+export class AnalyticsRankingV2QueryDto {
+	@Allow()
+	analyticsVideoScope?: AnalyticsVideoScope;
+
+	@ApiProperty({ example: '2026-01-01' })
+	@IsDateString()
+	fromDate: string;
+
+	@ApiProperty({ example: '2026-08-31' })
+	@IsDateString()
+	toDate: string;
+
+	@ApiProperty({ enum: ANALYTICS_RANKING_METRICS })
+	@IsIn(ANALYTICS_RANKING_METRICS)
+	metric: AnalyticsRankingMetric;
+
+	@ApiProperty({ enum: ANALYTICS_RANKING_ENTITY_TYPES })
+	@IsIn(ANALYTICS_RANKING_ENTITY_TYPES)
+	entityType: AnalyticsRankingEntityType;
+
+	@ApiPropertyOptional({ default: 1, minimum: 1 })
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	page: number = 1;
+
+	@ApiPropertyOptional({ default: 20, minimum: 1, maximum: 100 })
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	@Max(100)
+	pageSize: number = 20;
+
+	@ApiPropertyOptional()
+	@IsOptional()
+	@IsString()
+	keyword?: string;
+
+	@ApiPropertyOptional({ enum: ['audio', 'video'] })
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
+	@IsOptional()
+	@IsIn(['audio', 'video'])
+	releaseType?: 'audio' | 'video';
+
+	@ApiPropertyOptional({ default: false })
+	@IsOptional()
+	@Type(() => Boolean)
+	@IsBoolean()
+	groupBySource?: boolean;
+
+	@ApiPropertyOptional({ type: AnalyticsFilterSetDto })
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => AnalyticsFilterSetDto)
+	filters?: AnalyticsFilterSetDto;
+
+	get skip(): number {
+		return ((this.page ?? 1) - 1) * (this.pageSize ?? 20);
+	}
+
+	get limit(): number {
+		return this.pageSize ?? 20;
+	}
+}
+
 /**
  * Base DTO cho DSP analytics. Truyền cả pgDspId + dspReportId — ưu tiên pgDspId.
  */

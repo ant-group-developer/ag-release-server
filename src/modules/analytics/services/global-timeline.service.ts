@@ -8,6 +8,7 @@ import { toCountryFlagImageUrl } from 'src/utils/country-flag-image-url.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
+	AnalyticsFilterSetDto,
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	RevenueChartQueryDto,
@@ -40,7 +41,10 @@ import {
 	TrendViewLineChartSeriesResponse,
 } from '../interfaces/analytics.interface';
 import * as queries from '../queries/global-timeline.queries';
-import { buildAnalyticsSeriesFilters } from '../utils/analytics-series-filter.util';
+import {
+	buildAnalyticsFactFilters,
+	buildAnalyticsSeriesFilters,
+} from '../utils/analytics-series-filter.util';
 import type { ResolvedAnalyticsSeriesBy } from '../utils/analytics-series-filter.util';
 import {
 	appendDetailFilters,
@@ -528,6 +532,28 @@ export class TimelineAnalyticsService {
 		query: TimelineQueryDto,
 		forceTrackJoin = false,
 	): { joinSql: string; filterSql: string; params: Record<string, any> } {
+		const arrayFilters = (
+			query as TimelineQueryDto & {
+				filters?: AnalyticsFilterSetDto;
+			}
+		).filters;
+		if (arrayFilters) {
+			const built = buildAnalyticsFactFilters(
+				tenantId,
+				{
+					filters: arrayFilters,
+					releaseType: query.releaseType,
+					analyticsVideoScope: getAnalyticsVideoScope(query),
+				},
+				'revenue',
+				{ forceTrackJoin: true },
+			);
+			return {
+				joinSql: built.joinSql,
+				filterSql: built.filterSql,
+				params: built.params,
+			};
+		}
 		return this.buildDetailFilters(
 			tenantId,
 			query,

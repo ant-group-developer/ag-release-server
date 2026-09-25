@@ -4,6 +4,7 @@ export {
 	ChartQueryDto,
 	DspAnalyticsSummaryQueryDto,
 	DspRevenueChartQueryDto,
+	AnalyticsRankingV2QueryDto,
 	RankingQueryDto,
 	RevenueChartQueryDto,
 	TimelineQueryDto,

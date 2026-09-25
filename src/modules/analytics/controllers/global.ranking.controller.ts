@@ -9,7 +9,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
-import { RankingQueryDto } from '../dto';
+import { AnalyticsRankingV2QueryDto, RankingQueryDto } from '../dto';
 import {
 	ArtistRankingItem,
 	ChannelRankingItem,
@@ -21,6 +21,8 @@ import {
 	TenantRankingItem,
 	TrackRankingItem,
 } from '../interfaces/analytics.interface';
+import { AnalyticsRankingV2Response } from '../interfaces/analytics-ranking-v2.interface';
+import { AnalyticsRankingV2Service } from '../services/analytics-ranking-v2.service';
 import { ClickHouseSyncService } from '../services/clickhouse-sync.service';
 import { RankingService } from '../services/ranking.service';
 
@@ -34,8 +36,26 @@ import { RankingService } from '../services/ranking.service';
 export class RankingController {
 	constructor(
 		private readonly rankingService: RankingService,
+		private readonly rankingV2Service: AnalyticsRankingV2Service,
 		private readonly syncService: ClickHouseSyncService,
 	) {}
+
+	@Post('v2')
+	@ApiOperation({
+		summary: 'Unified ranking list',
+		description:
+			'metric selects the fact table and sort. trendViews reads trends. revenueUsd and usage read sales and both return usage plus revenue; only the order changes. filters use array OR/AND rules. Legacy scalar filters are not part of this contract.',
+	})
+	async getRankingV2(
+		@Req() req: Request,
+		@Body() query: AnalyticsRankingV2QueryDto,
+	): Promise<ResponseSuccess<AnalyticsRankingV2Response>> {
+		const data = await this.rankingV2Service.getRanking(
+			req.user!.tenantId,
+			query,
+		);
+		return new ResponseSuccess({ data });
+	}
 
 	/**
 	 * Top Tracks theo lượt nghe.

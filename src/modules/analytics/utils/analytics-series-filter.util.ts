@@ -121,20 +121,32 @@ export function resolveAnalyticsSeriesBy(query: AnalyticsSeriesFilterQuery): {
 	};
 }
 
+export type AnalyticsFactFilterQuery = {
+	filters?: AnalyticsFilterSetDto;
+	releaseType?: 'audio' | 'video';
+	analyticsVideoScope?: AnalyticsVideoScope;
+};
+
 /**
- * Builds ClickHouse filters for V2 multi-series line charts. Values in an
- * individual array are OR'ed; separate arrays are intersected. A legitimate
- * empty intersection intentionally returns no fact rows, not an error.
+ * Shared fact filter for ranking and line-chart series.
+ * One array is OR/IN. Different fields are AND. Each dspIds pair is
+ * pgDspId AND dspReportId, and pairs are OR'd. `subquery` avoids aliasing
+ * dsps_report as `r`, because DSP ranking queries already join that alias.
  */
-export function buildAnalyticsSeriesFilters(
+export function buildAnalyticsFactFilters(
 	tenantId: string,
-	query: AnalyticsSeriesFilterQuery,
+	query: AnalyticsFactFilterQuery,
 	ownershipPeriod: 'trend' | 'revenue',
-): FilterBuildResult {
+	options?: { forceTrackJoin?: boolean; dspMode?: 'join' | 'subquery' },
+): {
+	joinSql: string;
+	filterSql: string;
+	params: Record<string, unknown>;
+} {
 	const filters = query.filters ?? {};
-	const { seriesBy, seriesIds } = resolveAnalyticsSeriesBy(query);
 	const isSystem = checkIsSystemTenant(tenantId);
 	const params: Record<string, unknown> = {};
+	const dspMode = options?.dspMode ?? 'subquery';
 
 	if (
 		!isSystem &&
@@ -148,12 +160,8 @@ export function buildAnalyticsSeriesFilters(
 	}
 
 	const requiresTrackJoin =
+		options?.forceTrackJoin ||
 		!isSystem ||
-		seriesBy === 'release' ||
-		seriesBy === 'channel' ||
-		seriesBy === 'artist' ||
-		seriesBy === 'label' ||
-		seriesBy === 'tenant' ||
 		Boolean(
 			filters.tenantIds?.length ||
 			filters.labelIds?.length ||
@@ -174,9 +182,7 @@ export function buildAnalyticsSeriesFilters(
           AND ${getOwnershipLedgerFallbackPredicate()}`
 		: '';
 
-	const needsDspReportJoin =
-		seriesBy === 'dsp' || Boolean(filters.dspIds?.length);
-	if (needsDspReportJoin) {
+	if (dspMode === 'join' && filters.dspIds?.length) {
 		joinSql += `
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL) r
         ON s.dsp_id = r.id_dsps_report`;
@@ -207,10 +213,6 @@ export function buildAnalyticsSeriesFilters(
 		filterSql += ' AND hasAny(t.artist_ids, {artistIds:Array(String)})';
 		params.artistIds = filters.artistIds;
 	}
-	if (seriesBy === 'artist' && filters.artistIds?.length) {
-		filterSql +=
-			' AND arrayJoin(t.artist_ids) IN ({artistIds:Array(String)})';
-	}
 	if (filters.releaseIds?.length) {
 		filterSql += ' AND t.release_id IN ({releaseIds:Array(String)})';
 		params.releaseIds = filters.releaseIds;
@@ -231,7 +233,10 @@ export function buildAnalyticsSeriesFilters(
 		const dspPairPredicates = filters.dspIds.map((dspId, index) => {
 			params[`dspPgId${index}`] = dspId.pgDspId;
 			params[`dspReportId${index}`] = dspId.dspReportId;
-			return `(r.pg_uuid = {dspPgId${index}:String} AND s.dsp_id = {dspReportId${index}:String})`;
+			if (dspMode === 'join') {
+				return `(r.pg_uuid = {dspPgId${index}:String} AND s.dsp_id = {dspReportId${index}:String})`;
+			}
+			return `(s.dsp_id = {dspReportId${index}:String} AND s.dsp_id IN (SELECT id_dsps_report FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE pg_uuid = {dspPgId${index}:String}))`;
 		});
 		filterSql += ` AND (${dspPairPredicates.join(' OR ')})`;
 	}
@@ -249,6 +254,55 @@ export function buildAnalyticsSeriesFilters(
 		);
 	}
 
+	return { joinSql, filterSql, params };
+}
+
+/**
+ * Builds ClickHouse filters for V2 multi-series line charts. Values in an
+ * individual array are OR'ed; separate arrays are intersected. A legitimate
+ * empty intersection intentionally returns no fact rows, not an error.
+ */
+export function buildAnalyticsSeriesFilters(
+	tenantId: string,
+	query: AnalyticsSeriesFilterQuery,
+	ownershipPeriod: 'trend' | 'revenue',
+): FilterBuildResult {
+	const filters = query.filters ?? {};
+	const { seriesBy, seriesIds } = resolveAnalyticsSeriesBy(query);
+	const forceTrackJoin = [
+		'release',
+		'channel',
+		'artist',
+		'label',
+		'tenant',
+	].includes(seriesBy);
+	const built = buildAnalyticsFactFilters(
+		tenantId,
+		query,
+		ownershipPeriod,
+		{ forceTrackJoin, dspMode: 'join' },
+	);
+	let { joinSql, filterSql } = built;
+	const params = built.params;
+
+	if (seriesBy === 'dsp' && !joinSql.includes('dsps_report')) {
+		joinSql += `
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL) r
+        ON s.dsp_id = r.id_dsps_report`;
+	}
+	if (seriesBy === 'artist' && filters.artistIds?.length) {
+		filterSql +=
+			' AND arrayJoin(t.artist_ids) IN ({artistIds:Array(String)})';
+	}
+
+	const tenantExpr =
+		ownershipPeriod === 'revenue'
+			? getRevenueTenantExpr()
+			: "coalesce(nullIf(o.tenant_id, ''), t.tenant_id)";
+	const labelExpr =
+		ownershipPeriod === 'revenue'
+			? getRevenueLabelExpr()
+			: "coalesce(nullIf(o.label_id, ''), t.label_id)";
 	const seriesExpr: Record<ResolvedAnalyticsSeriesBy, string> = {
 		isrc: 's.isrc',
 		release: 't.release_id',
