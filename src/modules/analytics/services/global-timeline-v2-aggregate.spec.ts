@@ -129,7 +129,7 @@ describe('TimelineAnalyticsService V2 aggregate widgets', () => {
 					dspIds: [
 						{
 							pgDspId: 'spotify',
-							dspReportId: 'spotify-us',
+							dspReportIds: ['spotify-us'],
 						},
 					],
 				},
@@ -155,7 +155,6 @@ describe('TimelineAnalyticsService V2 aggregate widgets', () => {
 		for (const [, params] of query.mock.calls) {
 			expect(params).toMatchObject({
 				dspPgId0: 'spotify',
-				dspReportId0: 'spotify-us',
 				from: '2026-01-01',
 				to: '2026-02-01',
 			});

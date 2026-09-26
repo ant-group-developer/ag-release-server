@@ -86,7 +86,7 @@ describe('AnalyticsRankingV2Service', () => {
 						channelId: 'channel-1',
 						channelName: 'Channel',
 						pgDspId: 'spotify',
-						dspReportId: 'spotify-us',
+						dspReportIds: ['spotify-us'],
 						dspName: 'Spotify',
 						sourceType: 'ftp',
 						sourceTypeLabel: 'FTP',
@@ -141,8 +141,8 @@ describe('AnalyticsRankingV2Service', () => {
 		timeline.getRevenueTopTrack.mockResolvedValue(page([salesRow], 8));
 		const filters = {
 			dspIds: [
-				{ pgDspId: 'spotify', dspReportId: 'spotify-us' },
-				{ pgDspId: 'apple', dspReportId: 'apple-us' },
+				{ pgDspId: 'spotify', dspReportIds: ['spotify-us'] },
+				{ pgDspId: 'apple', dspReportIds: ['apple-us'] },
 			],
 		};
 
@@ -233,15 +233,15 @@ describe('ranking fact filters', () => {
 		).toThrow(ForbiddenException);
 	});
 
-	it('ANDs each DSP pair and ORs pairs without cross-matching', () => {
+	it('prioritizes each pg DSP and falls back to raw report IDs', () => {
 		const result = buildAnalyticsFactFilters(
 			SYSTEM_TENANT_ID,
 			{
 				filters: {
 					tenantIds: ['7c2358a0-1a38-4a10-b806-a1531ef71b0c'],
 					dspIds: [
-						{ pgDspId: 'spotify', dspReportId: 'spotify-us' },
-						{ pgDspId: 'apple', dspReportId: 'apple-us' },
+						{ pgDspId: 'spotify', dspReportIds: ['spotify-us'] },
+						{ dspReportIds: ['apple-us'] },
 					],
 				},
 			},
@@ -253,19 +253,17 @@ describe('ranking fact filters', () => {
 			'IN ({tenantIds:Array(String)})',
 		);
 		expect(result.filterSql).toContain(
-			's.dsp_id = {dspReportId0:String} AND s.dsp_id IN (SELECT id_dsps_report',
+			's.dsp_id IN (',
 		);
 		expect(result.filterSql).toContain('pg_uuid = {dspPgId0:String}');
 		expect(result.filterSql).toContain(' OR ');
 		expect(result.filterSql).not.toContain(
-			'pg_uuid = {dspPgId0:String} AND s.dsp_id = {dspReportId1:String}',
+			'pg_uuid = {dspPgId0:String} AND s.dsp_id IN ({dspReportIds1:Array(String)})',
 		);
 		expect(result.params).toEqual(
 			expect.objectContaining({
 				dspPgId0: 'spotify',
-				dspReportId0: 'spotify-us',
-				dspPgId1: 'apple',
-				dspReportId1: 'apple-us',
+				dspReportIds1: ['apple-us'],
 			}),
 		);
 	});
