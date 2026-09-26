@@ -401,7 +401,7 @@ export class TimelineAnalyticsController {
 	@ApiOperation({
 		summary: 'Get multi-series trend views line chart data',
 		description:
-			'Accepts array filters and returns one series for every selected value in the most specific filter array.',
+			'Accepts array filters and returns one series for every value in the longest filter array. Equal lengths keep the specificity order.',
 	})
 	async getTrendViewSeriesLineChart(
 		@Req() req: Request,
@@ -623,7 +623,7 @@ export class TimelineAnalyticsController {
 	@ApiOperation({
 		summary: 'Get multi-series revenue line chart data',
 		description:
-			'Accepts array filters and returns one series for every selected value in the most specific filter array.',
+			'Accepts array filters and returns one series for every value in the longest filter array. Equal lengths keep the specificity order.',
 	})
 	async getRevenueSeriesLineChart(
 		@Req() req: Request,

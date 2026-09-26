@@ -301,17 +301,6 @@ export class AnalyticsReportExportController {
 		);
 	}
 
-	@Sse('statement-export/:jobId/events')
-	@ApiOperation({
-		summary: 'Stream statement-currency analytics export progress via SSE',
-	})
-	streamStatementExportEvents(
-		@Req() req: Request,
-		@Param('jobId') jobId: string,
-	): Observable<MessageEvent> {
-		return this.streamExportEvents(req, jobId);
-	}
-
 	/**
 	 * Validate quyền truy cập workspace:
 	 * - tenantId và tenantIds là mutual exclusive (400 nếu truyền cả hai).
