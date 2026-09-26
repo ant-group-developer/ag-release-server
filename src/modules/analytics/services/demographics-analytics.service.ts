@@ -321,11 +321,14 @@ export class DemographicsAnalyticsService {
 		const dspIds = dto.filters?.dspIds ?? [];
 		if (!dspIds.length) return true;
 
-		const params: Record<string, string> = {};
+		const params: Record<string, string | string[]> = {};
 		const predicates = dspIds.map((dsp, index) => {
-			params[`pgDspId${index}`] = dsp.pgDspId;
-			params[`dspReportId${index}`] = dsp.dspReportId;
-			return `(pg_uuid = {pgDspId${index}:String} AND id_dsps_report = {dspReportId${index}:String})`;
+			if (dsp.pgDspId) {
+				params[`pgDspId${index}`] = dsp.pgDspId;
+				return `pg_uuid = {pgDspId${index}:String}`;
+			}
+			params[`dspReportIds${index}`] = dsp.dspReportIds ?? [];
+			return `id_dsps_report IN ({dspReportIds${index}:Array(String)})`;
 		});
 		const rows = await this.clickHouseService.query<{ dsp_name: string }>(
 			`SELECT dsp_name

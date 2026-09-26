@@ -82,7 +82,7 @@ describe('array-based series chart DTOs', () => {
 		expect(await validate(query)).toEqual([]);
 	});
 
-	it('requires each V2 DSP filter to carry the mapped and raw IDs together', async () => {
+	it('allows canonical pg DSP or fallback raw report filters', async () => {
 		const query = new TrendSeriesChartQueryDto();
 		query.fromDate = '2026-01-01';
 		query.toDate = '2026-01-31';
@@ -90,7 +90,7 @@ describe('array-based series chart DTOs', () => {
 			dspIds: [
 				Object.assign(new AnalyticsDspIdDto(), {
 					pgDspId: 'spotify',
-					dspReportId: 'spotify-us',
+					dspReportIds: ['spotify-us'],
 				}),
 			],
 		});
@@ -99,11 +99,21 @@ describe('array-based series chart DTOs', () => {
 
 		query.filters = Object.assign(new AnalyticsFilterSetDto(), {
 			dspIds: [
-				Object.assign(new AnalyticsDspIdDto(), { pgDspId: 'spotify' }),
+				Object.assign(new AnalyticsDspIdDto(), {
+					pgDspId: 'spotify',
+				}),
 			],
 		});
 		const errors = await validate(query);
-		expect(errors.some((error) => error.property === 'filters')).toBe(true);
+		expect(errors).toEqual([]);
+
+		query.filters = Object.assign(new AnalyticsFilterSetDto(), {
+			dspIds: [new AnalyticsDspIdDto()],
+		});
+		const invalidErrors = await validate(query);
+		expect(invalidErrors.some((error) => error.property === 'filters')).toBe(
+			true,
+		);
 	});
 
 	it('rejects scalar values in array filters and unknown series dimensions', async () => {

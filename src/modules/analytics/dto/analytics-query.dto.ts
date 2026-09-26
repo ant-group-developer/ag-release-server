@@ -17,7 +17,10 @@ import {
 	IsUUID,
 	Max,
 	Min,
+	Validate,
 	ValidateNested,
+	ValidatorConstraint,
+	ValidatorConstraintInterface,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import type { AnalyticsVideoScope } from '../services/analytics-video-scope.service';
@@ -45,20 +48,47 @@ export type AnalyticsSeriesBy = (typeof ANALYTICS_SERIES_BY_VALUES)[number];
 
 const MAX_ANALYTICS_FILTER_VALUES = 200;
 
+@ValidatorConstraint({ name: 'hasDspIdentifier', async: false })
+class HasDspIdentifierConstraint implements ValidatorConstraintInterface {
+	validate(value: AnalyticsDspIdDto): boolean {
+		return Boolean(value?.pgDspId || value?.dspReportIds?.length);
+	}
+
+	defaultMessage(): string {
+		return 'Each DSP filter must include pgDspId or dspReportId';
+	}
+}
+
 /**
- * A DSP is identified by the mapped Postgres DSP ID and the raw report ID
- * together. Keeping them in one object prevents accidental cross-pairing.
+ * pgDspId is the canonical DSP identifier. When present, it scopes all raw
+ * reports mapped to that DSP; dspReportId is only a fallback when pgDspId is
+ * absent.
  */
 export class AnalyticsDspIdDto {
-	@ApiProperty({ description: 'Mapped Postgres DSP ID' })
+	@ApiPropertyOptional({
+		description:
+			'Canonical mapped DSP ID. When present, all raw reports mapped to this DSP are included.',
+		example: 'oyGd-maAdA',
+	})
+	@IsOptional()
 	@IsString()
-	@IsNotEmpty()
-	pgDspId: string;
+	pgDspId?: string;
 
-	@ApiProperty({ description: 'Raw ClickHouse DSP report ID' })
-	@IsString()
-	@IsNotEmpty()
-	dspReportId: string;
+	@ApiPropertyOptional({
+		description:
+			'Raw DSP report IDs. Used only when pgDspId is not supplied.',
+		example: [
+			'2e73130c-b957-4524-85e6-96f488ff5b6a',
+			'3318cdc3-2ee1-4c8b-9b1d-83c29b743ba2',
+		],
+	})
+	@IsOptional()
+	@IsArray()
+	@ArrayNotEmpty()
+	@ArrayUnique()
+	@ArrayMaxSize(MAX_ANALYTICS_FILTER_VALUES)
+	@IsString({ each: true })
+	dspReportIds?: string[];
 }
 
 export class AnalyticsFilterSetDto {
@@ -128,17 +158,28 @@ export class AnalyticsFilterSetDto {
 	@ApiPropertyOptional({
 		type: [AnalyticsDspIdDto],
 		description:
-			'DSP identifier pairs. Every item must include the matching pgDspId and dspReportId.',
+			'Canonical DSP filters. pgDspId takes precedence and includes all mapped reports; dspReportId is fallback-only.',
+		example: [
+			{ pgDspId: 'oyGd-maAdA' },
+			{
+				dspReportIds: [
+					'2e73130c-b957-4524-85e6-96f488ff5b6a',
+					'3318cdc3-2ee1-4c8b-9b1d-83c29b743ba2',
+				],
+			},
+		],
 	})
 	@IsOptional()
 	@IsArray()
 	@ArrayNotEmpty()
 	@ArrayUnique(
-		(item: AnalyticsDspIdDto) => `${item.pgDspId}\u001f${item.dspReportId}`,
+		(item: AnalyticsDspIdDto) =>
+			`${item.pgDspId ?? ''}\u001f${(item.dspReportIds ?? []).join('\u001e')}`,
 	)
 	@ArrayMaxSize(MAX_ANALYTICS_FILTER_VALUES)
 	@ValidateNested({ each: true })
 	@Type(() => AnalyticsDspIdDto)
+	@Validate(HasDspIdentifierConstraint, { each: true })
 	dspIds?: AnalyticsDspIdDto[];
 }
 
