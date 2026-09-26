@@ -1,6 +1,7 @@
 export {
 	AnalyticsSummaryQueryDto,
 	AnalyticsAggregateChartQueryDto,
+	AnalyticsDspIdDto,
 	BaseAnalyticsQueryDto,
 	ChartQueryDto,
 	DemographicsAggregateChartQueryDto,
