@@ -27,8 +27,7 @@ describe('AnalyticsReportExportService.createExportJob', () => {
 			service.createExportJob('tenant-a', 'user-1', dto),
 		).resolves.toMatchObject({
 			jobId: 'job-statement',
-			eventsUrl:
-				'/analytics/reports/statement-export/job-statement/events',
+			eventsUrl: '/analytics/reports/export/job-statement/events',
 		});
 
 		expect(importJobsService.create).toHaveBeenCalledWith(
