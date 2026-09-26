@@ -1,9 +1,16 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+	ApiExtraModels,
+	ApiOperation,
+	ApiResponse,
+	ApiTags,
+} from '@nestjs/swagger';
 import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	AnalyticsAggregateChartQueryDto,
+	AnalyticsDspIdDto,
+	AnalyticsFilterSetDto,
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	DemographicsAggregateChartQueryDto,
@@ -43,6 +50,14 @@ import { TimelineAnalyticsService } from '../services/global-timeline.service';
  * Lọc native theo phân quyền Multi-Tenant trên ClickHouse bằng INNER JOIN pg_tracks_sync.
  */
 @ApiTags('Analytics')
+@ApiExtraModels(
+	AnalyticsDspIdDto,
+	AnalyticsFilterSetDto,
+	AnalyticsAggregateChartQueryDto,
+	RevenueAggregateChartQueryDto,
+	TrendSeriesChartQueryDto,
+	RevenueSeriesChartQueryDto,
+)
 @Controller('analytics')
 export class TimelineAnalyticsController {
 	constructor(

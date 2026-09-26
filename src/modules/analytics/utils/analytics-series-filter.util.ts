@@ -65,13 +65,13 @@ const FILTER_KEY_BY_SERIES: Record<
 	total: null,
 };
 
-const DSP_SERIES_SEPARATOR = '\u001f';
-
 function toDspSeriesId(dspId: {
-	pgDspId: string;
-	dspReportId: string;
-}): string {
-	return `${dspId.pgDspId}${DSP_SERIES_SEPARATOR}${dspId.dspReportId}`;
+	pgDspId?: string;
+	dspReportIds?: string[];
+}): string[] {
+	return dspId.pgDspId
+		? [dspId.pgDspId]
+		: dspId.dspReportIds ?? [];
 }
 
 function getSeriesIdsForFilter(
@@ -79,7 +79,7 @@ function getSeriesIdsForFilter(
 	filterKey: keyof AnalyticsFilterSetDto,
 ): string[] {
 	if (filterKey === 'dspIds') {
-		return (filters.dspIds ?? []).map(toDspSeriesId);
+		return (filters.dspIds ?? []).flatMap(toDspSeriesId);
 	}
 	return (filters[filterKey] ?? []) as string[];
 }
@@ -129,9 +129,10 @@ export type AnalyticsFactFilterQuery = {
 
 /**
  * Shared fact filter for ranking and line-chart series.
- * One array is OR/IN. Different fields are AND. Each dspIds pair is
- * pgDspId AND dspReportId, and pairs are OR'd. `subquery` avoids aliasing
- * dsps_report as `r`, because DSP ranking queries already join that alias.
+ * One array is OR/IN. Different fields are AND. pgDspId is canonical and
+ * includes all mapped raw reports; dspReportId is a fallback-only filter.
+ * `subquery` avoids aliasing dsps_report as `r`, because DSP ranking queries
+ * already join that alias.
  */
 export function buildAnalyticsFactFilters(
 	tenantId: string,
@@ -230,15 +231,26 @@ export function buildAnalyticsFactFilters(
 		params.importSources = filters.importSources;
 	}
 	if (filters.dspIds?.length) {
-		const dspPairPredicates = filters.dspIds.map((dspId, index) => {
-			params[`dspPgId${index}`] = dspId.pgDspId;
-			params[`dspReportId${index}`] = dspId.dspReportId;
-			if (dspMode === 'join') {
-				return `(r.pg_uuid = {dspPgId${index}:String} AND s.dsp_id = {dspReportId${index}:String})`;
+		const dspPredicates = filters.dspIds.map((dspId, index) => {
+			if (dspId.pgDspId) {
+				params[`dspPgId${index}`] = dspId.pgDspId;
+				if (dspMode === 'join') {
+					return `r.pg_uuid = {dspPgId${index}:String}`;
+				}
+				return `s.dsp_id IN (
+					SELECT id_dsps_report
+					FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL
+					WHERE pg_uuid = {dspPgId${index}:String}
+				)`;
 			}
-			return `(s.dsp_id = {dspReportId${index}:String} AND s.dsp_id IN (SELECT id_dsps_report FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE pg_uuid = {dspPgId${index}:String}))`;
+
+			params[`dspReportIds${index}`] = dspId.dspReportIds ?? [];
+			if (dspMode === 'join') {
+				return `s.dsp_id IN ({dspReportIds${index}:Array(String)})`;
+			}
+			return `s.dsp_id IN ({dspReportIds${index}:Array(String)})`;
 		});
-		filterSql += ` AND (${dspPairPredicates.join(' OR ')})`;
+		filterSql += ` AND (${dspPredicates.join(' OR ')})`;
 	}
 	if (query.releaseType) {
 		filterSql += ' AND t.release_type = {releaseType:String}';
@@ -303,6 +315,28 @@ export function buildAnalyticsSeriesFilters(
 		ownershipPeriod === 'revenue'
 			? getRevenueLabelExpr()
 			: "coalesce(nullIf(o.label_id, ''), t.label_id)";
+	const dspPgSeriesIds = (filters.dspIds ?? [])
+		.filter((dsp) => dsp.pgDspId)
+		.map((dsp) => dsp.pgDspId as string);
+	const dspReportSeriesIds = (filters.dspIds ?? [])
+		.filter((dsp) => !dsp.pgDspId && dsp.dspReportIds?.length)
+		.flatMap((dsp) => dsp.dspReportIds ?? []);
+	if (dspPgSeriesIds.length) {
+		params.dspPgSeriesIds = dspPgSeriesIds;
+	}
+	if (dspReportSeriesIds.length) {
+		params.dspReportSeriesIds = dspReportSeriesIds;
+	}
+	const dspSeriesExpr =
+		dspPgSeriesIds.length && dspReportSeriesIds.length
+			? `multiIf(
+				r.pg_uuid IN ({dspPgSeriesIds:Array(String)}), r.pg_uuid,
+				s.dsp_id IN ({dspReportSeriesIds:Array(String)}), s.dsp_id,
+				coalesce(nullIf(r.pg_uuid, ''), s.dsp_id)
+			)`
+			: dspPgSeriesIds.length
+				? 'r.pg_uuid'
+				: 's.dsp_id';
 	const seriesExpr: Record<ResolvedAnalyticsSeriesBy, string> = {
 		isrc: 's.isrc',
 		release: 't.release_id',
@@ -310,7 +344,7 @@ export function buildAnalyticsSeriesFilters(
 		artist: 'arrayJoin(t.artist_ids)',
 		label: labelExpr,
 		tenant: tenantExpr,
-		dsp: `concat(r.pg_uuid, '${DSP_SERIES_SEPARATOR}', s.dsp_id)`,
+		dsp: dspSeriesExpr,
 		importSource: 's.import_source',
 		total: "'total'",
 	};

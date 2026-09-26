@@ -327,25 +327,39 @@ export class TimelineAnalyticsService {
 			return result;
 		}
 
-		// DSP IDs are composite (pgDspId + unit-separator + dspReportId).
-		const pairs = seriesIds
+		// DSP series IDs are canonical pgDspIds. Keep support for the old
+		// composite form while caches roll over.
+		const dspSelections = seriesIds
 			.map((id) => {
-				const [pgDspId, dspReportId] = id.split(
+				const parts = id.split(
 					TimelineAnalyticsService.dspSeriesSeparator,
 				);
-				return { id, pgDspId, dspReportId };
+				return parts.length > 1
+					? {
+							id,
+							pgDspId: parts[0],
+							dspReportId: parts[1],
+						}
+					: { id, pgDspId: id, dspReportId: undefined };
 			})
-			.filter((item) => item.pgDspId && item.dspReportId);
-		if (!pairs.length) return result;
+			.filter((item) => item.pgDspId || item.dspReportId);
+		if (!dspSelections.length) return result;
 
-		const dspPredicates = pairs.map(
-			(_, index) =>
-				`(r.pg_uuid = {seriesDspPgId${index}:String} AND r.id_dsps_report = {seriesDspReportId${index}:String})`,
-		);
+		const dspPredicates = dspSelections.map((selection, index) => {
+			if (selection.dspReportId) {
+				return `(r.pg_uuid = {seriesDspPgId${index}:String} AND r.id_dsps_report = {seriesDspReportId${index}:String})`;
+			}
+			return `(r.pg_uuid = {seriesDspPgId${index}:String} OR r.id_dsps_report = {seriesDspPgId${index}:String})`;
+		});
 		const dspParams = Object.fromEntries(
-			pairs.flatMap((pair, index) => [
-				[`seriesDspPgId${index}`, pair.pgDspId],
-				[`seriesDspReportId${index}`, pair.dspReportId],
+			dspSelections.flatMap((selection, index) => [
+				[`seriesDspPgId${index}`, selection.pgDspId],
+				...(selection.dspReportId
+					? [[
+							`seriesDspReportId${index}`,
+							selection.dspReportId,
+						]]
+					: []),
 			]),
 		);
 		const dspRows = await this.clickHouseService.query<{
@@ -367,27 +381,53 @@ export class TimelineAnalyticsService {
 			`,
 			dspParams,
 		);
-		const metadataByPair = new Map(
-			dspRows.map((row) => [
-				`${row.pg_dsp_id}${TimelineAnalyticsService.dspSeriesSeparator}${row.dsp_report_id}`,
-				row,
-			]),
-		);
-		for (const pair of pairs) {
-			const item = metadataByPair.get(pair.id);
+		const metadataBySelection = new Map<
+			string,
+			{
+				name: string;
+				imageUrl: string | null;
+				pgDspId: string;
+				dspReportIds: string[];
+			}
+		>();
+		for (const selection of dspSelections) {
+			const matchingRows = dspRows.filter((row) =>
+				selection.dspReportId
+					? row.dsp_report_id === selection.dspReportId
+					: row.pg_dsp_id === selection.pgDspId ||
+						row.dsp_report_id === selection.pgDspId,
+			);
+			const first = matchingRows[0];
+			if (first) {
+				metadataBySelection.set(selection.id, {
+					name: first.dsp_name,
+					imageUrl: toDspImageUrl(first.image_url),
+					pgDspId: first.pg_dsp_id,
+					dspReportIds: matchingRows.map(
+						(row) => row.dsp_report_id,
+					),
+				});
+			}
+		}
+		for (const selection of dspSelections) {
+			const item = metadataBySelection.get(selection.id);
 			result.set(
-				pair.id,
+				selection.id,
 				item
 					? {
-							...fallback(pair.id, 'dsp', item.dsp_name),
-							imageUrl: toDspImageUrl(item.image_url),
-							pgDspId: pair.pgDspId,
-							dspReportId: pair.dspReportId,
+							...fallback(selection.id, 'dsp', item.name),
+							imageUrl: item.imageUrl,
+							pgDspId: item.pgDspId,
+							dspReportIds: item.dspReportIds,
+							dspReportId: item.dspReportIds[0] ?? null,
 						}
 					: {
-							...fallback(pair.id, 'dsp', pair.pgDspId),
-							pgDspId: pair.pgDspId,
-							dspReportId: pair.dspReportId,
+							...fallback(selection.id, 'dsp', selection.pgDspId ?? ''),
+							pgDspId: selection.pgDspId ?? null,
+							dspReportId: selection.dspReportId ?? null,
+							dspReportIds: selection.dspReportId
+								? [selection.dspReportId]
+								: [],
 						},
 			);
 		}

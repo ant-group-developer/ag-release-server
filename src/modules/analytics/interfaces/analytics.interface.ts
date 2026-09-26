@@ -498,6 +498,7 @@ export interface AnalyticsSeriesMetadata {
 	youtubeChannelId?: string | null;
 	pgDspId?: string | null;
 	dspReportId?: string | null;
+	dspReportIds?: string[];
 	importSource?: string | null;
 }
 

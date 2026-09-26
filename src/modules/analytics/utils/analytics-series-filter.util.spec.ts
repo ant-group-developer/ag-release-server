@@ -55,15 +55,18 @@ describe('analytics series filters', () => {
 		expect(result.seriesBy).toBe('release');
 	});
 
-	it('keeps pg DSP and raw report IDs paired instead of cross-matching arrays', () => {
+	it('prioritizes pg DSP and falls back to raw report IDs', () => {
 		const result = buildAnalyticsSeriesFilters(
 			SYSTEM_TENANT_ID,
 			{
 				...baseQuery,
 				filters: {
 					dspIds: [
-						{ pgDspId: 'spotify', dspReportId: 'spotify-us' },
-						{ pgDspId: 'apple', dspReportId: 'apple-us' },
+						{
+							pgDspId: 'spotify',
+							dspReportIds: ['ignored-report'],
+						},
+						{ dspReportIds: ['apple-us'] },
 					],
 				},
 			},
@@ -72,18 +75,20 @@ describe('analytics series filters', () => {
 
 		expect(result.seriesBy).toBe('dsp');
 		expect(result.seriesIds).toEqual([
-			'spotify\u001fspotify-us',
-			'apple\u001fapple-us',
+			'spotify',
+			'apple-us',
 		]);
 		expect(result.filterSql).toContain(
-			'(r.pg_uuid = {dspPgId0:String} AND s.dsp_id = {dspReportId0:String})',
+			'r.pg_uuid = {dspPgId0:String}',
 		);
 		expect(result.params).toMatchObject({
 			dspPgId0: 'spotify',
-			dspReportId0: 'spotify-us',
-			dspPgId1: 'apple',
-			dspReportId1: 'apple-us',
+			dspReportIds1: ['apple-us'],
 		});
+		expect(result.params).not.toHaveProperty('dspReportId0');
+		expect(result.filterSql).toContain(
+			's.dsp_id IN ({dspReportIds1:Array(String)})',
+		);
 	});
 
 	it('keeps tenant authorization strict for non-system tenants', () => {
