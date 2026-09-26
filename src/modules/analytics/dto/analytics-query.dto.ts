@@ -964,7 +964,7 @@ export class AnalyticsSeriesChartQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Series dimension. auto selects the most specific non-empty filter array.',
+			'Series dimension. auto uses the longest filter array. Equal lengths keep the specificity order.',
 		enum: ANALYTICS_SERIES_BY_VALUES,
 		default: 'auto',
 	})

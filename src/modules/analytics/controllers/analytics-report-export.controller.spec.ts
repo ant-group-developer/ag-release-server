@@ -147,7 +147,7 @@ describe('AnalyticsReportExportController.exportStatementReport', () => {
 			createExportJob: jest.fn().mockResolvedValue({
 				jobId: 'job-1',
 				status: ImportJobStatus.QUEUED,
-				eventsUrl: '/analytics/reports/statement-export/job-1/events',
+				eventsUrl: '/analytics/reports/export/job-1/events',
 			}),
 		};
 		const tenantService = {

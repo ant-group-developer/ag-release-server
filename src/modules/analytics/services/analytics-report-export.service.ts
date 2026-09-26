@@ -82,9 +82,8 @@ export class AnalyticsReportExportService {
 		return {
 			jobId: job.id,
 			status: ImportJobStatus.QUEUED,
-			eventsUrl: `/analytics/reports/${
-				dto.exportMode === 'statement' ? 'statement-export' : 'export'
-			}/${job.id}/events`,
+			// USD and statement-currency exports share one progress stream.
+			eventsUrl: `/analytics/reports/export/${job.id}/events`,
 		};
 	}
 

@@ -11,7 +11,7 @@ describe('analytics series filters', () => {
 		toDate: '2026-01-31',
 	};
 
-	it('uses the smallest selected content dimension as the automatic series key', () => {
+	it('uses the longest filter array as the automatic series key', () => {
 		expect(
 			resolveAnalyticsSeriesBy({
 				...baseQuery,
@@ -24,6 +24,36 @@ describe('analytics series filters', () => {
 		).toEqual({
 			seriesBy: 'isrc',
 			seriesIds: ['USAAA2600001', 'USAAA2600002'],
+		});
+	});
+
+	it('draws one line per DSP when that array is longer than the release scope', () => {
+		expect(
+			resolveAnalyticsSeriesBy({
+				...baseQuery,
+				filters: {
+					releaseIds: ['22222222-2222-4222-8222-222222222222'],
+					dspIds: [{ pgDspId: 'vevo' }, { pgDspId: 'facebook' }],
+				},
+			}),
+		).toEqual({
+			seriesBy: 'dsp',
+			seriesIds: ['vevo', 'facebook'],
+		});
+	});
+
+	it('keeps the specificity order when two arrays have the same length', () => {
+		expect(
+			resolveAnalyticsSeriesBy({
+				...baseQuery,
+				filters: {
+					tenantIds: ['11111111-1111-4111-8111-111111111111'],
+					releaseIds: ['22222222-2222-4222-8222-222222222222'],
+				},
+			}),
+		).toEqual({
+			seriesBy: 'release',
+			seriesIds: ['22222222-2222-4222-8222-222222222222'],
 		});
 	});
 
@@ -52,7 +82,7 @@ describe('analytics series filters', () => {
 			],
 			releaseIds: ['33333333-3333-4333-8333-333333333333'],
 		});
-		expect(result.seriesBy).toBe('release');
+		expect(result.seriesBy).toBe('tenant');
 	});
 
 	it('prioritizes pg DSP and falls back to raw report IDs', () => {

@@ -90,19 +90,23 @@ export function resolveAnalyticsSeriesBy(query: AnalyticsSeriesFilterQuery): {
 } {
 	const filters = query.filters ?? {};
 	if (!query.seriesBy || query.seriesBy === 'auto') {
+		// The longest array is the series. A one-element page scope therefore
+		// stays a filter when another array lists the lines. Equal lengths
+		// keep AUTO_SERIES_PRIORITY so the choice stays stable.
+		let selected: (typeof AUTO_SERIES_PRIORITY)[number] | undefined;
+		let selectedLength = 0;
 		for (const candidate of AUTO_SERIES_PRIORITY) {
-			const values = filters[candidate.filterKey];
-			if (values?.length) {
-				return {
-					seriesBy: candidate.seriesBy,
-					seriesIds: getSeriesIdsForFilter(
-						filters,
-						candidate.filterKey,
-					),
-				};
+			const length = filters[candidate.filterKey]?.length ?? 0;
+			if (length > selectedLength) {
+				selected = candidate;
+				selectedLength = length;
 			}
 		}
-		return { seriesBy: 'total', seriesIds: ['total'] };
+		if (!selected) return { seriesBy: 'total', seriesIds: ['total'] };
+		return {
+			seriesBy: selected.seriesBy,
+			seriesIds: getSeriesIdsForFilter(filters, selected.filterKey),
+		};
 	}
 
 	const seriesBy = query.seriesBy;
