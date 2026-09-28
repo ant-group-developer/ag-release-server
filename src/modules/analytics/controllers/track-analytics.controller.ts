@@ -2,52 +2,17 @@ import { Body, Controller, Param, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import {
-	AnalyticsSummaryQueryDto,
-	ChartQueryDto,
-	DemographicsQueryDto,
-	EntityOverviewQueryDto,
-	EntityRankingQueryDto,
-	RevenueChartQueryDto,
-} from '../dto/analytics-query.dto';
+import { DemographicsQueryDto } from '../dto/analytics-query.dto';
 import { DemographicsAnalyticsService } from '../services/demographics-analytics.service';
-import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
 @ApiTags('Analytics - Track')
 @Controller('analytics/track/:isrc')
 export class TrackAnalyticsController {
 	constructor(
-		private readonly entitySvc: EntityAnalyticsService,
 		private readonly demographicsSvc: DemographicsAnalyticsService,
 	) {}
 
-	@Post('summary')
-	@ApiOperation({ summary: 'Unified analytics summary for a track' })
-	async summary(
-		@Param('isrc') isrc: string,
-		@Body() dto: AnalyticsSummaryQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getSummary(
-				'track',
-				isrc,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
-
-	@Post('overview')
-	@ApiOperation({ summary: 'Overview stats for a track' })
-	async overview(
-		@Param('isrc') isrc: string,
-		@Body() dto: EntityOverviewQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getOverview(
-				'track',
+	@Post('demographics/device')
 				isrc,
 				dto,
 				req.user!.tenantId,

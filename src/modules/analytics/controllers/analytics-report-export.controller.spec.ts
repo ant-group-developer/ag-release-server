@@ -135,6 +135,7 @@ describe('AnalyticsReportExportController.exportStatementReport', () => {
 		);
 
 		expect(dto.exportMode).toBe('usd');
+		expect(dto.currency).toBe('USD');
 		expect(exportService.createExportJob).toHaveBeenCalledWith(
 			'tenant-a',
 			'user-1',
@@ -175,6 +176,60 @@ describe('AnalyticsReportExportController.exportStatementReport', () => {
 			'user-1',
 			dto,
 		);
+	});
+
+	it('keeps an explicit reporting currency on the USD export', async () => {
+		const exportService = {
+			createExportJob: jest.fn().mockResolvedValue({
+				jobId: 'job-vnd',
+				status: ImportJobStatus.QUEUED,
+				eventsUrl: '/analytics/reports/export/job-vnd/events',
+			}),
+		};
+		const controller = new AnalyticsReportExportController(
+			exportService as never,
+			{} as never,
+			{} as never,
+			{
+				getDescendantIds: jest.fn().mockResolvedValue(['tenant-a']),
+			} as never,
+		);
+		const dto: any = {
+			fromDate: '2026-01',
+			endDate: '2026-01',
+			currency: 'VND',
+		};
+
+		await controller.exportReport(
+			{ user: { tenantId: 'tenant-a', sub: 'user-1' } } as any,
+			dto,
+		);
+
+		expect(dto).toMatchObject({ exportMode: 'usd', currency: 'VND' });
+	});
+
+	it('rejects currency on the statement export', async () => {
+		const exportService = { createExportJob: jest.fn() };
+		const controller = new AnalyticsReportExportController(
+			exportService as never,
+			{} as never,
+			{} as never,
+			{
+				getDescendantIds: jest.fn().mockResolvedValue(['tenant-a']),
+			} as never,
+		);
+
+		await expect(
+			controller.exportStatementReport(
+				{ user: { tenantId: 'tenant-a', sub: 'user-1' } } as any,
+				{
+					fromDate: '2026-01',
+					endDate: '2026-01',
+					currency: 'USD',
+				} as any,
+			),
+		).rejects.toBeInstanceOf(BadRequestException);
+		expect(exportService.createExportJob).not.toHaveBeenCalled();
 	});
 });
 

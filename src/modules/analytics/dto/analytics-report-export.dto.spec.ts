@@ -1,6 +1,6 @@
-import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
+import 'reflect-metadata';
 import { AnalyticsReportExportDto } from './analytics-report-export.dto';
 
 function validate(payload: Record<string, unknown>) {
@@ -42,6 +42,30 @@ describe('AnalyticsReportExportDto date normalization', () => {
 		});
 
 		expect(errors.map((e) => e.property)).toContain('fromDate');
+	});
+});
+
+describe('AnalyticsReportExportDto currency validation', () => {
+	const base = { fromDate: '2026-01', endDate: '2026-06' };
+
+	it('accepts the reporting currencies and normalizes case', () => {
+		const { dto, errors } = validate({ ...base, currency: 'vnd' });
+
+		expect(errors.map((error) => error.property)).toEqual([]);
+		expect(dto.currency).toBe('VND');
+	});
+
+	it('leaves currency empty when the client omits it', () => {
+		const { dto, errors } = validate(base);
+
+		expect(errors).toHaveLength(0);
+		expect(dto.currency).toBeUndefined();
+	});
+
+	it('rejects an unsupported currency', () => {
+		const { errors } = validate({ ...base, currency: 'JPY' });
+
+		expect(errors.map((error) => error.property)).toContain('currency');
 	});
 });
 

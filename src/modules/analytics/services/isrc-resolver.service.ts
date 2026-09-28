@@ -18,6 +18,9 @@ import {
 	TrackMetadata,
 } from '../interfaces/analytics.interface';
 
+const TENANT_UUID =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class IsrcResolverService {
 	private readonly logger = new Logger(IsrcResolverService.name);
@@ -427,9 +430,12 @@ export class IsrcResolverService {
 			}
 		>
 	> {
-		if (!tenantIds.length) return new Map();
+		// Placeholder ids such as N/A stay in the caller result. They are not
+		// tenant rows, and Postgres rejects them on the uuid column.
+		const ids = tenantIds.filter((id) => TENANT_UUID.test(id));
+		if (!ids.length) return new Map();
 		const tenants = await this.tenantRepo.find({
-			where: { id: In(tenantIds) },
+			where: { id: In(ids) },
 			select: ['id', 'name', 'title', 'logo', 'type'],
 		});
 

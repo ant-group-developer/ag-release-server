@@ -36,6 +36,8 @@ import {
 	AnalyticsReportExportDto,
 	CancelAnalyticsReportExportJobsDto,
 	QueryAnalyticsReportExportsDto,
+	REPORTING_CURRENCIES,
+	ReportingCurrency,
 } from '../dto/analytics-report-export.dto';
 import {
 	AnalyticsReportExportCancelAllResult,
@@ -71,6 +73,7 @@ export class AnalyticsReportExportController {
 	): Promise<ResponseSuccess<AnalyticsReportExportJobResult>> {
 		const tenantId = req.user!.tenantId;
 		dto.exportMode = 'usd';
+		dto.currency = this.resolveReportingCurrency(dto.currency);
 
 		// ── Validate & resolve tenantIds ────────────────────────────
 		await this.validateAndResolveTenantIds(dto, tenantId);
@@ -98,6 +101,11 @@ export class AnalyticsReportExportController {
 		@Body() dto: AnalyticsReportExportDto,
 	): Promise<ResponseSuccess<AnalyticsReportExportJobResult>> {
 		const tenantId = req.user!.tenantId;
+		if (dto.currency) {
+			throw new BadRequestException(
+				'currency is not supported on statement export. Use POST /analytics/reports/export to choose a reporting currency.',
+			);
+		}
 		dto.exportMode = 'statement';
 
 		await this.validateAndResolveTenantIds(dto, tenantId);
@@ -299,6 +307,18 @@ export class AnalyticsReportExportController {
 				);
 			}, true),
 		);
+	}
+
+	private resolveReportingCurrency(
+		currency: string | undefined,
+	): ReportingCurrency {
+		const normalized = (currency ?? 'USD').trim().toUpperCase();
+		if (!REPORTING_CURRENCIES.includes(normalized as ReportingCurrency)) {
+			throw new BadRequestException(
+				`currency must be one of: ${REPORTING_CURRENCIES.join(', ')}`,
+			);
+		}
+		return normalized as ReportingCurrency;
 	}
 
 	/**

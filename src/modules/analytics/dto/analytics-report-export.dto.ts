@@ -32,6 +32,23 @@ const normalizeToMonth = (value: unknown): unknown => {
 	return trimmed;
 };
 
+export const REPORTING_CURRENCIES = [
+	'USD',
+	'VND',
+	'GBP',
+	'INR',
+	'CNY',
+	'EUR',
+] as const;
+
+export type ReportingCurrency = (typeof REPORTING_CURRENCIES)[number];
+
+const normalizeCurrency = (value: unknown): unknown => {
+	if (typeof value !== 'string') return value;
+	const normalized = value.trim().toUpperCase();
+	return normalized === '' ? undefined : normalized;
+};
+
 export class AnalyticsReportExportDto {
 	/** Server-only scope injected from the authenticated request. */
 	@Allow()
@@ -43,6 +60,18 @@ export class AnalyticsReportExportDto {
 	 */
 	@Allow()
 	exportMode?: 'usd' | 'statement';
+
+	@ApiPropertyOptional({
+		description:
+			'Reporting currency for POST /analytics/reports/export. Stored USD is multiplied by that month’s end-of-month rate. Defaults to USD. Not accepted by statement-export.',
+		enum: REPORTING_CURRENCIES,
+		default: 'USD',
+		example: 'VND',
+	})
+	@Transform(({ value }) => normalizeCurrency(value))
+	@IsOptional()
+	@IsIn(REPORTING_CURRENCIES)
+	currency?: ReportingCurrency;
 	@ApiProperty({
 		description:
 			'Start month of the report range. Accepts YYYY-MM or YYYY-MM-DD (day is ignored, normalized to month).',
