@@ -39,6 +39,11 @@ export interface AssetImportItemView {
 	status: string;
 	matchedReleaseId: string | null;
 	matchedTrackId: string | null;
+	requiresMerge: boolean;
+	duplicateClassification: string | null;
+	canonicalReleaseId: string | null;
+	canonicalTrackId: string | null;
+	duplicateSourceReleaseIds: string[];
 	current: {
 		tenantId: string | null;
 		tenantName: string | null;
@@ -250,6 +255,11 @@ export class AssetImportQueryService {
 			status: item.status,
 			matchedReleaseId: item.matchedReleaseId,
 			matchedTrackId: item.matchedTrackId,
+			requiresMerge: item.requiresMerge,
+			duplicateClassification: item.duplicateClassification,
+			canonicalReleaseId: item.canonicalReleaseId,
+			canonicalTrackId: item.canonicalTrackId,
+			duplicateSourceReleaseIds: item.duplicateSourceReleaseIds,
 			current: {
 				tenantId: item.currentTenantId,
 				tenantName: item.currentTenantId

@@ -60,7 +60,10 @@ describe('AssetImportApplyService', () => {
 	let dataSource: DataSource;
 	let releaseImport: { importRelease: jest.Mock };
 	let clickHouse: { insert: jest.Mock };
-	let assetOwnership: { transfer: jest.Mock; recordInitialOwnership: jest.Mock };
+	let assetOwnership: {
+		transfer: jest.Mock;
+		recordInitialOwnership: jest.Mock;
+	};
 	let service: AssetImportApplyService;
 
 	beforeEach(() => {
@@ -108,6 +111,7 @@ describe('AssetImportApplyService', () => {
 		for (const action of [
 			AssetImportAction.INVALID,
 			AssetImportAction.CONFLICT,
+			AssetImportAction.MERGE_REQUIRED,
 			AssetImportAction.NO_CHANGE,
 		]) {
 			const result = await service.applyItem(

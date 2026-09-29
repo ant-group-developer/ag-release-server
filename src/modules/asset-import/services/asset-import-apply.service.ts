@@ -71,6 +71,7 @@ export class AssetImportApplyService {
 		if (
 			item.action === AssetImportAction.INVALID ||
 			item.action === AssetImportAction.CONFLICT ||
+			item.action === AssetImportAction.MERGE_REQUIRED ||
 			item.action === AssetImportAction.NO_CHANGE
 		) {
 			return {

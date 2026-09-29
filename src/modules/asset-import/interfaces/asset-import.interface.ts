@@ -52,6 +52,11 @@ export interface ScannedAssetRow extends ParsedAssetRow {
 	matchedTrackId: string | null;
 	currentTenantId: string | null;
 	currentLabelId: string | null;
+	duplicateClassification: string | null;
+	canonicalReleaseId: string | null;
+	canonicalTrackId: string | null;
+	duplicateSourceReleaseIds: string[];
+	requiresMerge: boolean;
 	changes: AssetImportChange[];
 	errorMessage: string | null;
 }
@@ -62,6 +67,7 @@ export interface AssetImportScanSummary {
 	new: number;
 	invalid: number;
 	conflict: number;
+	mergeRequired: number;
 	willUpdate: number;
 	noChange: number;
 }

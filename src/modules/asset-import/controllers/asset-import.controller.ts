@@ -93,7 +93,12 @@ export class AssetImportController {
 	@ApiResponse({ status: 200, description: 'Danh sách batch có phân trang' })
 	async listBatches(@Query() query: QueryAssetImportBatchDto) {
 		const result = await this.queryService.listBatches(query);
-		return new ResponseSuccess({ data: result });
+		const items = await this.assetImportService.attachScannedFiles(
+			result.items,
+		);
+		return new ResponseSuccess({
+			data: { items, metadata: result.metadata },
+		});
 	}
 
 	@Get('batches/:batchId')
@@ -105,8 +110,11 @@ export class AssetImportController {
 			this.queryService.getBatchSummary(batchId),
 		]);
 
+		const [withFile] = await this.assetImportService.attachScannedFiles([
+			this.queryService.toBatchView(batch),
+		]);
 		return new ResponseSuccess({
-			data: { ...this.queryService.toBatchView(batch), summary },
+			data: { ...withFile, summary },
 		});
 	}
 
@@ -142,6 +150,48 @@ export class AssetImportController {
 			req.user!.sub,
 		);
 		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('batches/:batchId/merge-impact')
+	@ApiOperation({
+		summary: 'Xem các release report cần merge trước khi apply asset batch',
+	})
+	async mergeImpact(@Param('batchId', ParseUUIDPipe) batchId: string) {
+		return new ResponseSuccess({
+			data: await this.assetImportService.getMergeImpact(batchId),
+		});
+	}
+
+	@Post('batches/:batchId/merge-duplicates')
+	@ApiOperation({
+		summary:
+			'Merge các release report duplicate đã chọn ở nền, rồi rescan batch',
+		description:
+			'Trả về ngay jobId. Tiến độ đi qua SSE /batches/:batchId/events. Không merge trong request vì proxy chỉ chờ 30 giây.',
+	})
+	async mergeDuplicates(
+		@Param('batchId', ParseUUIDPipe) batchId: string,
+		@Body() dto: ApplyAssetImportDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.assetImportService.mergeDuplicates(
+				batchId,
+				dto,
+				req.user!.sub,
+			),
+		});
+	}
+
+	@Post('batches/:batchId/rescan-conflicts')
+	@ApiOperation({
+		summary:
+			'Quét lại các item conflict/merge-required mà không upload file lại',
+	})
+	async rescanConflicts(@Param('batchId', ParseUUIDPipe) batchId: string) {
+		return new ResponseSuccess({
+			data: await this.assetImportService.rescanConflicts(batchId),
+		});
 	}
 
 	@Delete('batches/:batchId')
