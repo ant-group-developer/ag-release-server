@@ -201,11 +201,20 @@ export class ReleaseMergeService {
 			sourceTracks,
 			target.id,
 		);
-		await this.assertOwnershipSafe(manager, source.id);
+		const detached = await this.detachUnmatchedTracks(
+			manager,
+			source,
+			sourceTracks,
+			targetByIsrc,
+			input.userId ?? null,
+		);
+		const matchedSourceTracks = sourceTracks.filter(
+			(track) => !detached.trackIds.includes(track.id),
+		);
 		await this.assertImportedRelationsOnly(
 			manager,
 			source.id,
-			sourceTracks.map((track) => track.id),
+			matchedSourceTracks.map((track) => track.id),
 		);
 		await this.assertNoUnexpectedReferences(
 			manager,
@@ -216,12 +225,12 @@ export class ReleaseMergeService {
 		await this.assertNoUnexpectedReferences(
 			manager,
 			'tracks',
-			sourceTracks.map((track) => track.id),
+			matchedSourceTracks.map((track) => track.id),
 			ALLOWED_TRACK_CHILD_TABLES,
 		);
 
 		const now = new Date();
-		for (const sourceTrack of sourceTracks) {
+		for (const sourceTrack of matchedSourceTracks) {
 			const normalizedIsrc = normalizeMergeIsrc(sourceTrack.isrc);
 			const targetTrack = targetByIsrc.get(normalizedIsrc);
 			if (!targetTrack) {
@@ -283,13 +292,21 @@ export class ReleaseMergeService {
 		);
 		await this.mergeOwnershipBaseline(manager, source, target);
 
-		const sourceTrackIds = sourceTracks.map((track) => track.id);
+		const sourceTrackIds = matchedSourceTracks.map((track) => track.id);
 		if (sourceTrackIds.length) {
 			await manager.query(
 				`DELETE FROM "track_artist" WHERE "track_id" = ANY($1)`,
 				[sourceTrackIds],
 			);
 			await manager.delete(Track, { id: In(sourceTrackIds) });
+		}
+		if (detached.trackIds.length) {
+			await manager.query(
+				`UPDATE track_artist
+				 SET release_artist_id = NULL, updated_at = now()
+				 WHERE track_id = ANY($1)`,
+				[detached.trackIds],
+			);
 		}
 		await manager.query(
 			`DELETE FROM "release_artist" WHERE "release_id" = $1`,
@@ -303,8 +320,8 @@ export class ReleaseMergeService {
 
 		await this.enqueueTargetSync(
 			manager,
-			target.id,
-			targetTracks.map((track) => track.id),
+			[target.id, ...detached.releaseIds],
+			[...targetTracks.map((track) => track.id), ...detached.trackIds],
 		);
 
 		if (input.mergeItemId) {
@@ -319,7 +336,7 @@ export class ReleaseMergeService {
 		return {
 			sourceReleaseId: source.id,
 			targetReleaseId: target.id,
-			mergedTrackCount: sourceTracks.length,
+			mergedTrackCount: matchedSourceTracks.length,
 			idempotent: false,
 		};
 	}
@@ -365,8 +382,8 @@ export class ReleaseMergeService {
 		if (sourceTracks.some((track) => !track.isImportedFromReport)) {
 			reasonCodes.push('SOURCE_HAS_NON_IMPORTED_TRACK');
 		}
-		if (sourceOnlyIsrcs.length)
-			reasonCodes.push('SOURCE_HAS_UNMATCHED_TRACKS');
+		// ISRC chỉ có ở release report không chặn merge. apply() tách mỗi
+		// ISRC thành một release import mới trước khi xóa release nguồn.
 		if (!sharedIsrcs.length) reasonCodes.push('NO_SHARED_ISRC');
 
 		const upcEquivalent = areEquivalentUpcs(source.upc, target.upc);
@@ -425,32 +442,142 @@ export class ReleaseMergeService {
 		}
 	}
 
-	private async assertOwnershipSafe(
+	/**
+	 * Bài không có trên canonical được chuyển sang release import mới,
+	 * UPC `ISRC-{isrc}`. Period owner được copy nguyên, kể cả lần chuyển
+	 * sang tenant mới, rồi release report trùng mới bị xóa.
+	 */
+	private async detachUnmatchedTracks(
 		manager: EntityManager,
-		sourceReleaseId: string,
-	): Promise<void> {
-		const [eventCountRow] = await manager.query(
-			`SELECT COUNT(*)::int AS count FROM asset_ownership_transfer_events WHERE release_id = $1`,
-			[sourceReleaseId],
-		);
-		if (Number(eventCountRow?.count ?? 0) > 0) {
-			throw new ConflictException('SOURCE_HAS_TRANSFER_HISTORY');
+		source: Release,
+		sourceTracks: Track[],
+		targetByIsrc: Map<string, Track>,
+		userId: string | null,
+	): Promise<{ releaseIds: string[]; trackIds: string[] }> {
+		const grouped = new Map<string, Track[]>();
+		for (const track of sourceTracks) {
+			if (!isRealIsrc(track.isrc)) continue;
+			const isrc = normalizeMergeIsrc(track.isrc);
+			if (targetByIsrc.has(isrc)) continue;
+			const list = grouped.get(isrc) ?? [];
+			list.push(track);
+			grouped.set(isrc, list);
 		}
-		const invalidPeriods = await manager.query(
-			`SELECT id FROM asset_ownership_periods
-			 WHERE release_id = $1
-			   AND (effective_from <> DATE '1900-01-01'
-			     OR revenue_effective_from <> DATE '1900-01-01'
-			     OR effective_to IS NOT NULL
-			     OR revenue_effective_to IS NOT NULL)
-			 LIMIT 1`,
-			[sourceReleaseId],
-		);
-		if (invalidPeriods.length) {
+		if (!grouped.size) return { releaseIds: [], trackIds: [] };
+
+		const isrcs = [...grouped.keys()];
+		const elsewhere: { release_id: string; isrc: string }[] =
+			await manager.query(
+				`SELECT r.id AS release_id,
+				        upper(regexp_replace(btrim(t.isrc), '[-[:space:]]', '', 'g')) AS isrc
+				 FROM tracks t
+				 JOIN releases r ON r.id = t.release_id
+				 WHERE upper(regexp_replace(btrim(t.isrc), '[-[:space:]]', '', 'g')) = ANY($1)
+				   AND r.id <> $2`,
+				[isrcs, source.id],
+			);
+		if (elsewhere.length) {
+			const sample = elsewhere
+				.slice(0, 5)
+				.map((row) => `${row.isrc} → ${row.release_id}`)
+				.join(', ');
 			throw new ConflictException(
-				'SOURCE_HAS_MEANINGFUL_OWNERSHIP_PERIOD',
+				`Unmatched ISRC already belongs to another release: ${sample}`,
 			);
 		}
+
+		const placeholders = isrcs.map((isrc) => `ISRC-${isrc}`);
+		const existingUpcs: { id: string; upc: string }[] = await manager.query(
+			`SELECT id, upc FROM releases WHERE upper(btrim(upc)) = ANY($1)`,
+			[placeholders],
+		);
+		if (existingUpcs.length) {
+			throw new ConflictException(
+				`Placeholder UPC already exists: ${existingUpcs
+					.map((row) => row.upc)
+					.join(', ')}`,
+			);
+		}
+
+		const releaseIds: string[] = [];
+		const trackIds: string[] = [];
+		for (const [isrc, tracks] of grouped) {
+			const created = await manager.save(
+				Release,
+				manager.create(Release, {
+					type: source.type,
+					upc: `ISRC-${isrc}`,
+					title: (tracks[0].title || isrc).slice(0, 150),
+					labelId: source.labelId,
+					tenantId: source.tenantId,
+					status: source.status,
+					isImportedFromReport: true,
+					importSourceType: source.importSourceType,
+					importParserCode: source.importParserCode,
+					importFileName: source.importFileName,
+					importJobId: source.importJobId,
+					creatorId: userId,
+					modifierId: userId,
+				}),
+			);
+			await this.copyOwnershipPeriods(
+				manager,
+				source.id,
+				created.id,
+				source.tenantId,
+				source.labelId,
+				userId,
+			);
+			for (const [index, track] of tracks.entries()) {
+				await manager.update(Track, track.id, {
+					releaseId: created.id,
+					order: index + 1,
+				});
+				trackIds.push(track.id);
+			}
+			releaseIds.push(created.id);
+		}
+		return { releaseIds, trackIds };
+	}
+
+	private async copyOwnershipPeriods(
+		manager: EntityManager,
+		sourceReleaseId: string,
+		targetReleaseId: string,
+		tenantId: string,
+		labelId: string | null,
+		userId: string | null,
+	): Promise<void> {
+		const copied: { id: string }[] = await manager.query(
+			`INSERT INTO asset_ownership_periods (
+			   id, release_id, tenant_id, label_id,
+			   effective_from, effective_to,
+			   revenue_effective_from, revenue_effective_to,
+			   asset_import_item_id, created_by, created_at, updated_at
+			 )
+			 SELECT gen_random_uuid(), $1, tenant_id, label_id,
+			        effective_from, effective_to,
+			        revenue_effective_from, revenue_effective_to,
+			        NULL, $2, now(), now()
+			 FROM asset_ownership_periods
+			 WHERE release_id = $3
+			 RETURNING id`,
+			[targetReleaseId, userId, sourceReleaseId],
+		);
+		if (copied.length) return;
+		await manager.query(
+			`INSERT INTO asset_ownership_periods (
+			   id, release_id, tenant_id, label_id,
+			   effective_from, revenue_effective_from,
+			   created_by, created_at, updated_at
+			 )
+			 VALUES (
+			   gen_random_uuid(), $1, $2, $3,
+			   DATE '1900-01-01', DATE '1900-01-01',
+			   $4, now(), now()
+			 )`,
+			[targetReleaseId, tenantId, labelId, userId],
+		);
 	}
 
 	private async assertImportedRelationsOnly(
@@ -582,16 +709,18 @@ export class ReleaseMergeService {
 
 	private async enqueueTargetSync(
 		manager: EntityManager,
-		targetReleaseId: string,
+		releaseIds: string[],
 		targetTrackIds: string[],
 	): Promise<void> {
-		await manager.query(
-			`INSERT INTO clickhouse_sync_outbox (entity_name, entity_id, action, processed)
-			 VALUES ('releases', $1, 'UPDATE', false)
-			 ON CONFLICT (entity_name, entity_id) WHERE processed = false
-			 DO UPDATE SET action = 'UPDATE', created_at = now(), error_message = NULL`,
-			[targetReleaseId],
-		);
+		for (const releaseId of releaseIds) {
+			await manager.query(
+				`INSERT INTO clickhouse_sync_outbox (entity_name, entity_id, action, processed)
+				 VALUES ('releases', $1, 'UPDATE', false)
+				 ON CONFLICT (entity_name, entity_id) WHERE processed = false
+				 DO UPDATE SET action = 'UPDATE', created_at = now(), error_message = NULL`,
+				[releaseId],
+			);
+		}
 		for (const trackId of targetTrackIds) {
 			await manager.query(
 				`INSERT INTO clickhouse_sync_outbox (entity_name, entity_id, action, processed)

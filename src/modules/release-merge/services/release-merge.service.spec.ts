@@ -49,7 +49,7 @@ describe('ReleaseMergeService pair planning', () => {
 		expect(plan.sourceOnlyIsrcs).toEqual([]);
 	});
 
-	it('blocks a source-only track so V1 never deletes an uncovered recording', () => {
+	it('stays auto-safe when the source has extra ISRCs so merge can detach them', () => {
 		const plan = service.buildPairPlan(source, target, [
 			track({ releaseId: target.id }),
 			track({
@@ -65,8 +65,8 @@ describe('ReleaseMergeService pair planning', () => {
 			}),
 		]);
 
-		expect(plan.autoSafe).toBe(false);
-		expect(plan.reasonCodes).toContain('SOURCE_HAS_UNMATCHED_TRACKS');
+		expect(plan.autoSafe).toBe(true);
+		expect(plan.reasonCodes).not.toContain('SOURCE_HAS_UNMATCHED_TRACKS');
 		expect(plan.sourceOnlyIsrcs).toEqual(['US38Y2521677']);
 	});
 
