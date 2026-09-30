@@ -21,6 +21,7 @@ import {
 } from 'src/modules/partners-api/ci/interfaces/vevo-video.interface';
 import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.service';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
+import { ReleaseMergeService } from 'src/modules/release-merge/services/release-merge.service';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
@@ -90,6 +91,7 @@ export class ReleaseExecution3Worker {
 		private readonly bucketService2: BucketService2,
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 		private readonly releaseDraftService: ReleaseDraftService,
+		private readonly releaseMergeService: ReleaseMergeService,
 
 		// @Inject(forwardRef(() => CiDistributionJobService))
 		private readonly ciJobService: CiDistributionJob3Service,
@@ -2354,7 +2356,6 @@ export class ReleaseExecution3Worker {
 			}[] = [];
 
 			let shouldCheckIsrc = true;
-			const deletedImportedReleaseIds: string[] = [];
 			const upc = release.upc?.trim();
 
 			if (upc) {
@@ -2397,14 +2398,17 @@ export class ReleaseExecution3Worker {
 					shouldCheckIsrc = false;
 				} else {
 					for (const importedRelease of importedDuplicateReleases) {
-						await this.releaseDraftService.handleDeleteById(
-							importedRelease.id,
-						);
-						deletedImportedReleaseIds.push(importedRelease.id);
+						const mergeResult =
+							await this.releaseMergeService.apply({
+								sourceReleaseId: importedRelease.id,
+								targetReleaseId: releaseId,
+								userId: releaseExecution.creatorId,
+							});
 						this.logService.warning({
-							message: `[CHECK_DUPLICATE_IDENTIFIERS] Deleted imported release ${importedRelease.id} because UPC "${upc}" is now used by release ${releaseId}`,
+							message: `[CHECK_DUPLICATE_IDENTIFIERS] Merged imported release ${importedRelease.id} into ${releaseId}`,
 							releaseExecutionId: releaseExecution.id,
 							releaseExecutionStepId: step.id,
+							data: mergeResult,
 						});
 					}
 				}
@@ -2521,6 +2525,9 @@ export class ReleaseExecution3Worker {
 			.where('UPPER(BTRIM(otherTrack.isrc)) = :isrc', {
 				isrc: normalizedIsrc,
 			});
+		trackQb.andWhere('otherTrack.isImportedFromReport = :isImported', {
+			isImported: true,
+		});
 
 		if (currentTrackId) {
 			trackQb.andWhere('otherTrack.id <> :currentTrackId', {
@@ -2548,6 +2555,10 @@ export class ReleaseExecution3Worker {
 			])
 			.where('UPPER(BTRIM(otherVideo.isrc)) = :isrc', {
 				isrc: normalizedIsrc,
+			})
+			.innerJoin('otherVideo.release', 'otherRelease')
+			.andWhere('otherRelease.isImportedFromReport = :isImported', {
+				isImported: true,
 			});
 
 		if (currentVideoId) {
