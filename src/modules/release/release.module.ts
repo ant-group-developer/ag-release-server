@@ -82,6 +82,7 @@ import { AssetOwnershipModule } from '../asset-import/asset-ownership.module';
 import { PartnersApiModule } from '../partners-api/partners-api.module';
 import { ReleaseCaption } from '../release-caption/entities/release-caption.entity';
 import { ReleaseCaptionModule } from '../release-caption/release-caption.module';
+import { ReleaseMergeModule } from '../release-merge/release-merge.module';
 import { VideoArtist } from '../video-artist/entities/video-artist.entity';
 import { VideoContributor } from '../video-contributor/entities/video-contributor.entity';
 import { Video } from '../video/entities/video.entity';
@@ -180,6 +181,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 
 		PartnersApiModule,
 		AssetOwnershipModule,
+		ReleaseMergeModule,
 
 		// ReleaseExecutions3Module,
 	],

@@ -1,12 +1,12 @@
 import { INestApplication, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import 'dotenv/config';
 import { AppModule } from './app.module';
 import { createDynamicCorsConfig } from './common/config/cors.config';
 import { setupSwagger } from './common/config/swagger.config';
 import { globalValidationPipe } from './common/config/validation.config';
 import { TenantDomainService } from './modules/tenant-domain/tenant-domain.service';
-
 export let APP_GOLBAL: INestApplication<any>;
 
 async function bootstrap() {
