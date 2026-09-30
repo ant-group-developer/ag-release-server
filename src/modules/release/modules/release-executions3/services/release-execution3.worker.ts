@@ -2426,12 +2426,16 @@ export class ReleaseExecution3Worker {
 					});
 
 					if (conflict) {
+						const conflictLabel =
+							conflict.kind === 'track'
+								? `bài hát "${conflict.trackTitle ?? 'không xác định'}"`
+								: `video`;
+
 						errors.push({
 							messageCode: 'release.validate.isrcAlreadyExists',
-							message: `Mã ISRC "${isrc}" đã được sử dụng bởi ${conflict.kind} "${conflict.id}" của release "${conflict.releaseId}"`,
+							message: `Mã ISRC "${isrc}" đã được sử dụng bởi ${conflictLabel} thuộc phát hành "${conflict.releaseTitle ?? 'không xác định'}"${conflict.releaseUpc ? ` (UPC "${conflict.releaseUpc}")` : ''}.`,
 							page: 'tracks',
 							field: `tracks.${index}.isrc`,
-							trackId: track.id,
 						});
 					}
 				}
@@ -2447,7 +2451,7 @@ export class ReleaseExecution3Worker {
 					if (conflict) {
 						errors.push({
 							messageCode: 'release.validate.isrcAlreadyExists',
-							message: `Mã ISRC "${videoIsrc}" đã được sử dụng bởi ${conflict.kind} "${conflict.id}" của release "${conflict.releaseId}"`,
+							message: `Mã ISRC "${videoIsrc}" đã được sử dụng bởi video thuộc phát hành "${conflict.releaseTitle ?? 'không xác định'}"${conflict.releaseUpc ? ` (UPC "${conflict.releaseUpc}")` : ''}.`,
 							page: 'video',
 							field: 'video.isrc',
 						});
@@ -2511,6 +2515,9 @@ export class ReleaseExecution3Worker {
 		kind: 'track' | 'video';
 		id: string;
 		releaseId: string;
+		trackTitle?: string;
+		releaseTitle?: string;
+		releaseUpc?: string | null;
 	} | null> {
 		const normalizedIsrc = isrc.trim().toUpperCase();
 
@@ -2519,14 +2526,19 @@ export class ReleaseExecution3Worker {
 			.createQueryBuilder('otherTrack')
 			.select([
 				'otherTrack.id',
+				'otherTrack.title',
 				'otherTrack.releaseId',
 				'otherTrack.isrc',
+				'otherRelease.id',
+				'otherRelease.title',
+				'otherRelease.upc',
 			])
+			.innerJoinAndSelect('otherTrack.release', 'otherRelease')
 			.where('UPPER(BTRIM(otherTrack.isrc)) = :isrc', {
 				isrc: normalizedIsrc,
 			});
 		trackQb.andWhere('otherTrack.isImportedFromReport = :isImported', {
-			isImported: true,
+			isImported: false,
 		});
 
 		if (currentTrackId) {
@@ -2542,6 +2554,9 @@ export class ReleaseExecution3Worker {
 				kind: 'track',
 				id: trackConflict.id,
 				releaseId: trackConflict.releaseId,
+				trackTitle: trackConflict.title,
+				releaseTitle: trackConflict.release?.title,
+				releaseUpc: trackConflict.release?.upc,
 			};
 		}
 
@@ -2552,13 +2567,16 @@ export class ReleaseExecution3Worker {
 				'otherVideo.id',
 				'otherVideo.releaseId',
 				'otherVideo.isrc',
+				'otherRelease.id',
+				'otherRelease.title',
+				'otherRelease.upc',
 			])
 			.where('UPPER(BTRIM(otherVideo.isrc)) = :isrc', {
 				isrc: normalizedIsrc,
 			})
-			.innerJoin('otherVideo.release', 'otherRelease')
+			.innerJoinAndSelect('otherVideo.release', 'otherRelease')
 			.andWhere('otherRelease.isImportedFromReport = :isImported', {
-				isImported: true,
+				isImported: false,
 			});
 
 		if (currentVideoId) {
@@ -2574,6 +2592,8 @@ export class ReleaseExecution3Worker {
 				kind: 'video',
 				id: videoConflict.id,
 				releaseId: videoConflict.releaseId,
+				releaseTitle: videoConflict.release?.title,
+				releaseUpc: videoConflict.release?.upc,
 			};
 		}
 
