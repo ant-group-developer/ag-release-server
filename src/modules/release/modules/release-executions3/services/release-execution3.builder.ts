@@ -5,6 +5,7 @@ import {
 	MINUTES_PER_DAY,
 } from 'src/common/constants/common.default.constants';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { ReleaseContentType } from 'src/modules/release/enum/release.enum';
 import { Repository } from 'typeorm';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
@@ -56,7 +57,10 @@ export class ReleaseExecution3Builder {
 					break; // ← QUAN TRỌNG: không rơi xuống logic GEN_UPC/VALIDATE
 				}
 
-				if (!releaseSnapshot.upc && releaseSnapshot.type !== 'video') {
+				if (
+					!releaseSnapshot.upc &&
+					releaseSnapshot.type === ReleaseContentType.AUDIO
+				) {
 					stepResult.push({
 						type: ReleaseExecutionStepType.GEN_UPC,
 						order: order++,
@@ -91,13 +95,13 @@ export class ReleaseExecution3Builder {
 
 				stepResult.push(
 					{
+						type: ReleaseExecutionStepType.CHECK_DUPLICATE_IDENTIFIERS,
+						order: order++,
+					},
+					{
 						type: ReleaseExecutionStepType.VALIDATE,
 						order: order++,
 					},
-					// {
-					// 	type: ReleaseExecutionStepType.REVIEW_RELEASE,
-					// 	order: order++,
-					// },
 					{
 						type: ReleaseExecutionStepType.PROCESS_DSPS,
 						order: order++,
@@ -112,7 +116,6 @@ export class ReleaseExecution3Builder {
 						},
 					},
 				);
-
 				break;
 			}
 
