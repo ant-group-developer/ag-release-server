@@ -24,15 +24,21 @@ import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
-import { ReleaseErrorType } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
+import {
+	ReleaseError,
+	ReleaseErrorType,
+} from 'src/modules/release/modules/release-errors/entities/release-error.entity';
 import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
 import { ReleaseReviewService } from 'src/modules/release/modules/release-reviews/services/release-review.service';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
+import { ReleaseDraftService } from 'src/modules/release/services/release.draft.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
+import { Track } from 'src/modules/track/entities/track.entity';
 import { TrackService } from 'src/modules/track/services/track.service';
+import { Video } from 'src/modules/video/entities/video.entity';
 import { VideoService } from 'src/modules/video/video.service';
 import { removeFolder } from 'src/utils/util';
 import { Readable } from 'stream';
@@ -83,6 +89,7 @@ export class ReleaseExecution3Worker {
 		private readonly vevoJobResultService: VevoJobResultService,
 		private readonly bucketService2: BucketService2,
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
+		private readonly releaseDraftService: ReleaseDraftService,
 
 		// @Inject(forwardRef(() => CiDistributionJobService))
 		private readonly ciJobService: CiDistributionJob3Service,
@@ -102,6 +109,9 @@ export class ReleaseExecution3Worker {
 
 			case ReleaseExecutionStepType.GEN_ISRC:
 				return this.genIsrc(context);
+
+			case ReleaseExecutionStepType.CHECK_DUPLICATE_IDENTIFIERS:
+				return this.checkDuplicateIdentifiers(context);
 
 			case ReleaseExecutionStepType.VALIDATE:
 				return this.validate(context);
@@ -2314,5 +2324,248 @@ export class ReleaseExecution3Worker {
 		}
 
 		return [];
+	}
+
+	private async checkDuplicateIdentifiers({
+		step,
+		releaseExecution,
+	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		try {
+			const releaseId = this.releaseIdFromExecution(releaseExecution);
+
+			const release = await this.manager.findOne(Release, {
+				where: { id: releaseId },
+				relations: {
+					tracks: true,
+					video: true,
+				},
+			});
+
+			if (!release) {
+				throw new Error(`Release ${releaseId} not found`);
+			}
+
+			const errors: {
+				messageCode: string;
+				message: string;
+				page: string;
+				field: string;
+				trackId?: string;
+			}[] = [];
+
+			let shouldCheckIsrc = true;
+			const deletedImportedReleaseIds: string[] = [];
+			const upc = release.upc?.trim();
+
+			if (upc) {
+				const sameUpcReleases = await this.manager
+					.getRepository(Release)
+					.createQueryBuilder('otherRelease')
+					.select([
+						'otherRelease.id',
+						'otherRelease.title',
+						'otherRelease.upc',
+						'otherRelease.isImportedFromReport',
+					])
+					.where(
+						`
+							TRIM(LEADING '0' FROM BTRIM(otherRelease.upc)) =
+							TRIM(LEADING '0' FROM :upc)
+						`,
+						{ upc },
+					)
+					.andWhere('otherRelease.id <> :releaseId', { releaseId })
+					.getMany();
+
+				const importedDuplicateReleases = sameUpcReleases.filter(
+					(item) => item.isImportedFromReport === true,
+				);
+
+				const directDuplicateReleases = sameUpcReleases.filter(
+					(item) => item.isImportedFromReport !== true,
+				);
+
+				if (directDuplicateReleases.length > 0) {
+					errors.push({
+						messageCode: 'release.validate.upcAlreadyExists',
+						message: `Mã UPC "${upc}" đã được sử dụng bởi release tạo trực tiếp: ${directDuplicateReleases
+							.map((item) => `"${item.title}" (${item.id})`)
+							.join(', ')}`,
+						page: 'core-detail',
+						field: 'upc',
+					});
+					shouldCheckIsrc = false;
+				} else {
+					for (const importedRelease of importedDuplicateReleases) {
+						await this.releaseDraftService.handleDeleteById(
+							importedRelease.id,
+						);
+						deletedImportedReleaseIds.push(importedRelease.id);
+						this.logService.warning({
+							message: `[CHECK_DUPLICATE_IDENTIFIERS] Deleted imported release ${importedRelease.id} because UPC "${upc}" is now used by release ${releaseId}`,
+							releaseExecutionId: releaseExecution.id,
+							releaseExecutionStepId: step.id,
+						});
+					}
+				}
+			}
+
+			if (shouldCheckIsrc) {
+				for (const [index, track] of (release.tracks ?? []).entries()) {
+					const isrc = track.isrc?.trim().toUpperCase();
+
+					if (!isrc) continue;
+
+					const conflict = await this.findIsrcConflict({
+						isrc,
+						currentTrackId: track.id,
+					});
+
+					if (conflict) {
+						errors.push({
+							messageCode: 'release.validate.isrcAlreadyExists',
+							message: `Mã ISRC "${isrc}" đã được sử dụng bởi ${conflict.kind} "${conflict.id}" của release "${conflict.releaseId}"`,
+							page: 'tracks',
+							field: `tracks.${index}.isrc`,
+							trackId: track.id,
+						});
+					}
+				}
+
+				const videoIsrc = release.video?.isrc?.trim().toUpperCase();
+
+				if (videoIsrc) {
+					const conflict = await this.findIsrcConflict({
+						isrc: videoIsrc,
+						currentVideoId: release.video!.id,
+					});
+
+					if (conflict) {
+						errors.push({
+							messageCode: 'release.validate.isrcAlreadyExists',
+							message: `Mã ISRC "${videoIsrc}" đã được sử dụng bởi ${conflict.kind} "${conflict.id}" của release "${conflict.releaseId}"`,
+							page: 'video',
+							field: 'video.isrc',
+						});
+					}
+				}
+			}
+
+			await this.manager.save(ReleaseExecutionStep3, step);
+
+			await this.manager.delete(ReleaseError, {
+				stepId: step.id,
+			});
+
+			if (errors.length > 0) {
+				await this.releaseErrorService.bulkCreateErrors(
+					errors.map((error) => ({
+						releaseId,
+						releaseExecutionId: releaseExecution.id,
+						stepId: step.id,
+						type: ReleaseErrorType.ADMIN_CREATE,
+						messageCode: error.messageCode,
+						message: error.message,
+						page: error.page,
+						field: error.field,
+						trackId: error.trackId,
+					})),
+				);
+
+				this.logService.error({
+					message: `[CHECK_DUPLICATE_IDENTIFIERS] Release ${releaseId} failed: ${errors
+						.map((error) => error.message)
+						.join(', ')}`,
+					releaseExecutionId: releaseExecution.id,
+					releaseExecutionStepId: step.id,
+				});
+
+				return ReleaseExecutionStepStatus.FAILED;
+			}
+
+			return ReleaseExecutionStepStatus.DONE;
+		} catch (err) {
+			this.logService.error({
+				message: `[CHECK_DUPLICATE_IDENTIFIERS] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
+			});
+
+			return ReleaseExecutionStepStatus.FAILED;
+		}
+	}
+
+	private async findIsrcConflict({
+		isrc,
+		currentTrackId,
+		currentVideoId,
+	}: {
+		isrc: string;
+		currentTrackId?: string;
+		currentVideoId?: string;
+	}): Promise<{
+		kind: 'track' | 'video';
+		id: string;
+		releaseId: string;
+	} | null> {
+		const normalizedIsrc = isrc.trim().toUpperCase();
+
+		const trackQb = this.manager
+			.getRepository(Track)
+			.createQueryBuilder('otherTrack')
+			.select([
+				'otherTrack.id',
+				'otherTrack.releaseId',
+				'otherTrack.isrc',
+			])
+			.where('UPPER(BTRIM(otherTrack.isrc)) = :isrc', {
+				isrc: normalizedIsrc,
+			});
+
+		if (currentTrackId) {
+			trackQb.andWhere('otherTrack.id <> :currentTrackId', {
+				currentTrackId,
+			});
+		}
+
+		const trackConflict = await trackQb.getOne();
+
+		if (trackConflict) {
+			return {
+				kind: 'track',
+				id: trackConflict.id,
+				releaseId: trackConflict.releaseId,
+			};
+		}
+
+		const videoQb = this.manager
+			.getRepository(Video)
+			.createQueryBuilder('otherVideo')
+			.select([
+				'otherVideo.id',
+				'otherVideo.releaseId',
+				'otherVideo.isrc',
+			])
+			.where('UPPER(BTRIM(otherVideo.isrc)) = :isrc', {
+				isrc: normalizedIsrc,
+			});
+
+		if (currentVideoId) {
+			videoQb.andWhere('otherVideo.id <> :currentVideoId', {
+				currentVideoId,
+			});
+		}
+
+		const videoConflict = await videoQb.getOne();
+
+		if (videoConflict) {
+			return {
+				kind: 'video',
+				id: videoConflict.id,
+				releaseId: videoConflict.releaseId,
+			};
+		}
+
+		return null;
 	}
 }

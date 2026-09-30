@@ -15,6 +15,14 @@ export enum ReleaseTimeMode {
 	SPECIFIC_TIMEZONE = 'specific_timezone',
 }
 
+export const ReleaseContentType = {
+	AUDIO: 'audio',
+	VIDEO: 'video',
+} as const;
+
+export type ReleaseContentType =
+	(typeof ReleaseContentType)[keyof typeof ReleaseContentType];
+
 export type ReleaseStatusNonDraft = Exclude<ReleaseStatus, ReleaseStatus.DRAFT>;
 
 export enum FieldOrderRelease {
