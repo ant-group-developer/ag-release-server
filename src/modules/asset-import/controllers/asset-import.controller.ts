@@ -25,6 +25,7 @@ import {
 } from 'src/modules/etl/services/import-jobs/job-events.gateway';
 import {
 	ApplyAssetImportDto,
+	MergeAssetImportDuplicatesDto,
 	PresignAssetImportDto,
 	QueryAssetImportBatchDto,
 	QueryAssetImportItemDto,
@@ -171,7 +172,7 @@ export class AssetImportController {
 	})
 	async mergeDuplicates(
 		@Param('batchId', ParseUUIDPipe) batchId: string,
-		@Body() dto: ApplyAssetImportDto,
+		@Body() dto: MergeAssetImportDuplicatesDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({

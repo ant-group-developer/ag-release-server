@@ -55,4 +55,23 @@ export class ApplyReleaseMergeItemsDto {
 	@IsArray()
 	@IsUUID('4', { each: true })
 	excludeItemIds?: string[];
+
+	@ApiPropertyOptional({
+		description:
+			'Force merge manual pairs that are blocked only by UPC_NOT_EQUIVALENT',
+		default: false,
+	})
+	@IsOptional()
+	@Transform(toBoolean)
+	@IsBoolean()
+	force: boolean = false;
+
+	@ApiPropertyOptional({
+		description: 'Retry các item FAILED trong lần apply trước',
+		default: false,
+	})
+	@IsOptional()
+	@Transform(toBoolean)
+	@IsBoolean()
+	retryFailed: boolean = false;
 }

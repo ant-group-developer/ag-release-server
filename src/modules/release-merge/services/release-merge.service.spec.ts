@@ -83,4 +83,22 @@ describe('ReleaseMergeService pair planning', () => {
 		expect(plan.autoSafe).toBe(false);
 		expect(plan.reasonCodes).toContain('SOURCE_NOT_IMPORTED');
 	});
+
+	it('allows force only for structurally identical pairs blocked by UPC', () => {
+		const plan = service.buildPairPlan(
+			release({ ...source, upc: '1111111111111' }),
+			target,
+			[
+				track({ releaseId: target.id }),
+				track({
+					id: 'track00002',
+					releaseId: source.id,
+					isImportedFromReport: true,
+				}),
+			],
+		);
+
+		expect(plan.reasonCodes).toEqual(['UPC_NOT_EQUIVALENT']);
+		expect(service.isForceEligible(plan)).toBe(true);
+	});
 });

@@ -157,8 +157,22 @@ export class ReleaseMergeScanService {
 		}
 		const where: any = {
 			runId,
-			classification: ReleaseMergeItemClassification.AUTO_SAFE,
-			status: ReleaseMergeItemStatus.PENDING,
+			classification: dto.force
+				? ReleaseMergeItemClassification.MANUAL_REVIEW
+				: ReleaseMergeItemClassification.AUTO_SAFE,
+			status: dto.force
+				? dto.retryFailed
+					? In([
+							ReleaseMergeItemStatus.MANUAL_REVIEW,
+							ReleaseMergeItemStatus.FAILED,
+						])
+					: ReleaseMergeItemStatus.MANUAL_REVIEW
+				: dto.retryFailed
+					? In([
+							ReleaseMergeItemStatus.PENDING,
+							ReleaseMergeItemStatus.FAILED,
+						])
+					: ReleaseMergeItemStatus.PENDING,
 		};
 		let items: ReleaseMergeItem[];
 		if (dto.selectAll) {
@@ -179,9 +193,18 @@ export class ReleaseMergeScanService {
 				order: { createdAt: 'ASC' },
 			});
 		}
+		if (dto.force) {
+			items = items.filter((item) => this.isForceEligibleItem(item));
+		}
 		if (!items.length)
 			throw new BadRequestException(
-				'No AUTO_SAFE pending merge item selected',
+				dto.force
+					? dto.retryFailed
+						? 'No force-eligible manual merge item is pending or failed'
+						: 'No force-eligible manual merge item selected'
+					: dto.retryFailed
+						? 'No AUTO_SAFE merge item is pending or failed'
+						: 'No AUTO_SAFE pending merge item selected',
 			);
 
 		await this.runRepo.update(runId, {
@@ -189,21 +212,40 @@ export class ReleaseMergeScanService {
 			errorMessage: null,
 			completedAt: null,
 		});
-		void this.applyItems(runId, items, userId).catch(async (error: any) => {
-			this.logger.error(`Merge run ${runId} failed: ${error.message}`);
-			await this.runRepo.update(runId, {
-				status: ReleaseMergeRunStatus.FAILED,
-				errorMessage: error.message,
-				completedAt: new Date(),
-			});
-		});
+		void this.applyItems(runId, items, userId, dto.force).catch(
+			async (error: any) => {
+				this.logger.error(
+					`Merge run ${runId} failed: ${error.message}`,
+				);
+				await this.runRepo.update(runId, {
+					status: ReleaseMergeRunStatus.FAILED,
+					errorMessage: error.message,
+					completedAt: new Date(),
+				});
+			},
+		);
 		return { runId, totalSelected: items.length };
+	}
+
+	private isForceEligibleItem(item: ReleaseMergeItem): boolean {
+		return (
+			item.classification ===
+				ReleaseMergeItemClassification.MANUAL_REVIEW &&
+			(item.status === ReleaseMergeItemStatus.MANUAL_REVIEW ||
+				item.status === ReleaseMergeItemStatus.FAILED) &&
+			item.reasonCodes.length === 1 &&
+			item.reasonCodes[0] === 'UPC_NOT_EQUIVALENT' &&
+			item.sharedIsrcs.length > 0 &&
+			item.sourceOnlyIsrcs.length === 0 &&
+			item.targetOnlyIsrcs.length === 0
+		);
 	}
 
 	private async applyItems(
 		runId: string,
 		items: ReleaseMergeItem[],
 		userId: string,
+		force = false,
 	): Promise<void> {
 		let failed = 0;
 		for (const item of items) {
@@ -217,6 +259,7 @@ export class ReleaseMergeScanService {
 					targetReleaseId: item.targetReleaseId,
 					mergeItemId: item.id,
 					userId,
+					force,
 				});
 			} catch (error: any) {
 				failed++;
@@ -245,7 +288,7 @@ export class ReleaseMergeScanService {
 		});
 		await this.runRepo.update(runId, {
 			status:
-				failed > 0 || remaining > 0
+				failedCandidates > 0 || remaining > 0
 					? ReleaseMergeRunStatus.PARTIALLY_APPLIED
 					: ReleaseMergeRunStatus.APPLIED,
 			appliedCandidates,

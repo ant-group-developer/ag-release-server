@@ -26,6 +26,7 @@ import {
 } from '../constants/asset-import.constant';
 import {
 	ApplyAssetImportDto,
+	MergeAssetImportDuplicatesDto,
 	PresignAssetImportDto,
 	ScanAssetImportDto,
 } from '../dto/asset-import.dto';
@@ -325,18 +326,22 @@ export class AssetImportService {
 			const sources = [];
 			for (const sourceReleaseId of group.sourceReleaseIds) {
 				try {
+					const plan = await this.releaseMergeService.preparePair(
+						sourceReleaseId,
+						group.targetReleaseId,
+					);
 					sources.push({
 						sourceReleaseId,
-						plan: await this.releaseMergeService.preparePair(
-							sourceReleaseId,
-							group.targetReleaseId,
-						),
+						plan,
+						forceEligible:
+							this.releaseMergeService.isForceEligible(plan),
 						error: null,
 					});
 				} catch (error: any) {
 					sources.push({
 						sourceReleaseId,
 						plan: null,
+						forceEligible: false,
 						error: error.message,
 					});
 				}
@@ -362,7 +367,7 @@ export class AssetImportService {
 	 */
 	async mergeDuplicates(
 		batchId: string,
-		dto: ApplyAssetImportDto,
+		dto: MergeAssetImportDuplicatesDto,
 		userId: string,
 	): Promise<{
 		batchId: string;
@@ -371,6 +376,11 @@ export class AssetImportService {
 	}> {
 		const batch = await this.getBatchOrFail(batchId);
 		this.assertBatchIdle(batch);
+		if (dto.force && !dto.sourceReleaseIds?.length) {
+			throw new BadRequestException(
+				'Cần sourceReleaseIds khi force merge để tránh merge nhầm cả batch',
+			);
+		}
 
 		const pairs = await this.collectMergePairs(batchId, dto);
 		if (!pairs.length) {
@@ -386,7 +396,12 @@ export class AssetImportService {
 			progressTotal: pairs.length,
 			tenantId: batch.targetTenantId,
 			createdBy: userId,
-			params: { batchId, totalPairs: pairs.length },
+			params: {
+				batchId,
+				totalPairs: pairs.length,
+				force: dto.force,
+				sourceReleaseIds: dto.sourceReleaseIds ?? [],
+			},
 		});
 
 		await this.batchRepo.update(batchId, {
@@ -401,6 +416,7 @@ export class AssetImportService {
 			job.id,
 			userId,
 			previousStatus,
+			dto.force,
 		).catch((err) => {
 			this.logger.error(
 				`Batch ${batchId} merge lỗi ngoài job: ${this.errorText(err)}`,
@@ -433,7 +449,7 @@ export class AssetImportService {
 	/** Một cặp release, không phải một dòng file. Không load rawData. */
 	private async collectMergePairs(
 		batchId: string,
-		dto: ApplyAssetImportDto,
+		dto: MergeAssetImportDuplicatesDto,
 	): Promise<{ sourceReleaseId: string; targetReleaseId: string }[]> {
 		const params: unknown[] = [batchId];
 		let idFilter = '';
@@ -451,6 +467,11 @@ export class AssetImportService {
 			params.push(dto.itemIds);
 			idFilter = `AND id = ANY($${params.length}::uuid[])`;
 		}
+		let sourceFilter = '';
+		if (dto.sourceReleaseIds?.length) {
+			params.push(dto.sourceReleaseIds);
+			sourceFilter = `AND src = ANY($${params.length}::text[])`;
+		}
 
 		const rows: { sourceReleaseId: string; targetReleaseId: string }[] =
 			await this.dataSource.query(
@@ -466,7 +487,8 @@ export class AssetImportService {
 				   AND status = 'PENDING'
 				   AND canonical_release_id IS NOT NULL
 				   AND src <> ''
-				   ${idFilter}`,
+				   ${idFilter}
+				   ${sourceFilter}`,
 				params,
 			);
 		return rows;
@@ -478,6 +500,7 @@ export class AssetImportService {
 		jobId: string,
 		userId: string,
 		previousStatus: AssetImportBatchStatus,
+		force = false,
 	): Promise<void> {
 		let merged = 0;
 		let failed = 0;
@@ -492,6 +515,7 @@ export class AssetImportService {
 						sourceReleaseId: pair.sourceReleaseId,
 						targetReleaseId: pair.targetReleaseId,
 						userId,
+						force,
 					});
 					merged++;
 				} catch (error) {
@@ -659,7 +683,9 @@ export class AssetImportService {
 		const items = await this.selectItems(batchId, dto);
 		if (!items.length) {
 			throw new BadRequestException(
-				'Không có item nào ở trạng thái PENDING khớp lựa chọn',
+				dto.retryFailed
+					? 'Không có item nào ở trạng thái PENDING hoặc FAILED để retry khớp lựa chọn'
+					: 'Không có item nào ở trạng thái PENDING khớp lựa chọn',
 			);
 		}
 
@@ -761,6 +787,9 @@ export class AssetImportService {
 		batchId: string,
 		dto: ApplyAssetImportDto,
 	): Promise<AssetImportItem[]> {
+		const selectableStatuses = dto.retryFailed
+			? [AssetImportItemStatus.PENDING, AssetImportItemStatus.FAILED]
+			: [AssetImportItemStatus.PENDING];
 		if (!dto.selectAll) {
 			if (!dto.itemIds?.length) {
 				throw new BadRequestException(
@@ -771,7 +800,7 @@ export class AssetImportService {
 				where: {
 					batchId,
 					id: In(dto.itemIds),
-					status: AssetImportItemStatus.PENDING,
+					status: In(selectableStatuses),
 				},
 				order: { rowNumber: 'ASC' },
 			});
@@ -780,7 +809,7 @@ export class AssetImportService {
 		return this.itemRepo.find({
 			where: {
 				batchId,
-				status: AssetImportItemStatus.PENDING,
+				status: In(selectableStatuses),
 				...(dto.action ? { action: dto.action } : {}),
 				...(dto.excludeItemIds?.length
 					? { id: Not(In(dto.excludeItemIds)) }

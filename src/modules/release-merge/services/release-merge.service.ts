@@ -47,6 +47,7 @@ export interface ApplyReleaseMergeInput {
 	targetReleaseId: string;
 	mergeItemId?: string | null;
 	userId?: string | null;
+	force?: boolean;
 }
 
 export interface ApplyReleaseMergeResult {
@@ -178,7 +179,7 @@ export class ReleaseMergeService {
 			.orderBy('track.order', 'ASC')
 			.getMany();
 		const plan = this.buildPairPlan(source, target, tracks);
-		if (!plan.autoSafe) {
+		if (!plan.autoSafe && !(input.force && this.isForceEligible(plan))) {
 			throw new ConflictException(
 				`Merge is not auto-safe: ${plan.reasonCodes.join(', ')}`,
 			);
@@ -339,6 +340,21 @@ export class ReleaseMergeService {
 			mergedTrackCount: matchedSourceTracks.length,
 			idempotent: false,
 		};
+	}
+
+	/**
+	 * Force is intentionally narrow: only a structurally identical imported
+	 * release pair blocked by a non-equivalent UPC can bypass auto-safe mode.
+	 */
+	isForceEligible(plan: ReleaseMergePairPlan): boolean {
+		return (
+			!plan.autoSafe &&
+			plan.reasonCodes.length === 1 &&
+			plan.reasonCodes[0] === 'UPC_NOT_EQUIVALENT' &&
+			plan.sharedIsrcs.length > 0 &&
+			plan.sourceOnlyIsrcs.length === 0 &&
+			plan.targetOnlyIsrcs.length === 0
+		);
 	}
 
 	buildPairPlan(
