@@ -421,10 +421,13 @@ export class AnalyticsReportExportService {
 		const pad = (n: number) => String(n).padStart(2, '0');
 		const now = new Date();
 		const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+		const currency = (dto.currency ?? 'USD').toUpperCase();
 		const suffix =
 			dto.exportMode === 'statement'
 				? 'statement-report'
-				: 'analytics-report';
+				: currency === 'USD'
+					? 'analytics-report'
+					: `analytics-report_${currency}`;
 		return `workspace_${suffix}_${dto.fromDate}_${dto.endDate}_${timestamp}.zip`;
 	}
 }

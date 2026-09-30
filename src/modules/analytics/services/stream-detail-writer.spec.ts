@@ -1,7 +1,22 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { CsvStreamDetailWriter } from './stream-detail-writer';
+import { CsvStreamDetailWriter, multiplyDecimal } from './stream-detail-writer';
+
+describe('multiplyDecimal', () => {
+	it('multiplies a grouped USD amount by a VND rate at scale 18', () => {
+		expect(multiplyDecimal('10.5', '25434')).toBe('267057');
+	});
+
+	it('rounds half away from zero to 18 decimal places', () => {
+		expect(multiplyDecimal('0.000000000000000001', '1.5')).toBe(
+			'0.000000000000000002',
+		);
+		expect(multiplyDecimal('-0.000000000000000001', '1.5')).toBe(
+			'-0.000000000000000002',
+		);
+	});
+});
 
 describe('CsvStreamDetailWriter', () => {
 	it('can reopen a flushed detail file in append mode without duplicating its header', async () => {

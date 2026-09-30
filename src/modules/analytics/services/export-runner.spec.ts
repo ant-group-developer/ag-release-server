@@ -291,3 +291,210 @@ describe('ExportRunner statement-currency mapping', () => {
 		expect(result.fileName).toContain('_statement-report_');
 	});
 });
+
+describe('ExportRunner reporting currency', () => {
+	function rawRow(revenue: string) {
+		return {
+			date: '2026-01',
+			start_date: '2026-01-01',
+			end_date: '2026-01-31',
+			tenant_id: 'system-tenant',
+			isrc: 'ISRC-1',
+			fallback_upc: '',
+			fallback_track_title: 'Track',
+			fallback_album_title: 'Album',
+			fallback_artist_name: 'Artist',
+			fallback_label_name: 'Label',
+			dsp_name: 'DSP',
+			territory: 'VN',
+			total_usage: '1',
+			revenue_amount: revenue,
+			revenue_usd: revenue,
+			currency: 'USD',
+		};
+	}
+
+	it('keeps the USD stream and amount unchanged', async () => {
+		let streamedSql = '';
+		const chQuery = jest.fn();
+		const upload = jest.fn(({ filePath }) => {
+			const zip = new AdmZip(filePath);
+			const detail = zip
+				.readAsText('System_Tenant/detail.csv')
+				.replace(/^\uFEFF/, '');
+			const summary = zip.readAsText('System_Tenant/summary.csv');
+			expect(detail).toContain('10.5,USD');
+			expect(summary).toContain('RevenueUsd,Currency');
+			expect(summary).toContain('10.5,USD');
+		});
+		const deps = {
+			pgQuery: jest.fn().mockResolvedValue([]),
+			chQuery,
+			chQueryStream: async (
+				sql: string,
+				_params: unknown,
+				onRows: any,
+			) => {
+				streamedSql = sql;
+				await onRows([rawRow('10.5')]);
+				return 1;
+			},
+			r2Upload: upload,
+			r2SignedUrlDown: jest
+				.fn()
+				.mockResolvedValue('https://example.test/usd.zip'),
+		} as unknown as ExportRunnerDeps;
+
+		const result = await new ExportRunner(deps, 'job-usd').run(
+			'system-tenant',
+			{ fromDate: '2026-01', endDate: '2026-01', format: 'csv' },
+		);
+
+		expect(chQuery).not.toHaveBeenCalled();
+		expect(streamedSql).not.toContain('exchange_rates');
+		expect(streamedSql).not.toContain('multiplyDecimal');
+		expect(result.fileName).toContain('_analytics-report_');
+		expect(result.fileName).not.toContain('_VND_');
+		expect(upload).toHaveBeenCalledTimes(1);
+	});
+
+	it('multiplies each grouped detail row and sums the converted amounts', async () => {
+		let streamedSql = '';
+		const chQuery = jest.fn(async (sql: string) => {
+			if (sql.includes('system.parts')) return [{ partition: '202601' }];
+			if (sql.includes('exchange_rates')) {
+				return [{ rate_month: '2026-01', usd_to_local_rate: '25434' }];
+			}
+			throw new Error(sql);
+		});
+		const chQueryStream = jest.fn(
+			async (sql: string, _params: unknown, onRows: any) => {
+				streamedSql = sql;
+				await onRows([
+					rawRow('10.5'),
+					{ ...rawRow('1'), isrc: 'ISRC-2' },
+				]);
+				return 2;
+			},
+		);
+		const upload = jest.fn(({ filePath }) => {
+			const zip = new AdmZip(filePath);
+			const detail = zip
+				.readAsText('System_Tenant/detail.csv')
+				.replace(/^\uFEFF/, '');
+			const summary = zip.readAsText('System_Tenant/summary.csv');
+			expect(detail).toContain('267057,VND');
+			expect(detail).toContain('25434,VND');
+			expect(detail).not.toContain('10.5,VND');
+			expect(summary).toContain('Revenue,Currency');
+			expect(summary).not.toContain('RevenueUsd');
+			expect(summary).toContain('292491,VND');
+		});
+		const deps = {
+			pgQuery: jest.fn().mockResolvedValue([]),
+			chQuery,
+			chQueryStream,
+			r2Upload: upload,
+			r2SignedUrlDown: jest
+				.fn()
+				.mockResolvedValue('https://example.test/vnd.zip'),
+		} as unknown as ExportRunnerDeps;
+
+		const result = await new ExportRunner(deps, 'job-vnd').run(
+			'system-tenant',
+			{
+				fromDate: '2026-01',
+				endDate: '2026-01',
+				format: 'csv',
+				currency: 'VND',
+			},
+		);
+
+		expect(chQueryStream).toHaveBeenCalledTimes(1);
+		expect(streamedSql).not.toContain('exchange_rates');
+		expect(streamedSql).not.toContain('multiplyDecimal');
+		expect(result.fileName).toContain('_analytics-report_VND_');
+		expect(upload).toHaveBeenCalledTimes(1);
+	});
+
+	it('fails before streaming when a cube month has no rate', async () => {
+		const chQueryStream = jest.fn();
+		const deps = {
+			pgQuery: jest.fn(),
+			chQuery: jest.fn(async (sql: string) => {
+				if (sql.includes('system.parts')) {
+					return [{ partition: '202601' }, { partition: '202602' }];
+				}
+				if (sql.includes('exchange_rates')) {
+					return [
+						{ rate_month: '2026-01', usd_to_local_rate: '25434' },
+					];
+				}
+				throw new Error(sql);
+			}),
+			chQueryStream,
+			r2Upload: jest.fn(),
+			r2SignedUrlDown: jest.fn(),
+		} as unknown as ExportRunnerDeps;
+
+		await expect(
+			new ExportRunner(deps, 'job-missing-rate').run('system-tenant', {
+				fromDate: '2026-01',
+				endDate: '2026-02',
+				format: 'csv',
+				currency: 'VND',
+			}),
+		).rejects.toThrow(/Missing VND exchange rate for month\(s\): 2026-02/);
+		expect(chQueryStream).not.toHaveBeenCalled();
+	});
+
+	it('falls back to the period column when system.parts is not readable', async () => {
+		const chQuery = jest.fn(async (sql: string) => {
+			if (sql.includes('system.parts')) {
+				throw new Error('Not enough privileges');
+			}
+			if (sql.includes('formatDateTime(period')) {
+				return [{ rate_month: '2026-01' }];
+			}
+			if (sql.includes('exchange_rates')) {
+				return [{ rate_month: '2026-01', usd_to_local_rate: '2' }];
+			}
+			throw new Error(sql);
+		});
+		const upload = jest.fn(({ filePath }) => {
+			const zip = new AdmZip(filePath);
+			const detail = zip
+				.readAsText('System_Tenant/detail.csv')
+				.replace(/^\uFEFF/, '');
+			expect(detail).toContain('21,GBP');
+		});
+		const deps = {
+			pgQuery: jest.fn().mockResolvedValue([]),
+			chQuery,
+			chQueryStream: async (
+				_sql: string,
+				_params: unknown,
+				onRows: any,
+			) => {
+				await onRows([rawRow('10.5')]);
+				return 1;
+			},
+			r2Upload: upload,
+			r2SignedUrlDown: jest
+				.fn()
+				.mockResolvedValue('https://example.test/gbp.zip'),
+		} as unknown as ExportRunnerDeps;
+
+		await new ExportRunner(deps, 'job-gbp').run('system-tenant', {
+			fromDate: '2026-01',
+			endDate: '2026-01',
+			format: 'csv',
+			currency: 'GBP',
+		});
+
+		expect(chQuery.mock.calls.map((call) => call[0]).join('\n')).toContain(
+			'formatDateTime(period',
+		);
+		expect(upload).toHaveBeenCalledTimes(1);
+	});
+});

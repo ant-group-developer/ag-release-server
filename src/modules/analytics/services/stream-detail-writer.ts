@@ -215,6 +215,78 @@ export function formatRevenueSum(acc: SummaryAccumulator): string {
 	return `${negative ? '-' : ''}${whole}${frac ? `.${frac}` : ''}`;
 }
 
+const REPORTING_RESULT_SCALE = 18;
+
+interface ParsedDecimal {
+	negative: boolean;
+	units: bigint;
+	scale: number;
+}
+
+function parseDecimal(value: string): ParsedDecimal {
+	const text = String(value ?? '').trim();
+	const match = text.match(/^([+-])?(\d*)(?:\.(\d*))?$/);
+	if (!match || (!match[2] && match[3] == null)) {
+		throw new Error(`Invalid decimal: ${value}`);
+	}
+	const whole = match[2] || '0';
+	const frac = match[3] || '';
+	const digits = `${whole}${frac}`.replace(/^0+(?=\d)/, '') || '0';
+	const units = BigInt(digits);
+	if (units === 0n) return { negative: false, units: 0n, scale: 0 };
+	return { negative: match[1] === '-', units, scale: frac.length };
+}
+
+function roundHalfAwayFromZero(
+	units: bigint,
+	scale: number,
+	resultScale: number,
+): bigint {
+	if (scale <= resultScale) {
+		return units * 10n ** BigInt(resultScale - scale);
+	}
+	const divisor = 10n ** BigInt(scale - resultScale);
+	const truncated = units / divisor;
+	const remainder = units % divisor;
+	return remainder * 2n >= divisor ? truncated + 1n : truncated;
+}
+
+function formatScaledDecimal(
+	units: bigint,
+	scale: number,
+	negative: boolean,
+): string {
+	if (units === 0n) return '0';
+	const digits = units.toString().padStart(scale + 1, '0');
+	const whole = digits.slice(0, digits.length - scale);
+	const frac = digits.slice(digits.length - scale).replace(/0+$/, '');
+	return `${negative ? '-' : ''}${whole}${frac ? `.${frac}` : ''}`;
+}
+
+/**
+ * Multiply two decimal strings and round half away from zero to `resultScale`.
+ * Matches ClickHouse multiplyDecimal(..., result_scale) without going through float.
+ */
+export function multiplyDecimal(
+	amount: string,
+	rate: string,
+	resultScale = REPORTING_RESULT_SCALE,
+): string {
+	const left = parseDecimal(amount);
+	const right = parseDecimal(rate);
+	if (left.units === 0n || right.units === 0n) return '0';
+	const rounded = roundHalfAwayFromZero(
+		left.units * right.units,
+		left.scale + right.scale,
+		resultScale,
+	);
+	return formatScaledDecimal(
+		rounded,
+		resultScale,
+		left.negative !== right.negative,
+	);
+}
+
 export function updateAccumulator(
 	acc: SummaryAccumulator,
 	row: DetailRowLike,

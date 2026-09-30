@@ -44,8 +44,16 @@ function fakeDataSource(data: {
 	labels?: any[];
 	tenants?: any[];
 }): DataSource {
+	const trackQueryBuilder = {
+		where: jest.fn().mockReturnThis(),
+		orderBy: jest.fn().mockReturnThis(),
+		getMany: jest.fn().mockResolvedValue(data.tracks ?? []),
+	};
 	const repos: Record<string, any> = {
-		Track: { find: jest.fn().mockResolvedValue(data.tracks ?? []) },
+		Track: {
+			find: jest.fn().mockResolvedValue(data.tracks ?? []),
+			createQueryBuilder: jest.fn().mockReturnValue(trackQueryBuilder),
+		},
 		Release: { find: jest.fn().mockResolvedValue(data.releases ?? []) },
 		Label: { find: jest.fn().mockResolvedValue(data.labels ?? []) },
 		Tenant: { find: jest.fn().mockResolvedValue(data.tenants ?? []) },
@@ -162,6 +170,41 @@ describe('AssetImportScanService', () => {
 		expect(items[0].matchedTrackId).toBeNull();
 	});
 
+	it('không âm thầm chọn release cũ nhất khi UPC có canonical và report source', async () => {
+		const service = new AssetImportScanService(
+			fakeDataSource({
+				releases: [
+					{
+						id: 'relCanonical',
+						upc: '8809633000028',
+						tenantId: TARGET_TENANT,
+						labelId: null,
+						isImportedFromReport: false,
+					},
+					{
+						id: 'relReport',
+						upc: '8809633000028',
+						tenantId: WRONG_TENANT,
+						labelId: null,
+						isImportedFromReport: true,
+					},
+				],
+			}),
+		);
+
+		const { items } = await service.scan(
+			[row({ upc: '8809633000028' })],
+			context,
+		);
+
+		expect(items[0]).toMatchObject({
+			action: AssetImportAction.MERGE_REQUIRED,
+			matchType: AssetImportMatchType.UPC,
+			canonicalReleaseId: 'relCanonical',
+			duplicateSourceReleaseIds: ['relReport'],
+		});
+	});
+
 	it('đánh dấu CONFLICT khi một ISRC thuộc nhiều release', async () => {
 		const service = new AssetImportScanService(
 			fakeDataSource({
@@ -183,6 +226,55 @@ describe('AssetImportScanService', () => {
 
 		expect(items[0].action).toBe(AssetImportAction.CONFLICT);
 		expect(summary.conflict).toBe(1);
+	});
+
+	it('đánh dấu MERGE_REQUIRED khi một ISRC có canonical và report source', async () => {
+		const service = new AssetImportScanService(
+			fakeDataSource({
+				tracks: [
+					{
+						id: 'trkCanonical',
+						isrc: 'VNA682200002',
+						releaseId: 'relCanonical',
+						isImportedFromReport: false,
+					},
+					{
+						id: 'trkReport',
+						isrc: 'VNA682200002',
+						releaseId: 'relReport',
+						isImportedFromReport: true,
+					},
+				],
+				releases: [
+					{
+						id: 'relCanonical',
+						tenantId: TARGET_TENANT,
+						labelId: null,
+						isImportedFromReport: false,
+					},
+					{
+						id: 'relReport',
+						tenantId: WRONG_TENANT,
+						labelId: null,
+						isImportedFromReport: true,
+					},
+				],
+			}),
+		);
+
+		const { items, summary } = await service.scan(
+			[row({ isrc: 'VNA682200002' })],
+			context,
+		);
+
+		expect(items[0]).toMatchObject({
+			action: AssetImportAction.MERGE_REQUIRED,
+			requiresMerge: true,
+			canonicalReleaseId: 'relCanonical',
+			canonicalTrackId: 'trkCanonical',
+			duplicateSourceReleaseIds: ['relReport'],
+		});
+		expect(summary.mergeRequired).toBe(1);
 	});
 
 	it('NO_CHANGE khi tenant và label đã đúng', async () => {

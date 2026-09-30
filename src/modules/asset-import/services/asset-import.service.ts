@@ -10,6 +10,7 @@ import { basename, extname } from 'path';
 import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
 import { ImportJobSourceType } from 'src/modules/etl/interfaces';
 import { ImportJobsService } from 'src/modules/etl/services/import-jobs/import-jobs.service';
+import { ReleaseMergeService } from 'src/modules/release-merge/services/release-merge.service';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { DataSource, In, Not, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
@@ -25,18 +26,21 @@ import {
 } from '../constants/asset-import.constant';
 import {
 	ApplyAssetImportDto,
+	MergeAssetImportDuplicatesDto,
 	PresignAssetImportDto,
 	ScanAssetImportDto,
 } from '../dto/asset-import.dto';
 import { AssetImportBatch } from '../entities/asset-import-batch.entity';
 import { AssetImportItem } from '../entities/asset-import-item.entity';
 import {
+	AssetImportAction,
 	AssetImportBatchStatus,
 	AssetImportItemStatus,
 } from '../enum/asset-import.enum';
 import {
 	AssetImportOptions,
 	AssetImportScanSummary,
+	ParsedAssetRow,
 	ScannedAssetRow,
 } from '../interfaces/asset-import.interface';
 import { AssetImportApplyService } from './asset-import-apply.service';
@@ -64,6 +68,7 @@ export class AssetImportService {
 		private readonly parserService: AssetImportParserService,
 		private readonly scanService: AssetImportScanService,
 		private readonly applyService: AssetImportApplyService,
+		private readonly releaseMergeService: ReleaseMergeService,
 		private readonly importJobsService: ImportJobsService,
 		private readonly r2Service: BucketR2Service,
 	) {}
@@ -127,8 +132,9 @@ export class AssetImportService {
 	}> {
 		await this.assertTenantExists(dto.targetTenantId);
 
-		const buffer = await this.readUploadedFile(dto.r2Key);
-		const fileName = basename(dto.r2Key);
+		const fileKey = dto.r2Key.trim();
+		const buffer = await this.readUploadedFile(fileKey);
+		const fileName = basename(fileKey);
 
 		const rows = this.parserService.parse(buffer);
 		const options: AssetImportOptions = {
@@ -152,7 +158,7 @@ export class AssetImportService {
 			createdBy: userId,
 			params: {
 				targetTenantId: dto.targetTenantId,
-				r2Key: dto.r2Key,
+				r2Key: fileKey,
 				options,
 				effectiveDate,
 				revenueEffectiveFrom,
@@ -162,6 +168,7 @@ export class AssetImportService {
 		const batch = await this.batchRepo.save(
 			this.batchRepo.create({
 				fileName,
+				fileKey,
 				fileHash: createHash('sha256').update(buffer).digest('hex'),
 				targetTenantId: dto.targetTenantId,
 				// Label luôn lấy theo cột Label Name trong file; cột này giữ lại
@@ -246,6 +253,11 @@ export class AssetImportService {
 					matchedTrackId: row.matchedTrackId,
 					currentTenantId: row.currentTenantId,
 					currentLabelId: row.currentLabelId,
+					duplicateClassification: row.duplicateClassification,
+					canonicalReleaseId: row.canonicalReleaseId,
+					canonicalTrackId: row.canonicalTrackId,
+					duplicateSourceReleaseIds: row.duplicateSourceReleaseIds,
+					requiresMerge: row.requiresMerge,
 					changes: row.changes,
 					status: AssetImportItemStatus.PENDING,
 					errorMessage: row.errorMessage,
@@ -273,6 +285,374 @@ export class AssetImportService {
 	private normalizeRevenueMonth(value: string): string {
 		const date = this.normalizeDate(value, 'revenueEffectiveFrom');
 		return `${date.slice(0, 7)}-01`;
+	}
+
+	async getMergeImpact(batchId: string) {
+		await this.getBatchOrFail(batchId);
+		const items = await this.itemRepo.find({
+			where: {
+				batchId,
+				action: AssetImportAction.MERGE_REQUIRED,
+				status: AssetImportItemStatus.PENDING,
+			},
+			order: { rowNumber: 'ASC' },
+		});
+		const groups = new Map<
+			string,
+			{
+				targetReleaseId: string;
+				sourceReleaseIds: Set<string>;
+				itemIds: string[];
+				isrcs: Set<string>;
+			}
+		>();
+		for (const item of items) {
+			if (!item.canonicalReleaseId) continue;
+			const group = groups.get(item.canonicalReleaseId) ?? {
+				targetReleaseId: item.canonicalReleaseId,
+				sourceReleaseIds: new Set<string>(),
+				itemIds: [],
+				isrcs: new Set<string>(),
+			};
+			(item.duplicateSourceReleaseIds ?? []).forEach((id) =>
+				group.sourceReleaseIds.add(id),
+			);
+			group.itemIds.push(item.id);
+			if (item.isrc) group.isrcs.add(item.isrc);
+			groups.set(item.canonicalReleaseId, group);
+		}
+		const detailedGroups = [];
+		for (const group of groups.values()) {
+			const sources = [];
+			for (const sourceReleaseId of group.sourceReleaseIds) {
+				try {
+					const plan = await this.releaseMergeService.preparePair(
+						sourceReleaseId,
+						group.targetReleaseId,
+					);
+					sources.push({
+						sourceReleaseId,
+						plan,
+						forceEligible:
+							this.releaseMergeService.isForceEligible(plan),
+						error: null,
+					});
+				} catch (error: any) {
+					sources.push({
+						sourceReleaseId,
+						plan: null,
+						forceEligible: false,
+						error: error.message,
+					});
+				}
+			}
+			detailedGroups.push({
+				targetReleaseId: group.targetReleaseId,
+				itemIds: group.itemIds,
+				isrcs: [...group.isrcs],
+				sources,
+			});
+		}
+
+		return {
+			totalItems: items.length,
+			totalTargets: groups.size,
+			groups: detailedGroups,
+		};
+	}
+
+	/**
+	 * Gộp các cặp release rồi rescan. Chạy nền: proxy Next của `/api/v1` cắt
+	 * request sau 30 giây và trả 500 dù handler còn chạy.
+	 */
+	async mergeDuplicates(
+		batchId: string,
+		dto: MergeAssetImportDuplicatesDto,
+		userId: string,
+	): Promise<{
+		batchId: string;
+		jobId: string;
+		totalPairs: number;
+	}> {
+		const batch = await this.getBatchOrFail(batchId);
+		this.assertBatchIdle(batch);
+		if (dto.force && !dto.sourceReleaseIds?.length) {
+			throw new BadRequestException(
+				'Cần sourceReleaseIds khi force merge để tránh merge nhầm cả batch',
+			);
+		}
+
+		const pairs = await this.collectMergePairs(batchId, dto);
+		if (!pairs.length) {
+			throw new BadRequestException(
+				'Không có cặp release MERGE_REQUIRED phù hợp',
+			);
+		}
+
+		const previousStatus = batch.status;
+		const job = await this.importJobsService.create({
+			sourceType: ImportJobSourceType.ASSET_IMPORT_MERGE,
+			fileName: batch.fileName,
+			progressTotal: pairs.length,
+			tenantId: batch.targetTenantId,
+			createdBy: userId,
+			params: {
+				batchId,
+				totalPairs: pairs.length,
+				force: dto.force,
+				sourceReleaseIds: dto.sourceReleaseIds ?? [],
+			},
+		});
+
+		await this.batchRepo.update(batchId, {
+			status: AssetImportBatchStatus.APPLYING,
+			applyJobId: job.id,
+			errorMessage: null,
+		});
+
+		void this.runMerge(
+			batchId,
+			pairs,
+			job.id,
+			userId,
+			previousStatus,
+			dto.force,
+		).catch((err) => {
+			this.logger.error(
+				`Batch ${batchId} merge lỗi ngoài job: ${this.errorText(err)}`,
+			);
+		});
+
+		return { batchId, jobId: job.id, totalPairs: pairs.length };
+	}
+
+	async rescanConflicts(batchId: string) {
+		const batch = await this.getBatchOrFail(batchId);
+		this.assertBatchIdle(batch);
+		return this.rescanPendingConflicts(batch);
+	}
+
+	private assertBatchIdle(batch: AssetImportBatch): void {
+		if (
+			batch.status === AssetImportBatchStatus.APPLYING ||
+			batch.status === AssetImportBatchStatus.SCANNING
+		) {
+			throw new BadRequestException(
+				'Batch đang được xử lý, chờ chạy xong',
+			);
+		}
+		if (batch.status === AssetImportBatchStatus.CANCELLED) {
+			throw new BadRequestException('Batch đã bị huỷ');
+		}
+	}
+
+	/** Một cặp release, không phải một dòng file. Không load rawData. */
+	private async collectMergePairs(
+		batchId: string,
+		dto: MergeAssetImportDuplicatesDto,
+	): Promise<{ sourceReleaseId: string; targetReleaseId: string }[]> {
+		const params: unknown[] = [batchId];
+		let idFilter = '';
+		if (dto.selectAll) {
+			if (dto.excludeItemIds?.length) {
+				params.push(dto.excludeItemIds);
+				idFilter = `AND id <> ALL($${params.length}::uuid[])`;
+			}
+		} else {
+			if (!dto.itemIds?.length) {
+				throw new BadRequestException(
+					'Cần itemIds khi selectAll = false',
+				);
+			}
+			params.push(dto.itemIds);
+			idFilter = `AND id = ANY($${params.length}::uuid[])`;
+		}
+		let sourceFilter = '';
+		if (dto.sourceReleaseIds?.length) {
+			params.push(dto.sourceReleaseIds);
+			sourceFilter = `AND src = ANY($${params.length}::text[])`;
+		}
+
+		const rows: { sourceReleaseId: string; targetReleaseId: string }[] =
+			await this.dataSource.query(
+				`SELECT DISTINCT
+				   src AS "sourceReleaseId",
+				   canonical_release_id::text AS "targetReleaseId"
+				 FROM asset_import_items
+				 CROSS JOIN LATERAL jsonb_array_elements_text(
+				   COALESCE(duplicate_source_release_ids, '[]'::jsonb)
+				 ) AS src
+				 WHERE batch_id = $1
+				   AND action = 'MERGE_REQUIRED'
+				   AND status = 'PENDING'
+				   AND canonical_release_id IS NOT NULL
+				   AND src <> ''
+				   ${idFilter}
+				   ${sourceFilter}`,
+				params,
+			);
+		return rows;
+	}
+
+	private async runMerge(
+		batchId: string,
+		pairs: { sourceReleaseId: string; targetReleaseId: string }[],
+		jobId: string,
+		userId: string,
+		previousStatus: AssetImportBatchStatus,
+		force = false,
+	): Promise<void> {
+		let merged = 0;
+		let failed = 0;
+		const errors: string[] = [];
+
+		try {
+			await this.importJobsService.markProcessing(jobId);
+
+			for (const [index, pair] of pairs.entries()) {
+				try {
+					await this.releaseMergeService.apply({
+						sourceReleaseId: pair.sourceReleaseId,
+						targetReleaseId: pair.targetReleaseId,
+						userId,
+						force,
+					});
+					merged++;
+				} catch (error) {
+					failed++;
+					if (errors.length < 20) {
+						errors.push(
+							`${pair.sourceReleaseId} -> ${pair.targetReleaseId}: ${this.errorText(error)}`,
+						);
+					}
+				}
+
+				await this.importJobsService.updateProgress(jobId, {
+					progressCurrent: index + 1,
+					progressTotal: pairs.length,
+					progressLabel: `Đã xử lý ${index + 1}/${pairs.length} cặp release`,
+					processedRows: merged,
+					errorRows: failed,
+					totalRows: pairs.length,
+				});
+			}
+
+			await this.importJobsService.updateProgress(
+				jobId,
+				{
+					progressCurrent: pairs.length,
+					progressTotal: pairs.length,
+					progressLabel: 'Đang quét lại các dòng conflict',
+					processedRows: merged,
+					errorRows: failed,
+					totalRows: pairs.length,
+				},
+				true,
+			);
+
+			const batch = await this.getBatchOrFail(batchId);
+			const rescan = await this.rescanPendingConflicts(batch);
+			await this.batchRepo.update(batchId, {
+				status: previousStatus,
+				errorMessage: null,
+			});
+			await this.importJobsService.markCompleted(jobId, {
+				merged,
+				failed,
+				rescanned: rescan.rescanned,
+				errors,
+			});
+			this.logger.log(
+				`Batch ${batchId} merge xong: merged=${merged}, failed=${failed}, rescanned=${rescan.rescanned}`,
+			);
+		} catch (error) {
+			const message = this.errorText(error);
+			this.logger.error(`Batch ${batchId} merge thất bại: ${message}`);
+			await this.batchRepo.update(batchId, {
+				status: previousStatus,
+				errorMessage: message,
+			});
+			await this.importJobsService.markFailed(jobId, message);
+		}
+	}
+
+	private errorText(error: unknown): string {
+		if (error instanceof Error) return error.message;
+		return String(error);
+	}
+
+	private async rescanPendingConflicts(batch: AssetImportBatch) {
+		const batchId = batch.id;
+		const items = await this.itemRepo.find({
+			where: {
+				batchId,
+				action: In([
+					AssetImportAction.MERGE_REQUIRED,
+					AssetImportAction.CONFLICT,
+				]),
+				status: AssetImportItemStatus.PENDING,
+			},
+			order: { rowNumber: 'ASC' },
+		});
+		if (!items.length) return { rescanned: 0, summary: null };
+
+		const rows: ParsedAssetRow[] = items.map((item) => ({
+			rowNumber: item.rowNumber,
+			raw: item.rawData,
+			isrc: item.isrc,
+			upc: item.upc,
+			trackName: item.trackName,
+			albumName: item.albumName,
+			labelName: item.labelName,
+		}));
+		const { items: rescannedItems, summary } = await this.scanService.scan(
+			rows,
+			{
+				targetTenantId: batch.targetTenantId,
+				options: batch.options,
+			},
+		);
+		const existingByRow = new Map(
+			items.map((item) => [item.rowNumber, item]),
+		);
+		for (const row of rescannedItems) {
+			const existing = existingByRow.get(row.rowNumber);
+			if (!existing) continue;
+			await this.itemRepo.update(existing.id, {
+				matchType: row.matchType,
+				action: row.action,
+				matchedReleaseId: row.matchedReleaseId,
+				matchedTrackId: row.matchedTrackId,
+				currentTenantId: row.currentTenantId,
+				currentLabelId: row.currentLabelId,
+				duplicateClassification: row.duplicateClassification,
+				canonicalReleaseId: row.canonicalReleaseId,
+				canonicalTrackId: row.canonicalTrackId,
+				duplicateSourceReleaseIds: row.duplicateSourceReleaseIds,
+				requiresMerge: row.requiresMerge,
+				changes: row.changes,
+				errorMessage: row.errorMessage,
+				rescannedAt: new Date(),
+			});
+		}
+		const [counts] = await this.dataSource.query(
+			`SELECT
+			   COUNT(*) FILTER (
+			     WHERE matched_release_id IS NOT NULL OR canonical_release_id IS NOT NULL
+			   )::int AS matched_rows,
+			   COUNT(*) FILTER (WHERE action = 'CREATE')::int AS new_rows,
+			   COUNT(*) FILTER (WHERE action = 'INVALID')::int AS invalid_rows
+			 FROM asset_import_items
+			 WHERE batch_id = $1`,
+			[batchId],
+		);
+		await this.batchRepo.update(batchId, {
+			matchedRows: Number(counts?.matched_rows ?? 0),
+			newRows: Number(counts?.new_rows ?? 0),
+			invalidRows: Number(counts?.invalid_rows ?? 0),
+			scannedAt: new Date(),
+		});
+		return { rescanned: rescannedItems.length, summary };
 	}
 
 	// ── APPLY ─────────────────────────────────────────────────────────
@@ -303,7 +683,9 @@ export class AssetImportService {
 		const items = await this.selectItems(batchId, dto);
 		if (!items.length) {
 			throw new BadRequestException(
-				'Không có item nào ở trạng thái PENDING khớp lựa chọn',
+				dto.retryFailed
+					? 'Không có item nào ở trạng thái PENDING hoặc FAILED để retry khớp lựa chọn'
+					: 'Không có item nào ở trạng thái PENDING khớp lựa chọn',
 			);
 		}
 
@@ -405,6 +787,9 @@ export class AssetImportService {
 		batchId: string,
 		dto: ApplyAssetImportDto,
 	): Promise<AssetImportItem[]> {
+		const selectableStatuses = dto.retryFailed
+			? [AssetImportItemStatus.PENDING, AssetImportItemStatus.FAILED]
+			: [AssetImportItemStatus.PENDING];
 		if (!dto.selectAll) {
 			if (!dto.itemIds?.length) {
 				throw new BadRequestException(
@@ -415,7 +800,7 @@ export class AssetImportService {
 				where: {
 					batchId,
 					id: In(dto.itemIds),
-					status: AssetImportItemStatus.PENDING,
+					status: In(selectableStatuses),
 				},
 				order: { rowNumber: 'ASC' },
 			});
@@ -424,7 +809,7 @@ export class AssetImportService {
 		return this.itemRepo.find({
 			where: {
 				batchId,
-				status: AssetImportItemStatus.PENDING,
+				status: In(selectableStatuses),
 				...(dto.action ? { action: dto.action } : {}),
 				...(dto.excludeItemIds?.length
 					? { id: Not(In(dto.excludeItemIds)) }
@@ -478,6 +863,89 @@ export class AssetImportService {
 	}
 
 	// ── Helper ────────────────────────────────────────────────────────
+
+	/**
+	 * Gắn file Excel đã scan (key + URL tải) vào list và detail.
+	 * Batch cũ chỉ giữ key trong params của scan job, nên đọc một lần rồi lưu lại.
+	 */
+	async attachScannedFiles<
+		T extends {
+			id: string;
+			fileName: string;
+			fileKey?: string | null;
+			scanJobId?: string | null;
+		},
+	>(
+		batches: T[],
+	): Promise<
+		Array<T & { fileKey: string | null; downloadUrl: string | null }>
+	> {
+		const missingJobIds = batches
+			.filter((batch) => !batch.fileKey && batch.scanJobId)
+			.map((batch) => batch.scanJobId as string);
+		const keyByJobId = new Map<string, string>();
+		if (missingJobIds.length) {
+			try {
+				const jobs =
+					await this.importJobsService.findByIds(missingJobIds);
+				for (const job of jobs) {
+					const key = job.params?.r2Key;
+					if (typeof key === 'string' && this.isAssetImportKey(key)) {
+						keyByJobId.set(job.id, key);
+					}
+				}
+			} catch (error) {
+				this.logger.warn(
+					`Không đọc được file key của scan job: ${this.errorText(error)}`,
+				);
+			}
+		}
+
+		return Promise.all(
+			batches.map(async (batch) => {
+				const resolved =
+					(batch.fileKey && this.isAssetImportKey(batch.fileKey)
+						? batch.fileKey
+						: null) ||
+					(batch.scanJobId
+						? (keyByJobId.get(batch.scanJobId) ?? null)
+						: null);
+				if (resolved && resolved !== batch.fileKey) {
+					await this.batchRepo.update(batch.id, {
+						fileKey: resolved,
+					});
+				}
+				const downloadUrl = resolved
+					? await this.signScannedFile(resolved, batch.fileName)
+					: null;
+				return { ...batch, fileKey: resolved, downloadUrl };
+			}),
+		);
+	}
+
+	private isAssetImportKey(key: string): boolean {
+		return key.startsWith(ASSET_IMPORT_R2_PREFIX) && !key.includes('..');
+	}
+
+	private async signScannedFile(
+		key: string,
+		fileName: string,
+	): Promise<string | null> {
+		const safeName =
+			fileName.replace(/["\r\n]/g, '').trim() || 'asset-import.xlsx';
+		try {
+			return await this.r2Service.getSignedUrlDown({
+				key,
+				isPublic: false,
+				fileName: safeName,
+			});
+		} catch (error) {
+			this.logger.warn(
+				`Không ký được URL tải ${key}: ${this.errorText(error)}`,
+			);
+			return null;
+		}
+	}
 
 	/**
 	 * @param withTargetTenant load kèm workspace đích để trả thẳng cho FE.

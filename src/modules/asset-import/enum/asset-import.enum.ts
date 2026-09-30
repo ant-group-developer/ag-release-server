@@ -23,6 +23,7 @@ export enum AssetImportAction {
 	NO_CHANGE = 'NO_CHANGE',
 	INVALID = 'INVALID',
 	CONFLICT = 'CONFLICT',
+	MERGE_REQUIRED = 'MERGE_REQUIRED',
 }
 
 /** Trạng thái apply của từng item. */

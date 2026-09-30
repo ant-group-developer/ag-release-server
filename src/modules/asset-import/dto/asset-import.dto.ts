@@ -124,7 +124,8 @@ export class ScanAssetImportDto {
 	effectiveDate?: string;
 
 	@ApiPropertyOptional({
-		description: 'Tháng bắt đầu ghi nhận revenue cho owner mới (YYYY-MM-01). Mặc định là tháng của effectiveDate.',
+		description:
+			'Tháng bắt đầu ghi nhận revenue cho owner mới (YYYY-MM-01). Mặc định là tháng của effectiveDate.',
 		example: '2026-09-01',
 	})
 	@IsOptional()
@@ -169,12 +170,44 @@ export class ApplyAssetImportDto {
 	excludeItemIds?: string[];
 
 	@ApiPropertyOptional({
+		description:
+			'Cho phép chạy lại các item FAILED (dùng để retry sau khi release import đã được merge/remap)',
+		default: false,
+	})
+	@IsOptional()
+	@Transform(toBoolean)
+	@IsBoolean()
+	retryFailed: boolean = false;
+
+	@ApiPropertyOptional({
 		description: 'Chỉ apply item có action này (dùng khi selectAll = true)',
 		enum: AssetImportAction,
 	})
 	@IsOptional()
 	@IsEnum(AssetImportAction)
 	action?: AssetImportAction;
+}
+
+export class MergeAssetImportDuplicatesDto extends ApplyAssetImportDto {
+	@ApiPropertyOptional({
+		description:
+			'Chỉ merge các release import nguồn này trong những item đã chọn',
+		type: [String],
+	})
+	@IsOptional()
+	@IsArray()
+	@IsUUID('4', { each: true })
+	sourceReleaseIds?: string[];
+
+	@ApiPropertyOptional({
+		description:
+			'Cho phép merge cặp chỉ bị chặn bởi UPC_NOT_EQUIVALENT. Phải truyền sourceReleaseIds.',
+		default: false,
+	})
+	@IsOptional()
+	@Transform(toBoolean)
+	@IsBoolean()
+	force: boolean = false;
 }
 
 export class QueryAssetImportBatchDto extends BaseQueryDto {

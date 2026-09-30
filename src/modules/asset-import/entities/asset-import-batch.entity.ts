@@ -37,6 +37,15 @@ export class AssetImportBatch extends BaseUUIDEntity {
 	fileHash: string | null;
 
 	@Column({
+		type: 'varchar',
+		length: 1000,
+		nullable: true,
+		comment:
+			'Object key của file Excel đã upload lên R2 và được dùng để scan',
+	})
+	fileKey: string | null;
+
+	@Column({
 		type: 'uuid',
 		comment: 'Workspace (tenant) đích mà người dùng chọn để gán asset về',
 	})
@@ -51,7 +60,10 @@ export class AssetImportBatch extends BaseUUIDEntity {
 	})
 	targetLabelId: string | null;
 
-	@Column({ type: 'date', comment: 'Ngày owner mới bắt đầu nhận trends/usage' })
+	@Column({
+		type: 'date',
+		comment: 'Ngày owner mới bắt đầu nhận trends/usage',
+	})
 	effectiveDate: string;
 
 	@Column({ type: 'date', comment: 'Tháng owner mới bắt đầu nhận revenue' })

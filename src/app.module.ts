@@ -13,11 +13,11 @@ import { AppConfigModule } from './modules/app-config/app-config.module';
 import { ArtistProfileModule } from './modules/artist-profile/artist-profile.module';
 import { ArtistRoleModule } from './modules/artist-role/artist-role.module';
 import { ArtistModule } from './modules/artist/artist.module';
+import { AssetImportModule } from './modules/asset-import/asset-import.module';
 import { AudioFileModule } from './modules/audio-file/audio-file.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PolicyGuard } from './modules/auth/guards/policy.guard';
-import { AssetImportModule } from './modules/asset-import/asset-import.module';
 import { BatchImportModule } from './modules/batch-import/batch-import.module';
 import { BucketModule2 } from './modules/bucket2/bucket2.module';
 import { CacheModule } from './modules/cache/cache.module';
@@ -35,9 +35,9 @@ import { DspModule } from './modules/dsp/dsp.module';
 import { ErnModule } from './modules/ern/ern.module';
 import { EtlModule } from './modules/etl/etl.module';
 import { ExcelModule } from './modules/excel/excel.module';
-import { FtpProviderConfigModule } from './modules/ftp-provider-config/ftp-provider-config.module';
 import { IsrcModule } from './modules/external/isrc/isrc.module';
 import { UpcModule } from './modules/external/upc/upc.module';
+import { FtpProviderConfigModule } from './modules/ftp-provider-config/ftp-provider-config.module';
 import { GenreModule } from './modules/genre/genre.module';
 import { IssueLevelModule } from './modules/issue-level/issue-level.module';
 import { IssueModule } from './modules/issue/issue.module';
@@ -51,6 +51,7 @@ import { PriceTierModule } from './modules/price-tiers/price-tier.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
 import { ReleaseContributorModule } from './modules/release-contributor/release-contributor.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
+import { ReleaseMergeModule } from './modules/release-merge/release-merge.module';
 import { ReleaseModule } from './modules/release/release.module';
 // import { ReleaseSubmitModule } from './modules/release/modules/release-submit/release-submit.module';
 import { Cache2Module } from './modules/cache2/cache2.module';
@@ -125,6 +126,7 @@ import { WebhookModule } from './modules/webhook/webhook.module';
 		PermissionModule,
 
 		ReleaseModule,
+		ReleaseMergeModule,
 		AlbumFormatModule,
 		ReleaseArtistModule,
 		// ReleaseLanguageModule,
