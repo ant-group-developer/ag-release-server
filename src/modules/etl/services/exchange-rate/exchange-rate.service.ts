@@ -37,6 +37,15 @@ export interface ExchangeRateRow {
  */
 @Injectable()
 export class ExchangeRateService {
+	/** Currencies added on top of the USD amount already stored in the export cube. */
+	static readonly REPORTING_CURRENCIES_TO_BACKFILL = [
+		'EUR',
+		'GBP',
+		'CNY',
+		'INR',
+		'VND',
+	] as const;
+
 	private readonly logger = new Logger(ExchangeRateService.name);
 	private readonly API_BASE =
 		process.env.FRANKFURTER_API_URL ||
@@ -219,6 +228,110 @@ export class ExchangeRateService {
 	}
 
 	/**
+	 * Insert reporting currencies that are absent from months already stored
+	 * in exchange_rates. Existing rows are left untouched, and sales cubes
+	 * are not rebuilt: export converts USD at read time.
+	 */
+	async backfillMissingCurrencies(
+		currencies: readonly string[] = ExchangeRateService.REPORTING_CURRENCIES_TO_BACKFILL,
+	): Promise<{
+		monthsChecked: number;
+		inserted: number;
+		stillMissing: Array<{ rate_month: string; currencies: string[] }>;
+	}> {
+		const requested = [
+			...new Set(currencies.map((currency) => currency.toUpperCase())),
+		].sort();
+		const months = await this.clickHouseService.query<{
+			rate_month: string;
+		}>(
+			`SELECT DISTINCT rate_month
+       FROM ${CLICKHOUSE_TABLES.EXCHANGE_RATES}
+       ORDER BY rate_month`,
+		);
+		const existing = await this.clickHouseService.query<{
+			rate_month: string;
+			currency: string;
+		}>(
+			`SELECT rate_month, currency
+       FROM ${CLICKHOUSE_TABLES.EXCHANGE_RATES}
+       WHERE currency IN ({currencies:Array(String)})
+       GROUP BY rate_month, currency`,
+			{ currencies: requested },
+		);
+		const present = new Set(
+			existing.map((row) => `${row.rate_month}|${row.currency}`),
+		);
+
+		let inserted = 0;
+		const stillMissing: Array<{
+			rate_month: string;
+			currencies: string[];
+		}> = [];
+		const pending = months
+			.map((row) => ({
+				rate_month: row.rate_month,
+				missing: requested.filter(
+					(currency) => !present.has(`${row.rate_month}|${currency}`),
+				),
+			}))
+			.filter((row) => row.missing.length > 0);
+
+		for (let index = 0; index < pending.length; index++) {
+			const { rate_month, missing } = pending[index];
+			try {
+				const rates = await this.fetchRatesFromApi(
+					this.getEndOfMonthDate(rate_month),
+					missing,
+				);
+				const rows: ExchangeRateRow[] = [];
+				const returned = new Set<string>();
+				for (const rate of rates) {
+					const currency = rate.quote.toUpperCase();
+					if (!missing.includes(currency) || returned.has(currency)) {
+						continue;
+					}
+					returned.add(currency);
+					rows.push({
+						rate_month,
+						currency,
+						usd_to_local_rate: String(rate.rate),
+						rate_date: rate.date,
+						is_provisional: 0,
+					});
+				}
+				if (rows.length) {
+					await this.clickHouseService.insert(
+						CLICKHOUSE_TABLES.EXCHANGE_RATES,
+						rows as unknown as Record<string, unknown>[],
+					);
+					inserted += rows.length;
+				}
+				const absent = missing.filter(
+					(currency) => !returned.has(currency),
+				);
+				if (absent.length) {
+					stillMissing.push({ rate_month, currencies: absent });
+					this.logger.warn(
+						`No ${absent.join(', ')} rate returned for ${rate_month}`,
+					);
+				}
+			} catch (err) {
+				stillMissing.push({ rate_month, currencies: missing });
+				this.logger.error(
+					`Failed to backfill ${rate_month}: ${err.message}`,
+				);
+			}
+			if (index < pending.length - 1) await this.delay(200);
+		}
+
+		this.logger.log(
+			`Backfilled ${inserted} exchange rate rows across ${months.length} months without rebuilding cubes`,
+		);
+		return { monthsChecked: months.length, inserted, stillMissing };
+	}
+
+	/**
 	 * Truncate + rebuild cả 2 sales cubes v2 từ fact_sales_report + exchange_rates.
 	 * Gọi sau khi sync exchange rates hoặc khi cần refresh data.
 	 */
@@ -305,8 +418,14 @@ export class ExchangeRateService {
 	 * Fetch all rates from Frankfurter v2 API for a specific date.
 	 * Returns ~170 currency pairs.
 	 */
-	private async fetchRatesFromApi(date: string): Promise<FrankfurterRate[]> {
-		const url = `${this.API_BASE}?base=USD&date=${date}`;
+	private async fetchRatesFromApi(
+		date: string,
+		quotes?: readonly string[],
+	): Promise<FrankfurterRate[]> {
+		const quoteQuery = quotes?.length
+			? `&quotes=${quotes.map((quote) => quote.toUpperCase()).join(',')}`
+			: '';
+		const url = `${this.API_BASE}?base=USD&date=${date}${quoteQuery}`;
 		this.logger.debug(`Fetching rates: ${url}`);
 
 		try {
@@ -341,8 +460,9 @@ export class ExchangeRateService {
 	 */
 	private getEndOfMonthDate(yearMonth: string): string {
 		const [year, month] = yearMonth.split('-').map(Number);
-		// Day 0 of next month = last day of current month
-		const lastDay = new Date(year, month, 0);
+		// Day 0 of the next month in UTC is the last calendar day of this month.
+		// Local `new Date(y, m, 0)` shifts back a day on servers east of UTC.
+		const lastDay = new Date(Date.UTC(year, month, 0));
 		return lastDay.toISOString().slice(0, 10);
 	}
 

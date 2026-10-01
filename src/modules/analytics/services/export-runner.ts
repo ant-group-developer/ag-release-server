@@ -8,7 +8,11 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { isValidStandardUpc } from 'src/utils/upc.util';
 import { zipFolder } from 'src/utils/util';
 import { v4 as uuidv4 } from 'uuid';
-import { AnalyticsReportExportDto } from '../dto/analytics-report-export.dto';
+import {
+	AnalyticsReportExportDto,
+	REPORTING_CURRENCIES,
+	ReportingCurrency,
+} from '../dto/analytics-report-export.dto';
 import {
 	AnalyticsReportExportResult,
 	DetailRow,
@@ -39,6 +43,7 @@ import {
 	createEmptyAccumulator,
 	createStreamWriter,
 	formatRevenueSum,
+	multiplyDecimal,
 	updateAccumulator,
 } from './stream-detail-writer';
 
@@ -47,6 +52,15 @@ export class ExportJobCancelledError extends Error {
 	constructor(jobId: string) {
 		super(`Export job ${jobId} was cancelled`);
 		this.name = ExportJobCancelledError.name;
+	}
+}
+
+export class MissingExchangeRateError extends Error {
+	constructor(currency: string, months: string[]) {
+		super(
+			`Missing ${currency} exchange rate for month(s): ${months.join(', ')}`,
+		);
+		this.name = MissingExchangeRateError.name;
 	}
 }
 
@@ -111,6 +125,9 @@ export class ExportRunner {
 	private static readonly TENANT_NAME_CACHE_SIZE = 10_000;
 	private static readonly MAX_OPEN_CSV_WRITERS = 256;
 	private static readonly PROGRESS_INTERVAL_MS = 2_000;
+	/** Set only for a non-USD reporting export. USD leaves the streamed amount untouched. */
+	private reportingRates: ReadonlyMap<string, string> | null = null;
+	private reportingCurrency: ReportingCurrency = 'USD';
 
 	constructor(
 		private readonly deps: ExportRunnerDeps,
@@ -130,6 +147,11 @@ export class ExportRunner {
 		await this.throwIfCancelled();
 		this.getMonthRange(dto);
 		const exportMode = dto.exportMode ?? 'usd';
+		this.reportingRates = null;
+		this.reportingCurrency = 'USD';
+		if (exportMode !== 'statement') {
+			await this.prepareReportingCurrency(dto);
+		}
 
 		const tenantNamesMap = await this.getTenantNames([tenantId]);
 		const tenantName = tenantNamesMap.get(tenantId) || 'unnamed_workspace';
@@ -294,6 +316,7 @@ export class ExportRunner {
 					summary,
 					format,
 					exportMode,
+					this.reportingCurrency,
 				);
 			}
 
@@ -427,14 +450,19 @@ export class ExportRunner {
 
 	private getSummaryColumns(
 		exportMode: 'usd' | 'statement' = 'usd',
+		currency: string = 'USD',
 	): Partial<ExcelJS.Column>[] {
+		const revenueHeader =
+			exportMode === 'statement' || currency !== 'USD'
+				? 'Revenue'
+				: 'RevenueUsd';
 		return [
 			{ header: 'StartDate', key: 'startDate', width: 14 },
 			{ header: 'EndDate', key: 'endDate', width: 14 },
 			{ header: 'WorkspaceName', key: 'tenantName', width: 28 },
 			{ header: 'TotalUsage', key: 'totalUsage', width: 14 },
 			{
-				header: exportMode === 'statement' ? 'Revenue' : 'RevenueUsd',
+				header: revenueHeader,
 				key: 'revenueUsd',
 				width: 18,
 			},
@@ -453,9 +481,10 @@ export class ExportRunner {
 		summary: SummaryRow,
 		format: 'xlsx' | 'csv',
 		exportMode: 'usd' | 'statement',
+		currency: string,
 	): Promise<void> {
 		if (format === 'csv') {
-			const columns = this.getSummaryColumns(exportMode);
+			const columns = this.getSummaryColumns(exportMode, currency);
 			const headers = columns.map((c) => c.header?.toString() ?? '');
 			const keys = columns.map((c) => c.key?.toString() ?? '');
 			const lines = [
@@ -472,7 +501,7 @@ export class ExportRunner {
 				useSharedStrings: false,
 			});
 			const sheet = workbook.addWorksheet('Summary');
-			sheet.columns = this.getSummaryColumns(exportMode);
+			sheet.columns = this.getSummaryColumns(exportMode, currency);
 			sheet.addRow(summary).commit();
 			sheet.commit();
 			await workbook.commit();
@@ -676,9 +705,30 @@ export class ExportRunner {
 			),
 			territory: pool(raw.territory),
 			totalUsage: Number(raw.total_usage || 0),
-			revenueUsd: String(raw.revenue_amount || raw.revenue_usd || '0.00'),
-			currency: pool(raw.currency || 'USD'),
+			revenueUsd: this.reportingAmount(raw),
+			currency: pool(
+				this.reportingRates
+					? this.reportingCurrency
+					: raw.currency || 'USD',
+			),
 		} as any;
+	}
+
+	/**
+	 * Detail rows are already summed USD for one month. Multiply that total by
+	 * the month rate instead of joining exchange_rates inside the export query.
+	 */
+	private reportingAmount(raw: RawDetailRow): string {
+		const amount = String(raw.revenue_amount || raw.revenue_usd || '0');
+		if (!this.reportingRates) return amount;
+		const month = String(raw.date ?? '').slice(0, 7);
+		const rate = this.reportingRates.get(month);
+		if (!rate) {
+			throw new MissingExchangeRateError(this.reportingCurrency, [
+				month || '(blank)',
+			]);
+		}
+		return multiplyDecimal(amount, rate);
 	}
 
 	private sanitizeFileName(name: string): string {
@@ -699,6 +749,132 @@ export class ExportRunner {
 
 	// PLACEHOLDER_QUERY
 
+	private async prepareReportingCurrency(
+		dto: AnalyticsReportExportDto,
+	): Promise<void> {
+		const currency = (dto.currency ?? 'USD').trim().toUpperCase();
+		if (!REPORTING_CURRENCIES.includes(currency as ReportingCurrency)) {
+			throw new Error(`Unsupported reporting currency: ${currency}`);
+		}
+		dto.currency = currency as ReportingCurrency;
+		this.reportingCurrency = dto.currency;
+		if (dto.currency === 'USD') return;
+
+		const rates = await this.loadReportingRates(
+			dto.currency,
+			dto.fromDate,
+			dto.endDate,
+		);
+		const cubeMonths = await this.listExportCubeMonths(
+			dto.fromDate,
+			dto.endDate,
+		);
+		const missing = cubeMonths
+			.filter((month) => !this.isPositiveDecimal(rates.get(month)))
+			.sort();
+		if (missing.length > 0) {
+			throw new MissingExchangeRateError(dto.currency, missing);
+		}
+		this.reportingRates = rates;
+	}
+
+	private isPositiveDecimal(value: string | undefined): boolean {
+		return (
+			!!value &&
+			/^\+?(?:[1-9]\d*(?:\.\d+)?|0\.\d*[1-9]\d*)$/.test(value.trim())
+		);
+	}
+
+	private async loadReportingRates(
+		currency: string,
+		fromMonth: string,
+		toMonth: string,
+	): Promise<Map<string, string>> {
+		const rows = await this.deps.chQuery<{
+			rate_month: string;
+			usd_to_local_rate: string;
+		}>(
+			`SELECT
+         rate_month,
+         toString(argMax(usd_to_local_rate, updated_at)) AS usd_to_local_rate
+       FROM ${CLICKHOUSE_TABLES.EXCHANGE_RATES}
+       WHERE currency = {currency:String}
+         AND rate_month >= {fromMonth:String}
+         AND rate_month <= {toMonth:String}
+       GROUP BY rate_month`,
+			{ currency, fromMonth, toMonth },
+		);
+		const rates = new Map<string, string>();
+		for (const row of rows) {
+			rates.set(row.rate_month, String(row.usd_to_local_rate));
+		}
+		return rates;
+	}
+
+	private async listExportCubeMonths(
+		fromMonth: string,
+		toMonth: string,
+	): Promise<string[]> {
+		const fromPartition = fromMonth.replace('-', '');
+		const toPartition = toMonth.replace('-', '');
+		try {
+			const rows = await this.deps.chQuery<{ partition: string }>(
+				`SELECT DISTINCT partition
+         FROM system.parts
+         WHERE database = {database:String}
+           AND table = {table:String}
+           AND active = 1
+           AND partition >= {fromPartition:String}
+           AND partition <= {toPartition:String}`,
+				{
+					database: 'music_analytics',
+					table: CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY,
+					fromPartition,
+					toPartition,
+				},
+			);
+			return this.normalizeCubeMonths(
+				rows.map((row) => String(row.partition)),
+				fromMonth,
+				toMonth,
+			);
+		} catch (error) {
+			if (!this.isPartsAccessError(error)) throw error;
+			const rows = await this.deps.chQuery<{ rate_month: string }>(
+				`SELECT DISTINCT formatDateTime(period, '%Y-%m') AS rate_month
+         FROM ${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY}
+         WHERE period >= toDate({from:String})
+           AND period <= toDate({to:String})`,
+				{ from: `${fromMonth}-01`, to: `${toMonth}-01` },
+			);
+			return this.normalizeCubeMonths(
+				rows.map((row) => row.rate_month),
+				fromMonth,
+				toMonth,
+			);
+		}
+	}
+
+	private isPartsAccessError(error: unknown): boolean {
+		const message = error instanceof Error ? error.message : String(error);
+		return /privilege|ACCESS_DENIED|not enough/i.test(message);
+	}
+
+	private normalizeCubeMonths(
+		values: string[],
+		fromMonth: string,
+		toMonth: string,
+	): string[] {
+		const months = new Set<string>();
+		for (const value of values) {
+			const digits = value.replace(/\D/g, '');
+			if (digits.length < 6) continue;
+			const month = `${digits.slice(0, 4)}-${digits.slice(4, 6)}`;
+			if (month >= fromMonth && month <= toMonth) months.add(month);
+		}
+		return [...months];
+	}
+
 	private buildFileName(
 		tenantName: string,
 		dto: AnalyticsReportExportDto,
@@ -707,10 +883,13 @@ export class ExportRunner {
 		const pad = (n: number) => String(n).padStart(2, '0');
 		const now = new Date();
 		const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+		const currency = (dto.currency ?? 'USD').toUpperCase();
 		const suffix =
 			dto.exportMode === 'statement'
 				? 'statement-report'
-				: 'analytics-report';
+				: currency === 'USD'
+					? 'analytics-report'
+					: `analytics-report_${currency}`;
 		return `${sanitized}_${suffix}_${dto.fromDate}_${dto.endDate}_${timestamp}.zip`;
 	}
 

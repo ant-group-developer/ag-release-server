@@ -8,6 +8,9 @@ describe('getRawDetailsPageQuery', () => {
 		const query = getRawDetailsPageQuery('s.dsp_id', '', '');
 
 		expect(query).not.toMatch(/ORDER\s+BY/i);
+		expect(query).toContain("'USD' AS currency");
+		expect(query).not.toContain('exchange_rates');
+		expect(query).not.toContain('multiplyDecimal');
 	});
 });
 

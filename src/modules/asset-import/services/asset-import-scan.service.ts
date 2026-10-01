@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Label } from 'src/modules/label/entities/label.entity';
+import { normalizeMergeIsrc } from 'src/modules/release-merge/release-merge.util';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
@@ -31,6 +32,13 @@ interface MatchedRecord {
 	matchType: AssetImportMatchType;
 }
 
+interface DuplicateResolution {
+	classification: 'RESOLVABLE_IMPORTED_DUPLICATE' | 'AMBIGUOUS_DUPLICATE';
+	canonicalRelease: Release | null;
+	canonicalTrack: Track | null;
+	sourceReleaseIds: string[];
+}
+
 /**
  * Label của tenant đích: tra theo tên lấy từ file, cộng một label mặc định
  * dùng khi dòng không có cột Label Name.
@@ -57,8 +65,13 @@ export class AssetImportScanService {
 		rows: ParsedAssetRow[],
 		context: ScanContext,
 	): Promise<{ items: ScannedAssetRow[]; summary: AssetImportScanSummary }> {
-		const { trackByIsrc, releaseById, releaseByUpc, conflictIsrcs } =
-			await this.loadMatches(rows);
+		const {
+			trackByIsrc,
+			releaseById,
+			releaseByUpc,
+			duplicateByIsrc,
+			duplicateByUpc,
+		} = await this.loadMatches(rows);
 
 		const labelResolution = await this.resolveLabels(rows, context);
 		const displayNames = await this.loadDisplayNames(
@@ -71,7 +84,8 @@ export class AssetImportScanService {
 				trackByIsrc,
 				releaseById,
 				releaseByUpc,
-				conflictIsrcs,
+				duplicateByIsrc,
+				duplicateByUpc,
 				labelResolution,
 				displayNames,
 			}),
@@ -94,10 +108,14 @@ export class AssetImportScanService {
 		const releaseRepo = this.dataSource.getRepository(Release);
 
 		const tracks = isrcs.length
-			? await trackRepo.find({
-					where: { isrc: In(isrcs) },
-					order: { createdAt: 'ASC' },
-				})
+			? await trackRepo
+					.createQueryBuilder('track')
+					.where(
+						`upper(regexp_replace(btrim(track.isrc), '[-[:space:]]', '', 'g')) IN (:...isrcs)`,
+						{ isrcs },
+					)
+					.orderBy('track.createdAt', 'ASC')
+					.getMany()
 			: [];
 
 		// ISRC trỏ tới nhiều release khác nhau là dữ liệu mập mờ — đánh dấu
@@ -106,18 +124,14 @@ export class AssetImportScanService {
 		const trackByIsrc = new Map<string, Track>();
 		for (const track of tracks) {
 			if (!track.isrc) continue;
-			if (!trackByIsrc.has(track.isrc))
-				trackByIsrc.set(track.isrc, track);
-			const set = releaseIdsByIsrc.get(track.isrc) ?? new Set<string>();
+			const normalizedIsrc = normalizeMergeIsrc(track.isrc);
+			if (!trackByIsrc.has(normalizedIsrc))
+				trackByIsrc.set(normalizedIsrc, track);
+			const set =
+				releaseIdsByIsrc.get(normalizedIsrc) ?? new Set<string>();
 			set.add(track.releaseId);
-			releaseIdsByIsrc.set(track.isrc, set);
+			releaseIdsByIsrc.set(normalizedIsrc, set);
 		}
-		const conflictIsrcs = new Set(
-			[...releaseIdsByIsrc.entries()]
-				.filter(([, ids]) => ids.size > 1)
-				.map(([isrc]) => isrc),
-		);
-
 		// UPC trong hệ thống có thể được lưu với số 0 đứng đầu khác nhau,
 		// nên tra theo mọi biến thể tương đương.
 		const upcVariants = [...new Set(upcs.flatMap(buildEquivalentUpcs))];
@@ -129,9 +143,14 @@ export class AssetImportScanService {
 			: [];
 
 		const releaseByUpc = new Map<string, Release>();
+		const releasesByUpc = new Map<string, Map<string, Release>>();
 		for (const release of releasesByUpcQuery) {
 			if (!release.upc) continue;
 			for (const variant of buildEquivalentUpcs(release.upc)) {
+				const grouped =
+					releasesByUpc.get(variant) ?? new Map<string, Release>();
+				grouped.set(release.id, release);
+				releasesByUpc.set(variant, grouped);
 				if (!releaseByUpc.has(variant)) {
 					releaseByUpc.set(variant, release);
 				}
@@ -149,7 +168,106 @@ export class AssetImportScanService {
 			releaseById.set(release.id, release);
 		}
 
-		return { trackByIsrc, releaseById, releaseByUpc, conflictIsrcs };
+		const duplicateByIsrc = new Map<string, DuplicateResolution>();
+		for (const [isrc, releaseIds] of releaseIdsByIsrc) {
+			if (releaseIds.size <= 1) continue;
+			const matchedTracks = tracks.filter(
+				(track) => normalizeMergeIsrc(track.isrc) === isrc,
+			);
+			const canonicalReleases = [...releaseIds]
+				.map((releaseId) => releaseById.get(releaseId))
+				.filter(
+					(release): release is Release =>
+						!!release && release.isImportedFromReport !== true,
+				);
+			const sourceReleases = [...releaseIds]
+				.map((releaseId) => releaseById.get(releaseId))
+				.filter(
+					(release): release is Release =>
+						!!release && release.isImportedFromReport === true,
+				);
+			const importedEndpointsAreClean = matchedTracks
+				.filter((track) =>
+					sourceReleases.some(
+						(release) => release.id === track.releaseId,
+					),
+				)
+				.every((track) => track.isImportedFromReport === true);
+
+			if (
+				canonicalReleases.length === 1 &&
+				sourceReleases.length > 0 &&
+				canonicalReleases.length + sourceReleases.length ===
+					releaseIds.size &&
+				importedEndpointsAreClean
+			) {
+				const canonicalRelease = canonicalReleases[0];
+				duplicateByIsrc.set(isrc, {
+					classification: 'RESOLVABLE_IMPORTED_DUPLICATE',
+					canonicalRelease,
+					canonicalTrack:
+						matchedTracks.find(
+							(track) => track.releaseId === canonicalRelease.id,
+						) ?? null,
+					sourceReleaseIds: sourceReleases.map(
+						(release) => release.id,
+					),
+				});
+			} else {
+				duplicateByIsrc.set(isrc, {
+					classification: 'AMBIGUOUS_DUPLICATE',
+					canonicalRelease: null,
+					canonicalTrack: null,
+					sourceReleaseIds: sourceReleases.map(
+						(release) => release.id,
+					),
+				});
+			}
+		}
+
+		const duplicateByUpc = new Map<string, DuplicateResolution>();
+		for (const [upc, grouped] of releasesByUpc) {
+			const releases = [...grouped.values()];
+			if (releases.length <= 1) continue;
+			const canonicalReleases = releases.filter(
+				(release) => release.isImportedFromReport !== true,
+			);
+			const sourceReleases = releases.filter(
+				(release) => release.isImportedFromReport === true,
+			);
+			if (
+				canonicalReleases.length === 1 &&
+				sourceReleases.length > 0 &&
+				canonicalReleases.length + sourceReleases.length ===
+					releases.length
+			) {
+				duplicateByUpc.set(upc, {
+					classification: 'RESOLVABLE_IMPORTED_DUPLICATE',
+					canonicalRelease: canonicalReleases[0],
+					canonicalTrack: null,
+					sourceReleaseIds: sourceReleases.map(
+						(release) => release.id,
+					),
+				});
+			} else {
+				duplicateByUpc.set(upc, {
+					classification: 'AMBIGUOUS_DUPLICATE',
+					canonicalRelease: null,
+					canonicalTrack: null,
+					sourceReleaseIds: sourceReleases.map(
+						(release) => release.id,
+					),
+				});
+			}
+		}
+
+		return {
+			trackByIsrc,
+			releaseById,
+			releaseByUpc,
+			duplicateByIsrc,
+			duplicateByUpc,
+		};
 	}
 
 	/**
@@ -239,7 +357,8 @@ export class AssetImportScanService {
 			trackByIsrc: Map<string, Track>;
 			releaseById: Map<string, Release>;
 			releaseByUpc: Map<string, Release>;
-			conflictIsrcs: Set<string>;
+			duplicateByIsrc: Map<string, DuplicateResolution>;
+			duplicateByUpc: Map<string, DuplicateResolution>;
 			labelResolution: LabelResolution;
 			displayNames: {
 				tenantNames: Map<string, string>;
@@ -255,6 +374,11 @@ export class AssetImportScanService {
 			matchedTrackId: null,
 			currentTenantId: null,
 			currentLabelId: null,
+			duplicateClassification: null,
+			canonicalReleaseId: null,
+			canonicalTrackId: null,
+			duplicateSourceReleaseIds: [],
+			requiresMerge: false,
 			changes: [],
 			errorMessage: null,
 		};
@@ -268,12 +392,61 @@ export class AssetImportScanService {
 			};
 		}
 
-		if (row.isrc && lookups.conflictIsrcs.has(row.isrc)) {
-			return {
-				...base,
-				action: AssetImportAction.CONFLICT,
-				errorMessage: `ISRC ${row.isrc} đang thuộc nhiều release khác nhau, cần xử lý thủ công`,
-			};
+		if (row.isrc) {
+			const duplicate = lookups.duplicateByIsrc.get(row.isrc);
+			if (duplicate?.classification === 'RESOLVABLE_IMPORTED_DUPLICATE') {
+				return {
+					...base,
+					matchType: AssetImportMatchType.ISRC,
+					action: AssetImportAction.MERGE_REQUIRED,
+					duplicateClassification: duplicate.classification,
+					canonicalReleaseId: duplicate.canonicalRelease!.id,
+					canonicalTrackId: duplicate.canonicalTrack?.id ?? null,
+					duplicateSourceReleaseIds: duplicate.sourceReleaseIds,
+					requiresMerge: true,
+					currentTenantId: duplicate.canonicalRelease!.tenantId,
+					currentLabelId: duplicate.canonicalRelease!.labelId,
+					errorMessage: `ISRC ${row.isrc} cần merge ${duplicate.sourceReleaseIds.length} release report vào release canonical ${duplicate.canonicalRelease!.id}`,
+				};
+			}
+			if (duplicate) {
+				return {
+					...base,
+					action: AssetImportAction.CONFLICT,
+					duplicateClassification: duplicate.classification,
+					duplicateSourceReleaseIds: duplicate.sourceReleaseIds,
+					errorMessage: `ISRC ${row.isrc} đang thuộc nhiều release nhưng không xác định được một canonical target`,
+				};
+			}
+		}
+
+		if (row.upc) {
+			const duplicate = buildEquivalentUpcs(row.upc)
+				.map((variant) => lookups.duplicateByUpc.get(variant))
+				.find((value): value is DuplicateResolution => !!value);
+			if (duplicate?.classification === 'RESOLVABLE_IMPORTED_DUPLICATE') {
+				return {
+					...base,
+					matchType: AssetImportMatchType.UPC,
+					action: AssetImportAction.MERGE_REQUIRED,
+					duplicateClassification: duplicate.classification,
+					canonicalReleaseId: duplicate.canonicalRelease!.id,
+					duplicateSourceReleaseIds: duplicate.sourceReleaseIds,
+					requiresMerge: true,
+					currentTenantId: duplicate.canonicalRelease!.tenantId,
+					currentLabelId: duplicate.canonicalRelease!.labelId,
+					errorMessage: `UPC ${row.upc} cần merge ${duplicate.sourceReleaseIds.length} release report vào release canonical ${duplicate.canonicalRelease!.id}`,
+				};
+			}
+			if (duplicate) {
+				return {
+					...base,
+					action: AssetImportAction.CONFLICT,
+					duplicateClassification: duplicate.classification,
+					duplicateSourceReleaseIds: duplicate.sourceReleaseIds,
+					errorMessage: `UPC ${row.upc} đang thuộc nhiều release nhưng không xác định được một canonical target`,
+				};
+			}
 		}
 
 		const matched = this.findMatch(row, lookups);
@@ -669,10 +842,15 @@ export class AssetImportScanService {
 
 		return {
 			totalRows: items.length,
-			matched: items.filter((i) => i.matchedReleaseId !== null).length,
+			matched: items.filter(
+				(i) =>
+					i.matchedReleaseId !== null ||
+					i.canonicalReleaseId !== null,
+			).length,
 			new: count(AssetImportAction.CREATE),
 			invalid: count(AssetImportAction.INVALID),
 			conflict: count(AssetImportAction.CONFLICT),
+			mergeRequired: count(AssetImportAction.MERGE_REQUIRED),
 			willUpdate: count(AssetImportAction.UPDATE),
 			noChange: count(AssetImportAction.NO_CHANGE),
 		};

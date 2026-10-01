@@ -443,16 +443,21 @@ export class ImportJobsService implements OnModuleInit {
 	 * create) thì gọi `getSnapshot()` tường minh — xem ReportImportService.startJob.
 	 */
 	async findById(id: string): Promise<ImportJob | null> {
+		const jobs = await this.findByIds([id]);
+		return jobs[0] ?? null;
+	}
+
+	async findByIds(ids: string[]): Promise<ImportJob[]> {
+		const unique = [...new Set(ids.filter(Boolean))];
+		if (!unique.length) return [];
 		const sql = `
       SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
-      WHERE id = {id:String}
-      LIMIT 1
+      WHERE id IN ({ids:Array(String)})
     `;
 		const rows = await this.clickHouseService.query<ImportJobRow>(sql, {
-			id,
+			ids: unique,
 		});
-		if (!rows.length) return null;
-		return rowToDomain(rows[0]);
+		return rows.map(rowToDomain);
 	}
 
 	async list(filters: ListImportJobsFilters = {}): Promise<{

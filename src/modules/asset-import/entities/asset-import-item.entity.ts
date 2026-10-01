@@ -97,6 +97,27 @@ export class AssetImportItem extends BaseUUIDEntity {
 	})
 	currentLabelId: string | null;
 
+	@Column({ type: 'varchar', length: 40, nullable: true })
+	duplicateClassification: string | null;
+
+	@Column({ type: 'uuid', nullable: true })
+	canonicalReleaseId: string | null;
+
+	@Column({ type: 'varchar', length: 10, nullable: true })
+	canonicalTrackId: string | null;
+
+	@Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+	duplicateSourceReleaseIds: string[];
+
+	@Column({ type: 'boolean', default: false })
+	requiresMerge: boolean;
+
+	@Column({ type: 'uuid', nullable: true })
+	mergeItemId: string | null;
+
+	@Column({ type: 'timestamptz', nullable: true })
+	rescannedAt: Date | null;
+
 	@Column({
 		type: 'jsonb',
 		default: () => "'[]'::jsonb",

@@ -28,6 +28,23 @@ export class ExchangeRateController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Post('backfill-currencies')
+	@ApiOperation({
+		summary:
+			'Insert missing EUR, GBP, CNY, INR, and VND rates without rebuilding cubes',
+		description:
+			'For each month already stored in exchange_rates, inserts only the missing reporting currencies. Existing rates, including USD, are not updated and sales cubes are not rebuilt.',
+	})
+	@ApiResponse({
+		status: 201,
+		description: 'Missing currency rows inserted.',
+	})
+	async backfillCurrencies() {
+		const result =
+			await this.exchangeRateService.backfillMissingCurrencies();
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Post('backfill')
 	@ApiOperation({
 		summary: 'Backfill exchange rates for all months in fact_sales_report',

@@ -19,18 +19,11 @@ import { Video } from 'src/modules/video/entities/video.entity';
 
 // Controllers
 import { AnalyticsReportExportController } from './controllers/analytics-report-export.controller';
-import { ArtistAnalyticsController } from './controllers/artist-analytics.controller';
-import { ChannelAnalyticsController } from './controllers/channel-analytics.controller';
 import { DashboardAnalyticsController } from './controllers/dashboard-analytics.controller';
 import { DspAnalyticsController } from './controllers/dsp-analytics.controller';
 import { TimelineAnalyticsController } from './controllers/global-timeline-analytics.controller';
 import { RankingController } from './controllers/global.ranking.controller';
-import { LabelAnalyticsController } from './controllers/label-analytics.controller';
-import { ReleaseAnalyticsController } from './controllers/release-analytics.controller';
-import { SourceTypeAnalyticsController } from './controllers/source-type-analytics.controller';
 import { SourceTypeConfigController } from './controllers/source-type-config.controller';
-import { TenantAnalyticsController } from './controllers/tenant-analytics.controller';
-import { TerAnalyticsController } from './controllers/ter-analytics.controller';
 import { TrackAnalyticsController } from './controllers/track-analytics.controller';
 
 // Services
@@ -43,14 +36,12 @@ import { ClickHouseSyncService } from './services/clickhouse-sync.service';
 import { DashboardAnalyticsService } from './services/dashboard-analytics.service';
 import { DemographicsAnalyticsService } from './services/demographics-analytics.service';
 import { DspAnalyticsService } from './services/dsp-analytics.service';
-import { EntityAnalyticsService } from './services/entity-analytics.service';
 import { ExportQueueService } from './services/export-queue.service';
 import { TimelineAnalyticsService } from './services/global-timeline.service';
 import { IsrcResolverService } from './services/isrc-resolver.service';
 import { AnalyticsRankingV2Service } from './services/analytics-ranking-v2.service';
 import { RankingService } from './services/ranking.service';
 import { SourceTypeConfigService } from './services/source-type-config.service';
-import { TerAnalyticsService } from './services/ter-analytics.service';
 import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 
 @Module({
@@ -74,21 +65,13 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 	controllers: [
 		TimelineAnalyticsController,
 		RankingController,
-		ReleaseAnalyticsController,
-		LabelAnalyticsController,
 		TrackAnalyticsController,
-		ArtistAnalyticsController,
 		DashboardAnalyticsController,
 		AnalyticsReportExportController,
-		TenantAnalyticsController,
-		ChannelAnalyticsController,
 		DspAnalyticsController,
-		SourceTypeAnalyticsController,
 		SourceTypeConfigController,
-		TerAnalyticsController,
 	],
 	providers: [
-		EntityAnalyticsService,
 		DemographicsAnalyticsService,
 		AnalyticsReportExportService,
 		ExportQueueService,
@@ -107,7 +90,6 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 			useClass: AnalyticsVideoScopeInterceptor,
 		},
 		DspAnalyticsService,
-		TerAnalyticsService,
 		SourceTypeConfigService,
 	],
 	exports: [IsrcResolverService, AnalyticsCacheService],

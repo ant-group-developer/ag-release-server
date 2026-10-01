@@ -71,6 +71,7 @@ export class AssetImportApplyService {
 		if (
 			item.action === AssetImportAction.INVALID ||
 			item.action === AssetImportAction.CONFLICT ||
+			item.action === AssetImportAction.MERGE_REQUIRED ||
 			item.action === AssetImportAction.NO_CHANGE
 		) {
 			return {
@@ -117,6 +118,7 @@ export class AssetImportApplyService {
 		batch: AssetImportBatch,
 		userId: string,
 	): Promise<EnrichmentLogRow[]> {
+		await this.remapMergedReferences(manager, item);
 		if (!item.matchedReleaseId) {
 			throw new Error('Item không có release khớp để cập nhật');
 		}
@@ -234,6 +236,98 @@ export class AssetImportApplyService {
 		}
 
 		return logs;
+	}
+
+	/**
+	 * Asset batches keep the release/track IDs found during scan. A later
+	 * release-merge can delete the imported release and leave an alias pointing
+	 * at the canonical release. Follow that alias chain before applying so an
+	 * older batch can still be retried safely.
+	 */
+	private async remapMergedReferences(
+		manager: EntityManager,
+		item: AssetImportItem,
+	): Promise<void> {
+		// Keep the apply service usable with lightweight unit-test managers and
+		// older adapters that do not expose raw-query execution. The real
+		// TypeORM EntityManager always has `query`, so production still follows
+		// merge aliases.
+		if (
+			typeof (manager as EntityManager & { query?: unknown }).query !==
+			'function'
+		) {
+			return;
+		}
+		const releaseId = item.matchedReleaseId
+			? await this.resolveAliasChain(
+					manager,
+					'release_merge_aliases',
+					'source_release_id',
+					item.matchedReleaseId,
+				)
+			: null;
+		const trackId = item.matchedTrackId
+			? await this.resolveAliasChain(
+					manager,
+					'track_merge_aliases',
+					'source_track_id',
+					item.matchedTrackId,
+				)
+			: null;
+
+		const patch: {
+			matchedReleaseId?: string;
+			matchedTrackId?: string;
+		} = {};
+		if (releaseId && releaseId !== item.matchedReleaseId) {
+			item.matchedReleaseId = releaseId;
+			patch.matchedReleaseId = releaseId;
+		}
+		if (trackId && trackId !== item.matchedTrackId) {
+			item.matchedTrackId = trackId;
+			patch.matchedTrackId = trackId;
+		}
+		if (Object.keys(patch).length) {
+			await manager.update(AssetImportItem, item.id, patch);
+			this.logger.log(
+				`Remapped merged asset item ${item.id}: release=${item.matchedReleaseId}, track=${item.matchedTrackId ?? 'none'}`,
+			);
+		}
+	}
+
+	private async resolveAliasChain(
+		manager: EntityManager,
+		table: 'release_merge_aliases' | 'track_merge_aliases',
+		sourceColumn: 'source_release_id' | 'source_track_id',
+		id: string,
+	): Promise<string> {
+		const targetColumn =
+			sourceColumn === 'source_release_id'
+				? 'target_release_id'
+				: 'target_track_id';
+		const rows: Array<{ target_id: string }> = await manager.query(
+			`WITH RECURSIVE alias_chain AS (
+			   SELECT ${sourceColumn} AS source_id,
+			          ${targetColumn} AS target_id,
+			          1 AS depth
+			   FROM ${table}
+			   WHERE ${sourceColumn} = $1
+			   UNION ALL
+			   SELECT chain.source_id,
+			          alias.${targetColumn} AS target_id,
+			          chain.depth + 1
+			   FROM alias_chain chain
+			   JOIN ${table} alias
+			     ON alias.${sourceColumn} = chain.target_id
+			   WHERE chain.depth < 20
+			 )
+			 SELECT target_id
+			 FROM alias_chain
+			 ORDER BY depth DESC
+			 LIMIT 1`,
+			[id],
+		);
+		return rows[0]?.target_id ?? id;
 	}
 
 	// ── CREATE ────────────────────────────────────────────────────────

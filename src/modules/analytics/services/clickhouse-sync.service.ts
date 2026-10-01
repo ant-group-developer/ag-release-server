@@ -181,6 +181,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				   SELECT isrc FROM tracks WHERE isrc IS NOT NULL AND isrc != ''
 				   UNION
 				   SELECT isrc FROM videos WHERE isrc IS NOT NULL AND isrc != ''
+				   UNION
+				   SELECT stat_key AS isrc FROM release_stat_identities WHERE active = true
 				 ) AS combined`,
 			);
 			const pgCount = Number(pgCountResult[0]?.c ?? 0);
@@ -327,6 +329,37 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            INNER JOIN releases r ON r.id = v.release_id
            LEFT JOIN labels l ON l.id = r.label_id
            WHERE v.isrc IS NOT NULL AND v.isrc != ''
+
+		   UNION ALL
+
+		   SELECT
+		     si.stat_key AS isrc,
+		     r.tenant_id AS tenant_id,
+		     r.id AS release_id,
+		     COALESCE(r.upc, '') AS release_upc,
+		     COALESCE(r.label_id, '') AS label_id,
+		     '' AS artist_ids,
+		     r.type AS release_type,
+		     '' AS channel_id,
+		     '' AS external_id,
+		     COALESCE(r.title, '') AS track_title,
+		     '' AS track_version,
+		     COALESCE(r.title, '') AS release_title,
+		     COALESCE(l.name, '') AS label_name,
+		     '' AS artist_names,
+		     COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+		     COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+		     COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+		     COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+		     COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original,
+		     '' AS track_metadata_spotify,
+		     '' AS track_metadata_deezer,
+		     COALESCE(r.metadata_spotify::text, '') AS release_metadata_spotify,
+		     COALESCE(r.metadata_deezer::text, '') AS release_metadata_deezer
+		   FROM release_stat_identities si
+		   JOIN releases r ON r.id = si.release_id
+		   LEFT JOIN labels l ON l.id = r.label_id
+		   WHERE si.active = true
 			 ) AS combined
          WHERE isrc > $2
          ORDER BY isrc
@@ -849,6 +882,37 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            LEFT JOIN labels l ON l.id = r.label_id
            WHERE r.id = ANY($1)
              AND v.isrc IS NOT NULL AND v.isrc != ''
+
+		 UNION ALL
+
+		 SELECT
+		   si.stat_key AS isrc,
+		   r.tenant_id AS tenant_id,
+		   r.id AS release_id,
+		   COALESCE(r.upc, '') AS release_upc,
+		   COALESCE(r.label_id, '') AS label_id,
+		   '' AS artist_ids,
+		   r.type AS release_type,
+		   '' AS channel_id,
+		   '' AS external_id,
+		   COALESCE(r.title, '') AS track_title,
+		   '' AS track_version,
+		   COALESCE(r.title, '') AS release_title,
+		   COALESCE(l.name, '') AS label_name,
+		   '' AS artist_names,
+		   COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+		   COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+		   COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+		   COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+		   COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original,
+		   '' AS track_metadata_spotify,
+		   '' AS track_metadata_deezer,
+		   COALESCE(r.metadata_spotify::text, '') AS release_metadata_spotify,
+		   COALESCE(r.metadata_deezer::text, '') AS release_metadata_deezer
+		 FROM release_stat_identities si
+		 JOIN releases r ON r.id = si.release_id
+		 LEFT JOIN labels l ON l.id = r.label_id
+		 WHERE si.active = true AND si.release_id = ANY($1)
          ) AS combined
          ORDER BY isrc`,
 				[releaseUpsertIds],
@@ -956,6 +1020,9 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				   UNION
 				   SELECT release_id, isrc FROM videos
 				   WHERE release_id = ANY($1) AND isrc IS NOT NULL AND isrc != ''
+				   UNION
+				   SELECT release_id, stat_key AS isrc FROM release_stat_identities
+				   WHERE release_id = ANY($1) AND active = true
 				 ) x ON x.release_id = p.release_id
 				 WHERE p.release_id = ANY($1)`,
 				[chunk],
