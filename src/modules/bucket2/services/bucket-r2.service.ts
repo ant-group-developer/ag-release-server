@@ -15,7 +15,9 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import * as fs from 'fs';
+import { Agent } from 'https';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Readable } from 'stream';
 import { BucketException } from '../constants/bucket.response';
@@ -46,6 +48,14 @@ export class BucketR2Service {
 			credentials: { accessKeyId, secretAccessKey },
 			requestChecksumCalculation: 'WHEN_REQUIRED',
 			responseChecksumValidation: 'WHEN_REQUIRED',
+			requestHandler: new NodeHttpHandler({
+				httpsAgent: new Agent({
+					keepAlive: true,
+					keepAliveMsecs: 1_000,
+				}),
+				connectionTimeout: 60_000,
+				socketTimeout: 10 * 60 * 1_000,
+			}),
 		});
 
 		this.publicBucketName =
